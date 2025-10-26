@@ -59,6 +59,30 @@ export default function TabLayout() {
           href: null,
         }}
       />
+      
+      {/* Hide emergency report from tabs */}
+      <Tabs.Screen
+        name="emergency-report"
+        options={{
+          href: null,
+        }}
+      />
+      
+      {/* Hide profile from tabs */}
+      <Tabs.Screen
+        name="profile"
+        options={{
+          href: null,
+        }}
+      />
+      
+      {/* Hide profile settings from tabs */}
+      <Tabs.Screen
+        name="profile-settings"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

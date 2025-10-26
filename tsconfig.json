@@ -12,8 +12,13 @@
     "moduleDetection": "force",
     "resolveJsonModule": true,
     "target": "ESNext",
-    "lib": ["DOM", "ESNext"],
-    "customConditions": ["react-native"],
+    "lib": [
+      "DOM",
+      "ESNext"
+    ],
+    "customConditions": [
+      "react-native"
+    ],
     "paths": {
       "@/*": [
         "./*"
@@ -33,5 +38,6 @@
     "jest.config.js",
     "android",
     "ios"
-  ]
+  ],
+  "extends": "expo/tsconfig.base"
 }

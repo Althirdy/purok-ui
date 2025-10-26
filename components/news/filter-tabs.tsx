@@ -1,8 +1,9 @@
 /**
- * Filter Tabs Component for News Feed
+ * Filter Tabs Component for News Feed - Responsive for Mobile
  */
 
 import { DesignSystem } from '@/constants/design-system';
+import { isTablet } from '@/constants/responsive';
 import type { FeedSource } from '@/types';
 import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
@@ -26,6 +27,7 @@ export function FilterTabs({ activeFilter, onFilterChange }: FilterTabsProps) {
       horizontal 
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.container}
+      style={styles.scrollView}
     >
       {filters.map((filter) => (
         <TouchableOpacity
@@ -52,19 +54,25 @@ export function FilterTabs({ activeFilter, onFilterChange }: FilterTabsProps) {
 }
 
 const styles = StyleSheet.create({
+  scrollView: {
+    paddingRight: spacing.md,
+  },
+  
   container: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: 0, // Remove padding to prevent cut-off
     paddingVertical: spacing.sm,
     gap: spacing.sm,
+    paddingLeft: spacing.lg, // Only left padding
   },
   
   tab: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md * (isTablet ? 1.2 : 1),
+    paddingVertical: spacing.sm * (isTablet ? 1.2 : 1),
     borderRadius: borderRadius.full,
     backgroundColor: colors.background.secondary,
     borderWidth: 1,
     borderColor: colors.neutral.gray600,
+    marginRight: spacing.sm,
   },
   
   tabActive: {
@@ -76,6 +84,7 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
     color: colors.text.secondary,
+    whiteSpace: 'nowrap',
   },
   
   tabTextActive: {
