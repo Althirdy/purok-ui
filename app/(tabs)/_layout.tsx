@@ -1,7 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DesignSystem } from '@/constants/design-system';
 
 const { colors } = DesignSystem;
@@ -34,21 +34,21 @@ export default function TabLayout() {
         name="news-feed"
         options={{
           title: 'News',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="newspaper.fill" color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="newspaper" size={28} color={color} />,
         }}
       />
       <Tabs.Screen
         name="map"
         options={{
           title: 'Map',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="map.fill" color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="map" size={28} color={color} />,
         }}
       />
       <Tabs.Screen
         name="notifications"
         options={{
           title: 'Alerts',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="bell.fill" color={color} />,
+          tabBarIcon: ({ color }) => <Ionicons name="notifications" size={28} color={color} />,
         }}
       />
       

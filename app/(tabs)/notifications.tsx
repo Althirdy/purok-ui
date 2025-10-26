@@ -3,9 +3,9 @@
  */
 
 import { Card } from '@/components/common/card';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
+import { Ionicons } from '@expo/vector-icons';
 import { FlatList, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { styles } from './notifications.styles';
@@ -38,13 +38,13 @@ export default function NotificationsScreen() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'alert':
-        return 'exclamationmark.triangle.fill';
+        return 'warning';
       case 'info':
-        return 'info.circle.fill';
+        return 'information-circle';
       case 'update':
-        return 'arrow.triangle.2.circlepath';
+        return 'sync';
       default:
-        return 'bell.fill';
+        return 'notifications';
     }
   };
 
@@ -55,7 +55,7 @@ export default function NotificationsScreen() {
           styles.iconContainer,
           !item.read && styles.iconContainerUnread,
         ]}>
-          <IconSymbol 
+          <Ionicons 
             name={getNotificationIcon(item.type) as any} 
             size={24} 
             color={item.read ? colors.text.secondary : colors.accent.orange} 
@@ -110,7 +110,7 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <IconSymbol name="bell.slash.fill" size={64} color={colors.neutral.gray600} />
+            <Ionicons name="notifications-off-outline" size={64} color={colors.neutral.gray600} />
             <Text style={styles.emptyStateText}>No notifications</Text>
           </View>
         }

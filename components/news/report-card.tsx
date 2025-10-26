@@ -4,9 +4,9 @@
 
 import { Badge } from '@/components/common/badge';
 import { Card } from '@/components/common/card';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DesignSystem } from '@/constants/design-system';
 import type { EmergencyReport } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { colors, typography, spacing } = DesignSystem;
@@ -21,13 +21,13 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
   const getSourceIcon = (source?: string) => {
     switch (source) {
       case 'cctv':
-        return 'video.fill';
-      case 'sensor':
-        return 'sensor.fill';
-      case 'citizen':
-        return 'person.fill';
+        return 'videocam';
+      case 'sensor_box':
+        return 'hardware-chip';
+      case 'citizen_reports':
+        return 'people';
       default:
-        return 'info.circle.fill';
+        return 'information-circle';
     }
   };
 
@@ -62,7 +62,7 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.iconContainer}>
-            <IconSymbol 
+            <Ionicons 
               name={getSourceIcon(report.source) as any} 
               size={20} 
               color={colors.accent.orange} 
@@ -87,7 +87,7 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
 
       <View style={styles.footer}>
         <View style={styles.locationContainer}>
-          <IconSymbol name="location.fill" size={16} color={colors.text.secondary} />
+          <Ionicons name="location" size={16} color={colors.text.secondary} />
           <Text style={styles.locationText}>{report.location}</Text>
         </View>
         <Text style={styles.timestamp}>{formatTimestamp(report.timestamp)}</Text>

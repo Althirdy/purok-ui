@@ -3,9 +3,9 @@
  */
 
 import { ReportCard } from '@/components/news/report-card';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
+import { Ionicons } from '@expo/vector-icons';
 // import { mockReports } from '@/services/mock-data';
 import type { EmergencyReport } from '@/types';
 import { useState } from 'react';
@@ -38,7 +38,7 @@ export default function ReportsScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>All Reports</Text>
         <TouchableOpacity style={styles.filterButton}>
-          <IconSymbol name="line.3.horizontal.decrease.circle" size={24} color={colors.text.primary} />
+          <Ionicons name="filter" size={24} color={colors.text.primary} />
         </TouchableOpacity>
       </View>
 
@@ -90,7 +90,7 @@ export default function ReportsScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <IconSymbol name="tray.fill" size={64} color={colors.neutral.gray600} />
+            <Ionicons name="folder-open-outline" size={64} color={colors.neutral.gray600} />
             <Text style={styles.emptyStateText}>No reports in this category</Text>
           </View>
         }

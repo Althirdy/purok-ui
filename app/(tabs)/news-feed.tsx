@@ -5,11 +5,11 @@
 import { Button } from '@/components/common/button';
 import { FilterTabs } from '@/components/news/filter-tabs';
 import { ReportCard } from '@/components/news/report-card';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { mockUser } from '@/services/mock-data';
 import type { EmergencyReport, FeedSource } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -64,7 +64,7 @@ export default function NewsFeedScreen() {
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
             <View style={styles.logoSmall}>
-              <IconSymbol name="shield.fill" size={24} color={colors.accent.orange} />
+              <Ionicons name="shield" size={24} color={colors.accent.orange} />
             </View>
             <View>
               <Text style={styles.headerTitle}>{mockUser.purokName}</Text>
@@ -73,7 +73,7 @@ export default function NewsFeedScreen() {
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.iconButton}>
-              <IconSymbol name="bell.fill" size={24} color={colors.text.primary} />
+              <Ionicons name="notifications" size={24} color={colors.text.primary} />
               {pendingCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{pendingCount}</Text>
@@ -81,7 +81,7 @@ export default function NewsFeedScreen() {
               )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton}>
-              <IconSymbol name="person.fill" size={24} color={colors.text.primary} />
+              <Ionicons name="person" size={24} color={colors.text.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -99,7 +99,7 @@ export default function NewsFeedScreen() {
           onPress={handleEmergencyReport}
           variant="primary"
           fullWidth
-          icon={<IconSymbol name="exclamationmark.circle.fill" size={20} color={colors.text.primary} />}
+          icon={<Ionicons name="warning" size={20} color={colors.text.primary} />}
         />
       </View>
 
@@ -134,7 +134,7 @@ export default function NewsFeedScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <IconSymbol name="tray.fill" size={64} color={colors.neutral.gray600} />
+            <Ionicons name="folder-open-outline" size={64} color={colors.neutral.gray600} />
             <Text style={styles.emptyStateText}>No reports available</Text>
           </View>
         }

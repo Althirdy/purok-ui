@@ -2,9 +2,9 @@
  * Map Screen - View incidents on map
  */
 
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
+import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,7 +18,7 @@ export default function MapScreen() {
       </View>
 
       <View style={styles.mapContainer}>
-        <IconSymbol name="map.fill" size={80} color={colors.neutral.gray600} />
+        <Ionicons name="map-outline" size={80} color={colors.neutral.gray600} />
         <Text style={styles.placeholderText}>Map View</Text>
         <Text style={styles.placeholderSubtext}>
           Interactive map will be displayed here
