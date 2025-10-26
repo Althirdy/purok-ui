@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "citizen",
-    "slug": "citizen",
+    "name": "UrbanWatch",
+    "slug": "urbanwatch-purok",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "citizen",
-    "userInterfaceStyle": "automatic",
+    "scheme": "urbanwatch",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
