@@ -8,30 +8,31 @@ import { ReportCard } from '@/components/news/report-card';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { getReportsBySource, mockReports, mockUser } from '@/services/mock-data';
+import { mockUser } from '@/services/mock-data';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { styles } from './news-feed.styles';
 
-const { colors, typography, spacing } = DesignSystem;
+const { colors } = DesignSystem;
 
 export default function NewsFeedScreen() {
   const [activeFilter, setActiveFilter] = useState<FeedSource>('all');
   const [refreshing, setRefreshing] = useState(false);
-  const [reports, setReports] = useState<EmergencyReport[]>(mockReports);
+  const [reports, setReports] = useState<EmergencyReport[]>([]);
 
   const handleRefresh = () => {
     setRefreshing(true);
     setTimeout(() => {
-      setReports(getReportsBySource(activeFilter));
+      // TODO: Fetch reports from API
       setRefreshing(false);
     }, 1000);
   };
 
   const handleFilterChange = (filter: FeedSource) => {
     setActiveFilter(filter);
-    setReports(getReportsBySource(filter));
+    // TODO: Filter reports based on source
   };
 
   const handleReportPress = (reportId: string) => {
@@ -141,130 +142,3 @@ export default function NewsFeedScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  header: {
-    backgroundColor: colors.primary.navy,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  
-  logoSmall: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: `${colors.accent.orange}20`,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.sm,
-  },
-  
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  
-  headerSubtitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-  },
-  
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.background.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: colors.semantic.error,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  
-  badgeText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  
-  titleSection: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  
-  sectionTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  
-  emergencySection: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  
-  currentReportSection: {
-    marginBottom: spacing.sm,
-  },
-  
-  currentReportHeader: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  
-  currentReportTitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-  },
-  
-  listContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing['4xl'],
-  },
-  
-  emptyStateText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-    marginTop: spacing.md,
-  },
-});
-

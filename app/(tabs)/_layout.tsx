@@ -6,6 +6,10 @@ import { DesignSystem } from '@/constants/design-system';
 
 const { colors } = DesignSystem;
 
+export const unstable_settings = {
+  initialRouteName: 'news-feed',
+};
+
 export default function TabLayout() {
   return (
     <Tabs
@@ -34,10 +38,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="reports"
+        name="map"
         options={{
-          title: 'Reports',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="doc.text.fill" color={color} />,
+          title: 'Map',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="map.fill" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -48,15 +52,9 @@ export default function TabLayout() {
         }}
       />
       
-      {/* Hide old screens from tabs */}
+      {/* Hide reports from tabs */}
       <Tabs.Screen
-        name="index"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
+        name="reports"
         options={{
           href: null,
         }}

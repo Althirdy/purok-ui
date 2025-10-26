@@ -2,15 +2,11 @@
  * Login Screen with PIN Authentication
  */
 
-import { Button } from '@/components/common/button';
-import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { authenticateUser } from '@/services/mock-data';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
-const { colors, typography, spacing, borderRadius } = DesignSystem;
+import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { styles } from './login.styles';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -44,12 +40,11 @@ export default function LoginScreen() {
   };
 
   const handleLogin = (pinString: string) => {
-    const user = authenticateUser(pinString);
-    
-    if (user) {
+    // Allow any PIN to login for now
+    if (pinString.length === 6) {
       router.replace('/(tabs)/news-feed');
     } else {
-      Alert.alert('Error', 'Invalid PIN. Please try again.');
+      Alert.alert('Error', 'Please enter all 6 digits.');
       setPin(['', '', '', '', '', '']);
       setActiveIndex(0);
     }
@@ -151,160 +146,7 @@ export default function LoginScreen() {
           </View>
         </View>
 
-        {/* Login Button */}
-        <Button
-          title="Login"
-          onPress={() => {
-            const pinString = pin.join('');
-            if (pinString.length === 6) {
-              handleLogin(pinString);
-            } else {
-              Alert.alert('Error', 'Please enter all 6 digits.');
-            }
-          }}
-          variant="primary"
-          fullWidth
-          style={styles.loginButton}
-        />
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: spacing['3xl'],
-  },
-  
-  logoContainer: {
-    marginBottom: spacing.lg,
-  },
-  
-  logo: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.background.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.accent.orange,
-  },
-  
-  logoInner: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: colors.primary.navy,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.accent.orange,
-  },
-  
-  logoText: {
-    fontSize: 48,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.accent.orange,
-  },
-  
-  appName: {
-    fontSize: typography.fontSize['4xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  
-  subtitle: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-  },
-  
-  pinSection: {
-    alignItems: 'center',
-    marginBottom: spacing['2xl'],
-  },
-  
-  pinLabel: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-    marginBottom: spacing.lg,
-  },
-  
-  pinDots: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  
-  pinDot: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: colors.background.secondary,
-    borderWidth: 2,
-    borderColor: colors.neutral.gray600,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  
-  pinDotFilled: {
-    borderColor: colors.accent.orange,
-  },
-  
-  pinDotActive: {
-    borderColor: colors.accent.orange,
-    backgroundColor: `${colors.accent.orange}20`,
-  },
-  
-  pinDotInner: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.accent.orange,
-  },
-  
-  forgotPin: {
-    fontSize: typography.fontSize.sm,
-    color: colors.accent.orange,
-    marginTop: spacing.sm,
-  },
-  
-  numberPad: {
-    marginBottom: spacing.xl,
-  },
-  
-  numberRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  
-  numberButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: colors.background.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  
-  numberText: {
-    fontSize: typography.fontSize['3xl'],
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
-  },
-  
-  loginButton: {
-    marginTop: spacing.md,
-  },
-});
-
