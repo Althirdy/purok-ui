@@ -6,7 +6,6 @@ import { Badge } from '@/components/common/badge';
 import { Card } from '@/components/common/card';
 import { DesignSystem } from '@/constants/design-system';
 import type { EmergencyReport } from '@/types';
-import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { colors, typography, spacing } = DesignSystem;
@@ -22,12 +21,31 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
     switch (source) {
       case 'cctv':
         return 'videocam';
-      case 'sensor_box':
+      case 'sensor':
         return 'hardware-chip';
-      case 'citizen_reports':
+      case 'citizen':
         return 'people';
       default:
         return 'information-circle';
+    }
+  };
+
+  const getCategory = (type: string) => {
+    switch (type) {
+      case 'accident':
+        return 'Road Accident';
+      case 'crime':
+        return 'Crime';
+      case 'fire':
+        return 'Fire';
+      case 'medical':
+        return 'Medical Emergency';
+      case 'suspicious':
+        return 'Suspicious Activity';
+      case 'other':
+        return 'Flood';
+      default:
+        return 'Other';
     }
   };
 
@@ -57,40 +75,38 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
     return new Date(date).toLocaleDateString();
   };
 
+  const getStatusBadge = () => {
+    if (report.status === 'acknowledged') {
+      return (
+        <View style={styles.statusBadge}>
+          <Text style={styles.statusText}>Acknowledged</Text>
+        </View>
+      );
+    }
+    return null;
+  };
+
   return (
     <Card onPress={onPress} variant="elevated" style={styles.card}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.iconContainer}>
-            <Ionicons 
-              name={getSourceIcon(report.source) as any} 
-              size={20} 
-              color={colors.accent.orange} 
-            />
-          </View>
-          <View>
-            <Text style={styles.sourceText}>{report.source?.toUpperCase() || 'REPORT'}</Text>
-            <Text style={styles.idText}>ID: {report.id.substring(0, 8)}</Text>
-          </View>
-        </View>
-        <View style={styles.headerRight}>
-          {getSeverityBadge(report.severity)}
-        </View>
+        <Text style={styles.title}>{report.title}</Text>
+        {getSeverityBadge(report.severity)}
       </View>
 
-      <View style={styles.body}>
-        <Text style={styles.title}>{report.title}</Text>
-        <Text style={styles.description} numberOfLines={2}>
+      <View style={styles.descriptionContainer}>
+        <Text style={styles.descriptionText} numberOfLines={4}>
           {report.description}
         </Text>
       </View>
 
       <View style={styles.footer}>
-        <View style={styles.locationContainer}>
-          <Ionicons name="location" size={16} color={colors.text.secondary} />
-          <Text style={styles.locationText}>{report.location}</Text>
-        </View>
-        <Text style={styles.timestamp}>{formatTimestamp(report.timestamp)}</Text>
+        <Text style={styles.detailsText}>
+          {report.location} • {formatTimestamp(report.timestamp)}
+        </Text>
+      </View>
+
+      <View style={styles.categoryContainer}>
+        <Text style={styles.categoryText}>Category: {getCategory(report.type)}</Text>
       </View>
 
       {report.status === 'pending' && onAcknowledge && (
@@ -105,11 +121,7 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
         </TouchableOpacity>
       )}
 
-      {report.status === 'acknowledged' && (
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>Acknowledged</Text>
-        </View>
-      )}
+      {getStatusBadge()}
     </Card>
   );
 }
@@ -122,18 +134,21 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: spacing.sm,
   },
   
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+  acknowledgedBadge: {
+    backgroundColor: colors.semantic.success,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 20,
   },
   
-  headerRight: {
-    marginLeft: spacing.sm,
+  acknowledgedText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
   },
   
   iconContainer: {
@@ -159,47 +174,45 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   
-  body: {
-    marginBottom: spacing.sm,
-  },
-  
   title: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
-    marginBottom: spacing.xs,
+    flex: 1,
   },
-  
-  description: {
+
+  descriptionContainer: {
+    marginBottom: spacing.md,
+  },
+
+  descriptionText: {
     fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
     lineHeight: typography.fontSize.sm * 1.5,
   },
   
+  body: {
+    marginBottom: spacing.sm,
+  },
+  
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.neutral.gray600,
+    marginBottom: spacing.xs,
   },
   
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  
-  locationText: {
+  detailsText: {
     fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
-    marginLeft: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  
-  timestamp: {
+
+  categoryContainer: {
+    marginBottom: spacing.sm,
+  },
+
+  categoryText: {
     fontSize: typography.fontSize.sm,
-    color: colors.text.tertiary,
+    color: colors.text.secondary,
+    fontStyle: 'italic',
   },
   
   acknowledgeButton: {
@@ -218,15 +231,31 @@ const styles = StyleSheet.create({
   
   statusBadge: {
     backgroundColor: colors.semantic.success,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
-    marginTop: spacing.sm,
   },
   
   statusText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
+    color: colors.text.primary,
+  },
+
+  seeMoreButton: {
+    backgroundColor: colors.background.secondary,
+    borderWidth: 1,
+    borderColor: colors.text.secondary,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+
+  seeMoreText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
   },
 });

@@ -52,9 +52,9 @@ export const DesignSystem = {
     
     // Background Colors
     background: {
-      primary: '#1e2a3d',
-      secondary: '#2a3a52',
-      card: '#2a3a52',
+      primary: '#1C2433',
+      secondary: '#2A303E',
+      card: '#2A303E',
       overlay: 'rgba(0, 0, 0, 0.5)',
     },
   },

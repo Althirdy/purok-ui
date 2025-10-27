@@ -8,7 +8,7 @@ import { globalStyles } from '@/constants/global-styles';
 import type { EmergencyReport } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing } = DesignSystem;
@@ -96,6 +96,12 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginTop: spacing.md,
   },
+  sectionTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  },
 });
 
 type ReportStatus = 'all' | 'pending' | 'acknowledged' | 'resolved';
@@ -109,24 +115,24 @@ export default function ReportsScreen() {
   );
 
   const statusTabs: { key: ReportStatus; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: reports.length },
-    { key: 'pending', label: 'Pending', count: reports.filter(r => r.status === 'pending').length },
-    { key: 'acknowledged', label: 'Active', count: reports.filter(r => r.status === 'acknowledged').length },
+    { key: 'all', label: 'All Reports', count: reports.length },
+    { key: 'acknowledged', label: 'Your Reports', count: reports.filter(r => r.status === 'acknowledged').length },
     { key: 'resolved', label: 'Resolved', count: reports.filter(r => r.status === 'resolved').length },
   ];
 
   return (
     <SafeAreaView style={globalStyles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>All Reports</Text>
-        <TouchableOpacity style={styles.filterButton}>
-          <Ionicons name="filter" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
-      </View>
+      <ScrollView 
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Section Title */}
+        <View style={styles.header}>
+          <Text style={styles.sectionTitle}>Reports and History</Text>
+        </View>
 
-      {/* Status Tabs */}
-      <View style={styles.tabsContainer}>
+        {/* Status Tabs */}
+        <View style={styles.tabsContainer}>
         {statusTabs.map((tab) => (
           <TouchableOpacity
             key={tab.key}
@@ -159,25 +165,25 @@ export default function ReportsScreen() {
         ))}
       </View>
 
-      {/* Reports List */}
-      <FlatList
-        data={filteredReports}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ReportCard
-            report={item}
-            onPress={() => console.log('Report pressed:', item.id)}
-            onAcknowledge={() => console.log('Acknowledge:', item.id)}
-          />
-        )}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="folder-open-outline" size={64} color={colors.neutral.gray600} />
-            <Text style={styles.emptyStateText}>No reports in this category</Text>
-          </View>
-        }
-      />
+        {/* Reports List */}
+        <View style={styles.listContent}>
+          {filteredReports.length > 0 ? (
+            filteredReports.map((item) => (
+              <ReportCard
+                key={item.id}
+                report={item}
+                onPress={() => console.log('Report pressed:', item.id)}
+                onAcknowledge={() => console.log('Acknowledge:', item.id)}
+              />
+            ))
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="folder-open-outline" size={64} color={colors.neutral.gray600} />
+              <Text style={styles.emptyStateText}>No reports in this category</Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
