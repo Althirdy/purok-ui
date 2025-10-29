@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "urbanwatch",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.urbanwatchpurok"
@@ -39,12 +39,6 @@
           "dark": {
             "backgroundColor": "#000000"
           }
-        }
-      ],
-      [
-        "react-native-maps",
-        {
-          "googleMapsApiKey": ""
         }
       ]
     ],
