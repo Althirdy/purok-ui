@@ -50,15 +50,17 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
   };
 
   const getSeverityBadge = (severity: string) => {
+    // Use unified blue styling for all severities per design request
+    const baseStyle = { backgroundColor: colors.primary.blue } as const;
     switch (severity) {
       case 'critical':
-        return <Badge label="CRITICAL" variant="error" />;
+        return <Badge label="CRITICAL" style={baseStyle} />;
       case 'high':
-        return <Badge label="HIGH" variant="warning" />;
+        return <Badge label="HIGH" style={baseStyle} />;
       case 'medium':
-        return <Badge label="MEDIUM" variant="info" />;
+        return <Badge label="MEDIUM" style={baseStyle} />;
       case 'low':
-        return <Badge label="LOW" variant="success" />;
+        return <Badge label="LOW" style={baseStyle} />;
       default:
         return null;
     }
@@ -176,7 +178,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: `${colors.accent.orange}20`,
+    backgroundColor: '#1e3a8a20',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.sm,
@@ -237,7 +239,7 @@ const styles = StyleSheet.create({
   },
   
   acknowledgeButton: {
-    backgroundColor: colors.accent.orange,
+    backgroundColor: colors.primary.blue,
     paddingVertical: spacing.sm,
     borderRadius: 8,
     alignItems: 'center',
@@ -247,7 +249,7 @@ const styles = StyleSheet.create({
   acknowledgeText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
+    color: colors.text.inverse,
   },
   
   statusBadge: {

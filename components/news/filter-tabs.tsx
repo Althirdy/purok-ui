@@ -76,8 +76,8 @@ const styles = StyleSheet.create({
   },
   
   tabActive: {
-    backgroundColor: colors.accent.orange,
-    borderColor: colors.accent.orange,
+    backgroundColor: colors.primary.blue,
+    borderColor: colors.primary.blue,
   },
   
   tabText: {
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   },
   
   tabTextActive: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
     fontWeight: typography.fontWeight.semibold,
   },
 });

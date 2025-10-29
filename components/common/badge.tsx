@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
   text: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
+    color: colors.text.inverse,
   },
 });
 

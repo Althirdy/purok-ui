@@ -12,7 +12,7 @@ import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, FlatList, Modal, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Easing, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Inline styles to avoid .styles.ts files being treated as routes
@@ -378,7 +378,7 @@ export default function NewsFeedScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={colors.accent.orange}
+            tintColor={colors.primary.blue}
           />
         }
         ListEmptyComponent={
@@ -392,6 +392,8 @@ export default function NewsFeedScreen() {
       {/* Bottom Acknowledgement Sheet (matches mobile UI) */}
       <Modal visible={showAckModal} transparent animationType="none" onRequestClose={dismissSheet}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          {/* Overlay press to dismiss */}
+          <Pressable onPress={dismissSheet} style={{ flex: 1 }} />
           <Animated.View
             style={{
               transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }],
@@ -434,42 +436,15 @@ export default function NewsFeedScreen() {
               </View>
             </View>
 
-            {/* Actions: See More, Dismiss, Acknowledge */}
+            {/* Actions: Acknowledge only */}
             <View style={{ marginTop: spacing.lg }}>
               <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => {
-                  dismissSheet();
-                  router.push({ pathname: 'report-details', params: { reportId: selectedReportId || 'UW-2025-001' } } as any);
-                }}
-                style={{
-                  backgroundColor: colors.background.secondary,
-                  borderWidth: 1,
-                  borderColor: colors.text.secondary,
-                  paddingVertical: spacing.md,
-                  borderRadius: 10,
-                  alignItems: 'center',
-                }}
+                activeOpacity={0.9}
+                onPress={confirmAcknowledge}
+                style={{ backgroundColor: colors.primary.blue, paddingVertical: spacing.md, borderRadius: 10, alignItems: 'center' }}
               >
-                <Text style={{ color: colors.text.primary, fontWeight: typography.fontWeight.semibold }}>See More</Text>
+                <Text style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold }}>Acknowledge</Text>
               </TouchableOpacity>
-
-              <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={dismissSheet}
-                  style={{ flex: 1, borderWidth: 1, borderColor: colors.neutral.gray600, paddingVertical: spacing.md, borderRadius: 10, alignItems: 'center', backgroundColor: colors.background.secondary }}
-                >
-                  <Text style={{ color: colors.text.primary, fontWeight: typography.fontWeight.semibold }}>Dismiss</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={confirmAcknowledge}
-                  style={{ flex: 1, backgroundColor: colors.accent.orange, paddingVertical: spacing.md, borderRadius: 10, alignItems: 'center' }}
-                >
-                  <Text style={{ color: colors.text.primary, fontWeight: typography.fontWeight.semibold }}>Acknowledge</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           </Animated.View>
         </View>
