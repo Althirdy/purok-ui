@@ -186,6 +186,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
     paddingBottom: spacing.xl,
   },
+  headerWrapper: {
+    marginHorizontal: -(spacing.lg * (isTablet ? 1.5 : 1)),
+  },
   
   emptyState: {
     alignItems: 'center',
@@ -301,8 +304,8 @@ export default function NewsFeedScreen() {
 
   const pendingCount = reports.filter(r => r.status === 'pending').length;
 
-  return (
-    <SafeAreaView style={globalStyles.container}>
+  const renderHeader = () => (
+    <View style={styles.headerWrapper}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -334,8 +337,6 @@ export default function NewsFeedScreen() {
         </View>
       </View>
 
-      {/* Title removed by request */}
-
       {/* Report a Concern */}
       <View style={styles.emergencySection}>
         <View style={styles.concernCard}>
@@ -361,7 +362,11 @@ export default function NewsFeedScreen() {
           <FilterTabs activeFilter={activeFilter} onFilterChange={handleFilterChange} />
         </View>
       </View>
+    </View>
+  );
 
+  return (
+    <SafeAreaView style={globalStyles.container}>
       {/* Reports List */}
       <FlatList
         data={reports}
@@ -373,6 +378,7 @@ export default function NewsFeedScreen() {
             onAcknowledge={() => handleAcknowledge(item.id)}
           />
         )}
+        ListHeaderComponent={renderHeader}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
