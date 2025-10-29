@@ -285,7 +285,6 @@ export default function NewsFeedScreen() {
             </View>
             <View>
               <Text style={styles.concernTitle}>Manual Report</Text>
-              <Text style={styles.concernDesc}>Fill out a detailed form to report your concern</Text>
             </View>
           </TouchableOpacity>
         </View>

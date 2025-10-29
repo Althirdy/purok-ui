@@ -8,17 +8,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -29,52 +29,9 @@ const isIOS = Platform.OS === 'ios';
 
 // Inline styles to avoid route conflicts
 const styles = StyleSheet.create({
-  header: {
-    backgroundColor: colors.primary.navy,
-    paddingHorizontal: spacing.md * (isTablet ? 1.5 : 1),
-    paddingBottom: spacing.sm,
-    paddingTop: isIOS ? spacing.sm : spacing.xs,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  logo: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: `${colors.accent.orange}20`,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.sm,
-  },
-  logoText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  iconButton: {
-    width: isTablet ? 44 : 36,
-    height: isTablet ? 44 : 36,
-    borderRadius: isTablet ? 22 : 18,
-    backgroundColor: colors.background.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   navBar: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.md,
     backgroundColor: colors.primary.navy,
   },
   backButton: {
@@ -82,9 +39,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
+    color: colors.text.inverse,
     marginLeft: spacing.xs,
   },
   scrollContent: {
@@ -102,11 +59,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   formContainer: {
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: colors.accent.orange,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: 0,
     marginBottom: spacing.lg,
   },
   formGroup: {
@@ -126,7 +79,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.neutral.gray700,
+    borderColor: colors.border.default,
     minHeight: 48,
   },
   inputText: {
@@ -154,14 +107,14 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     marginTop: spacing.xs,
     borderWidth: 1,
-    borderColor: colors.neutral.gray700,
+    borderColor: colors.border.default,
     overflow: 'hidden',
   },
   dropdownItem: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.neutral.gray700,
+    borderBottomColor: colors.border.default,
   },
   dropdownItemText: {
     fontSize: typography.fontSize.sm,
@@ -174,7 +127,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   submitButton: {
-    backgroundColor: colors.accent.orange,
+    backgroundColor: colors.primary.navy,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
@@ -185,7 +138,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
+    color: colors.text.inverse,
   },
   footerText: {
     fontSize: typography.fontSize.xs,
@@ -244,33 +197,12 @@ export default function EmergencyReportScreen() {
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <View style={styles.headerLeft}>
-              <View style={styles.logo}>
-                <Ionicons name="shield" size={28} color={colors.accent.orange} />
-              </View>
-              <Text style={styles.logoText}>Argus</Text>
-            </View>
-            <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.iconButton}>
-                <Ionicons name="notifications" size={24} color={colors.text.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.iconButton}
-                onPress={() => router.push('./profile')}
-              >
-                <Ionicons name="person" size={24} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+        {/* Header removed by request; keep only back button below */}
 
         {/* Navigation Bar with Back Button */}
         <View style={styles.navBar}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="arrow-back" size={26} color={colors.text.inverse} />
             <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
         </View>
@@ -283,7 +215,7 @@ export default function EmergencyReportScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Title */}
-          <Text style={styles.title}>Emergency Report</Text>
+          <Text style={styles.title}>Incident Report</Text>
 
           {/* Form Container with Dotted Border */}
           <View style={styles.formContainer}>
@@ -342,7 +274,7 @@ export default function EmergencyReportScreen() {
                 onPress={handleSelectLocation}
                 activeOpacity={0.7}
               >
-                <Ionicons name="radio-button-on" size={24} color={colors.accent.orange} />
+                <Ionicons name="radio-button-on" size={24} color={colors.primary.navy} />
                 <Text style={[styles.inputText, styles.locationInput, !location && styles.placeholder]}>
                   {location || 'Select location'}
                 </Text>
@@ -374,7 +306,7 @@ export default function EmergencyReportScreen() {
             onPress={handleSubmit}
             activeOpacity={0.8}
           >
-            <Text style={styles.submitButtonText}>Submit Emergency Report</Text>
+            <Text style={styles.submitButtonText}>Submit Incident Report</Text>
           </TouchableOpacity>
 
           {/* Footer Text */}
