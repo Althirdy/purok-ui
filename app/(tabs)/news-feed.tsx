@@ -327,12 +327,6 @@ export default function NewsFeedScreen() {
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.iconButton} 
-              onPress={() => router.push('./profile')}
-            >
-              <Ionicons name="person" size={24} color={colors.text.inverse} />
-            </TouchableOpacity>
           </View>
         </View>
       </View>

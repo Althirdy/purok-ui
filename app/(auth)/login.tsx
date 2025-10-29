@@ -6,8 +6,8 @@ import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing } = DesignSystem;
@@ -66,59 +66,29 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.sm,
   },
-  pinDot: {
+  pinBox: {
     width: 45,
     height: 45,
-    borderRadius: 22.5,
+    borderRadius: 10,
     backgroundColor: colors.background.secondary,
     borderWidth: 1,
     borderColor: colors.border.default,
-    justifyContent: 'center',
-    alignItems: 'center',
+    textAlign: 'center',
+    fontSize: typography.fontSize.xl,
+    color: colors.text.primary,
   },
-  pinDotFilled: {
+  pinBoxActive: {
     borderColor: '#000',
-  },
-  pinDotActive: {
-    borderColor: '#000',
-    backgroundColor: '#00000020',
-  },
-  pinDotInner: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#000',
   },
   forgotPin: {
     fontSize: typography.fontSize.sm,
     color: '#000',
     marginTop: spacing.sm,
   },
-  numberPad: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  numberRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  numberButton: {
-    width: 65,
-    height: 65,
-    borderRadius: 20,
-    backgroundColor: colors.background.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border.default,
-  },
-  numberText: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
-  },
+  numberPad: { flex: 1 },
+  numberRow: {},
+  numberButton: {},
+  numberText: {},
   loginButton: {
     marginBottom: spacing.md,
   },
@@ -126,43 +96,45 @@ const styles = StyleSheet.create({
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [pin, setPin] = useState<string[]>(['', '', '', '', '', '']);
+  const [pin, setPin] = useState<string[]>(['', '', '', '']);
   const [activeIndex, setActiveIndex] = useState(0);
+  const inputRefs = [useRef<TextInput>(null), useRef<TextInput>(null), useRef<TextInput>(null), useRef<TextInput>(null)];
 
-  const handleNumberPress = (num: number) => {
-    if (activeIndex < 6) {
-      const newPin = [...pin];
-      newPin[activeIndex] = num.toString();
-      setPin(newPin);
-      setActiveIndex(activeIndex + 1);
-      
-      // Auto-login when all 6 digits entered
-      if (activeIndex === 5) {
-        setTimeout(() => {
-          const pinString = [...newPin.slice(0, 5), num.toString()].join('');
-          handleLogin(pinString);
-        }, 100);
+  const handleChange = (value: string, index: number) => {
+    const sanitized = value.replace(/[^0-9]/g, '').slice(-1);
+    const nextPin = [...pin];
+    nextPin[index] = sanitized;
+    setPin(nextPin);
+
+    if (sanitized) {
+      if (index < 3) {
+        inputRefs[index + 1].current?.focus();
+        setActiveIndex(index + 1);
+      } else {
+        const pinString = nextPin.join('');
+        if (pinString.length === 4) handleLogin(pinString);
       }
     }
   };
 
-  const handleBackspace = () => {
-    if (activeIndex > 0) {
-      const newPin = [...pin];
-      newPin[activeIndex - 1] = '';
-      setPin(newPin);
-      setActiveIndex(activeIndex - 1);
+  const handleKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === 'Backspace' && pin[index] === '' && index > 0) {
+      inputRefs[index - 1].current?.focus();
+      setActiveIndex(index - 1);
+      const nextPin = [...pin];
+      nextPin[index - 1] = '';
+      setPin(nextPin);
     }
   };
 
   const handleLogin = (pinString: string) => {
-    // Allow any PIN to login for now
-    if (pinString.length === 6) {
+    if (pinString.length === 4) {
       router.replace('/(tabs)/news-feed');
     } else {
-      Alert.alert('Error', 'Please enter all 6 digits.');
-      setPin(['', '', '', '', '', '']);
+      Alert.alert('Error', 'Please enter all 4 digits.');
+      setPin(['', '', '', '']);
       setActiveIndex(0);
+      inputRefs[0].current?.focus();
     }
   };
 
@@ -186,20 +158,24 @@ export default function LoginScreen() {
 
         {/* PIN Input Section */}
         <View style={styles.pinSection}>
-          <Text style={styles.pinLabel}>Enter your 6 digit PIN:</Text>
-          
+          <Text style={styles.pinLabel}>Enter your 4 digit PIN:</Text>
           <View style={styles.pinDots}>
             {pin.map((digit, index) => (
-              <View 
+              <TextInput
                 key={index}
-                style={[
-                  styles.pinDot,
-                  digit !== '' && styles.pinDotFilled,
-                  index === activeIndex && styles.pinDotActive,
-                ]}
-              >
-                {digit !== '' && <View style={styles.pinDotInner} />}
-              </View>
+                ref={inputRefs[index]}
+                style={[styles.pinBox, index === activeIndex && styles.pinBoxActive]}
+                value={digit}
+                onChangeText={(text) => handleChange(text, index)}
+                onFocus={() => setActiveIndex(index)}
+                onKeyPress={(e) => handleKeyPress(e, index)}
+                keyboardType="number-pad"
+                maxLength={1}
+                secureTextEntry
+                autoCorrect={false}
+                textContentType="oneTimeCode"
+                importantForAutofill="yes"
+              />
             ))}
           </View>
 
@@ -208,57 +184,8 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Number Pad */}
-        <View style={styles.numberPad}>
-          <View style={styles.numberRow}>
-            {[1, 2, 3].map((num) => (
-              <TouchableOpacity
-                key={num}
-                style={styles.numberButton}
-                onPress={() => handleNumberPress(num)}
-              >
-                <Text style={styles.numberText}>{num}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.numberRow}>
-            {[4, 5, 6].map((num) => (
-              <TouchableOpacity
-                key={num}
-                style={styles.numberButton}
-                onPress={() => handleNumberPress(num)}
-              >
-                <Text style={styles.numberText}>{num}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.numberRow}>
-            {[7, 8, 9].map((num) => (
-              <TouchableOpacity
-                key={num}
-                style={styles.numberButton}
-                onPress={() => handleNumberPress(num)}
-              >
-                <Text style={styles.numberText}>{num}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <View style={styles.numberRow}>
-            <View style={styles.numberButton} />
-            <TouchableOpacity
-              style={styles.numberButton}
-              onPress={() => handleNumberPress(0)}
-            >
-              <Text style={styles.numberText}>0</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.numberButton}
-              onPress={handleBackspace}
-            >
-              <Text style={styles.numberText}>←</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* Spacer to retain original layout where numpad used to be */}
+        <View style={styles.numberPad} />
 
       </View>
     </SafeAreaView>
