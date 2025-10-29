@@ -5,6 +5,7 @@
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { MarkerData, markers } from '@/constants/heatmap.data';
+import { Fonts } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -68,7 +69,13 @@ export default function MapScreen() {
     <SafeAreaView style={globalStyles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Incident Map</Text>
+        <View style={styles.headerTopRow}>
+          <Text style={styles.headerTitle}>Incident Map</Text>
+          <View style={styles.headerActions}>
+            <Ionicons name="locate" size={20} color={colors.text.primary} />
+          </View>
+        </View>
+        <Text style={styles.headerSubtitle}>View incidents near you</Text>
       </View>
 
       {/* Map View */}
@@ -145,13 +152,33 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.background.primary,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   
   headerTitle: {
     fontSize: typography.fontSize['2xl'],
     fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
+    fontFamily: Fonts.rounded,
+  },
+  headerSubtitle: {
+    marginTop: 4,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+  },
+  headerActions: {
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: colors.background.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.light,
   },
   
   // Custom Marker Styles

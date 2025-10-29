@@ -4,9 +4,11 @@
 
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing } = DesignSystem;
 
@@ -27,35 +29,24 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   logo: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.background.secondary,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#e0f2fe',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.accent.orange,
-  },
-  logoInner: {
-    width: 75,
-    height: 75,
-    borderRadius: 37.5,
-    backgroundColor: colors.primary.navy,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.accent.orange,
-  },
-  logoText: {
-    fontSize: 40,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.accent.orange,
+    shadowColor: colors.primary.navy,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
   },
   appName: {
     fontSize: typography.fontSize['3xl'],
     fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
+    color: colors.primary.navy,
     marginBottom: spacing.xs,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: typography.fontSize.sm,
@@ -80,27 +71,27 @@ const styles = StyleSheet.create({
     height: 45,
     borderRadius: 22.5,
     backgroundColor: colors.background.secondary,
-    borderWidth: 2,
-    borderColor: colors.neutral.gray600,
+    borderWidth: 1,
+    borderColor: colors.border.default,
     justifyContent: 'center',
     alignItems: 'center',
   },
   pinDotFilled: {
-    borderColor: colors.accent.orange,
+    borderColor: '#000',
   },
   pinDotActive: {
-    borderColor: colors.accent.orange,
-    backgroundColor: `${colors.accent.orange}20`,
+    borderColor: '#000',
+    backgroundColor: '#00000020',
   },
   pinDotInner: {
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: colors.accent.orange,
+    backgroundColor: '#000',
   },
   forgotPin: {
     fontSize: typography.fontSize.sm,
-    color: colors.accent.orange,
+    color: '#000',
     marginTop: spacing.sm,
   },
   numberPad: {
@@ -116,10 +107,12 @@ const styles = StyleSheet.create({
   numberButton: {
     width: 65,
     height: 65,
-    borderRadius: 32.5,
+    borderRadius: 20,
     backgroundColor: colors.background.secondary,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   numberText: {
     fontSize: typography.fontSize['2xl'],
@@ -178,15 +171,13 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={globalStyles.container}>
+    <SafeAreaView style={globalStyles.container}>
       <View style={styles.content}>
         {/* Logo Section */}
         <View style={styles.logoSection}>
           <View style={styles.logoContainer}>
             <View style={styles.logo}>
-              <View style={styles.logoInner}>
-                <Text style={styles.logoText}>U</Text>
-              </View>
+              <Ionicons name="shield-checkmark" size={48} color={colors.primary.navy} />
             </View>
           </View>
           <Text style={styles.appName}>UrbanWatch</Text>
@@ -270,6 +261,6 @@ export default function LoginScreen() {
         </View>
 
       </View>
-    </View>
+    </SafeAreaView>
   );
 }

@@ -2,11 +2,11 @@
  * News Feed Screen - Main Dashboard for Purok Officials
  */
 
-import { Button } from '@/components/common/button';
 import { FilterTabs } from '@/components/news/filter-tabs';
 import { ReportCard } from '@/components/news/report-card';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
+import { Fonts } from '@/constants/theme';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -112,6 +112,55 @@ const styles = StyleSheet.create({
   emergencySection: {
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
     paddingVertical: spacing.md,
+  },
+
+  // Report a Concern card
+  concernCard: {
+    backgroundColor: colors.background.card,
+    borderRadius: 16,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  concernHeader: {
+    fontSize: isTablet ? typography.fontSize['2xl'] : typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+    fontFamily: Fonts.rounded,
+  },
+  concernSub: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.md,
+  },
+  concernOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    backgroundColor: colors.background.secondary,
+    borderRadius: 16,
+  },
+  concernIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E6F4FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  concernTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+  },
+  concernDesc: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginTop: 2,
   },
   
   currentReportSection: {
@@ -223,20 +272,23 @@ export default function NewsFeedScreen() {
         </View>
       </View>
 
-      {/* News and Report Feed Title */}
-      <View style={styles.titleSection}>
-        <Text style={styles.sectionTitle}>News and Report Feed</Text>
-      </View>
+      {/* Title removed by request */}
 
-      {/* Emergency Report Button */}
+      {/* Report a Concern */}
       <View style={styles.emergencySection}>
-        <Button
-          title="Incident report"
-          onPress={handleEmergencyReport}
-          variant="primary"
-          fullWidth
-          icon={<Ionicons name="warning" size={20} color={colors.text.inverse} />}
-        />
+        <View style={styles.concernCard}>
+          <Text style={styles.concernHeader}>Report a Concern</Text>
+          <Text style={styles.concernSub}>Choose how you'd like to report an issue</Text>
+          <TouchableOpacity onPress={handleEmergencyReport} activeOpacity={0.8} style={styles.concernOption}>
+            <View style={styles.concernIconWrap}>
+              <Ionicons name="create-outline" size={22} color={colors.primary.blue} />
+            </View>
+            <View>
+              <Text style={styles.concernTitle}>Manual Report</Text>
+              <Text style={styles.concernDesc}>Fill out a detailed form to report your concern</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Current Report Section */}
