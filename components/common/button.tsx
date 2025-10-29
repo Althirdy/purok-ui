@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   },
   
   text_primary: {
-    color: colors.text.primary,
+    color: colors.text.inverse,
   },
   
   text_secondary: {

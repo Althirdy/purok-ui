@@ -116,7 +116,7 @@ export const globalStyles = StyleSheet.create({
   buttonPrimaryText: {
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
+    color: colors.text.inverse,
   },
   
   buttonSecondary: {
@@ -128,7 +128,7 @@ export const globalStyles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.neutral.gray600,
+    borderColor: colors.border.default,
   },
   
   buttonSecondaryText: {
@@ -187,7 +187,7 @@ export const globalStyles = StyleSheet.create({
   // Divider
   divider: {
     height: 1,
-    backgroundColor: colors.neutral.gray600,
+    backgroundColor: colors.border.default,
     marginVertical: spacing.md,
   },
   
@@ -202,7 +202,7 @@ export const globalStyles = StyleSheet.create({
   badgeText: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
+    color: colors.text.inverse,
   },
 });
 

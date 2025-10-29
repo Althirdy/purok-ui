@@ -8,16 +8,19 @@ export const DesignSystem = {
   colors: {
     // Primary Colors
     primary: {
-      navy: '#1e2a3d',
-      navyDark: '#151d2b',
-      navyLight: '#2a3a52',
+      blue: '#1e3a8a',
+      blueLight: '#3b5fb0',
+      blueDark: '#152a5e',
+      navy: '#1e3a8a',
+      navyDark: '#152a5e',
+      navyLight: '#3b5fb0',
     },
     
     // Accent Colors
     accent: {
-      orange: '#ff5a3d',
-      orangeLight: '#ff7659',
-      orangeDark: '#e64d33',
+      orange: '#f59e0b',
+      orangeLight: '#fbbf24',
+      orangeDark: '#d97706',
     },
     
     // Neutral Colors
@@ -40,22 +43,35 @@ export const DesignSystem = {
       warning: '#f59e0b',
       error: '#ef4444',
       info: '#3b82f6',
+      security: '#ef4444',
+      resolved: '#10b981',
+      investigating: '#8b5cf6',
+      neutral: '#64748b',
     },
     
     // Text Colors
     text: {
-      primary: '#ffffff',
-      secondary: '#a3a3a3',
-      tertiary: '#737373',
-      inverse: '#1e2a3d',
+      primary: '#1e293b',
+      secondary: '#475569',
+      tertiary: '#64748b',
+      light: '#94a3b8',
+      inverse: '#ffffff',
     },
     
     // Background Colors
     background: {
-      primary: '#1C2433',
-      secondary: '#2A303E',
-      card: '#2A303E',
+      primary: '#f8fafc',
+      secondary: '#ffffff',
+      card: '#ffffff',
+      accent: '#f8fafc',
       overlay: 'rgba(0, 0, 0, 0.5)',
+    },
+    
+    // Border Colors
+    border: {
+      default: '#e2e8f0',
+      light: '#f1f5f9',
+      dark: '#cbd5e1',
     },
   },
   

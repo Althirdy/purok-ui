@@ -20,7 +20,7 @@ interface TabConfig {
 const tabs: TabConfig[] = [
   {
     routeName: 'news-feed',
-    label: 'News',
+    label: 'Incident',
     icon: (focused) => focused ? 'newspaper' : 'newspaper-outline',
   },
   {
@@ -29,9 +29,9 @@ const tabs: TabConfig[] = [
     icon: (focused) => focused ? 'map' : 'map-outline',
   },
   {
-    routeName: 'reports',
-    label: 'Incident',
-    icon: (focused) => focused ? 'warning' : 'warning-outline',
+    routeName: 'profile',
+    label: 'Profile',
+    icon: (focused) => focused ? 'person' : 'person-outline',
   },
 ];
 
@@ -74,13 +74,13 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
             style={styles.tabButton}
             activeOpacity={0.7}
           >
-            {isFocused && <View style={styles.activeContainer} />}
+            {isFocused && <View style={styles.activeUnderline} />}
             
             <View style={styles.iconContainer}>
               <Ionicons
                 name={tabConfig.icon(isFocused) as any}
                 size={isFocused ? 28 : 24}
-                color={isFocused ? colors.text.primary : colors.text.secondary}
+                color={isFocused ? colors.text.inverse : colors.neutral.gray400}
               />
             </View>
             
@@ -102,7 +102,7 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: '#2A303E',
+    backgroundColor: colors.primary.blue,
     paddingBottom: spacing.sm,
     paddingTop: spacing.sm,
     elevation: 10,
@@ -119,15 +119,14 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1,
   },
-  activeContainer: {
+  activeUnderline: {
     position: 'absolute',
-    top: spacing.xs,
-    bottom: spacing.xs,
-    left: spacing.sm,
-    right: spacing.sm,
+    bottom: 0,
+    left: '20%',
+    right: '20%',
+    height: 3,
     backgroundColor: colors.accent.orange,
-    borderRadius: borderRadius.md,
-    zIndex: 0,
+    borderRadius: borderRadius.sm,
   },
   iconContainer: {
     marginBottom: spacing.xs,
@@ -136,11 +135,11 @@ const styles = StyleSheet.create({
   label: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
+    color: colors.neutral.gray400,
     zIndex: 2,
   },
   labelActive: {
     fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
+    color: colors.text.inverse,
   },
 });

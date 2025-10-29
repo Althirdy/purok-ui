@@ -7,7 +7,6 @@ import { FilterTabs } from '@/components/news/filter-tabs';
 import { ReportCard } from '@/components/news/report-card';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { mockUser } from '@/services/mock-data';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -23,10 +22,10 @@ const isIOS = Platform.OS === 'ios';
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: colors.primary.navy,
+    backgroundColor: colors.primary.blue,
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
     paddingBottom: spacing.md,
-    paddingTop: isIOS ? spacing.sm : spacing.xs,
+    paddingTop: spacing.md,
   },
   
   headerTop: {
@@ -46,7 +45,7 @@ const styles = StyleSheet.create({
     width: isTablet ? 56 : 48,
     height: isTablet ? 56 : 48,
     borderRadius: isTablet ? 28 : 24,
-    backgroundColor: `${colors.accent.orange}20`,
+    backgroundColor: colors.neutral.gray300,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.sm,
@@ -55,12 +54,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: isTablet ? typography.fontSize.xl : typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
+    color: colors.text.inverse,
   },
   
   headerSubtitle: {
     fontSize: isTablet ? typography.fontSize.base : typography.fontSize.sm,
-    color: colors.text.secondary,
+    color: colors.text.inverse,
   },
   
   headerRight: {
@@ -73,7 +72,7 @@ const styles = StyleSheet.create({
     width: isTablet ? 48 : 40,
     height: isTablet ? 48 : 40,
     borderRadius: isTablet ? 24 : 20,
-    backgroundColor: colors.background.secondary,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -95,7 +94,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
+    color: colors.text.inverse,
   },
   
   titleSection: {
@@ -192,22 +191,22 @@ export default function NewsFeedScreen() {
   const pendingCount = reports.filter(r => r.status === 'pending').length;
 
   return (
-    <SafeAreaView style={globalStyles.container} edges={['top']}>
+    <SafeAreaView style={globalStyles.container}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
             <View style={styles.logoSmall}>
-              <Ionicons name="shield" size={24} color={colors.accent.orange} />
+              <Ionicons name="shield" size={24} color={colors.primary.blue} />
             </View>
             <View>
-              <Text style={styles.headerTitle}>{mockUser.purokName}</Text>
-              <Text style={styles.headerSubtitle}>{mockUser.name}</Text>
+              <Text style={styles.headerTitle}>UrbanWatch</Text>
+              <Text style={styles.headerSubtitle}>Safety News</Text>
             </View>
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.iconButton}>
-              <Ionicons name="notifications" size={24} color={colors.text.primary} />
+              <Ionicons name="notifications" size={24} color={colors.text.inverse} />
               {pendingCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{pendingCount}</Text>
@@ -218,7 +217,7 @@ export default function NewsFeedScreen() {
               style={styles.iconButton} 
               onPress={() => router.push('./profile')}
             >
-              <Ionicons name="person" size={24} color={colors.text.primary} />
+              <Ionicons name="person" size={24} color={colors.text.inverse} />
             </TouchableOpacity>
           </View>
         </View>
@@ -232,11 +231,11 @@ export default function NewsFeedScreen() {
       {/* Emergency Report Button */}
       <View style={styles.emergencySection}>
         <Button
-          title="Emergency report"
+          title="Incident report"
           onPress={handleEmergencyReport}
           variant="primary"
           fullWidth
-          icon={<Ionicons name="warning" size={20} color={colors.text.primary} />}
+          icon={<Ionicons name="warning" size={20} color={colors.text.inverse} />}
         />
       </View>
 

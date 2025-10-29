@@ -16,7 +16,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="news-feed"
         options={{
-          title: 'News',
+          title: 'Incident',
         }}
       />
       <Tabs.Screen
@@ -26,9 +26,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="reports"
+        name="profile"
         options={{
-          title: 'Incident',
+          title: 'Profile',
         }}
       />
       
@@ -48,9 +48,9 @@ export default function TabLayout() {
         }}
       />
       
-      {/* Hide profile from tabs */}
+      {/* Hide reports from tabs */}
       <Tabs.Screen
-        name="profile"
+        name="reports"
         options={{
           href: null,
         }}
