@@ -2,6 +2,7 @@
  * News Feed Screen - Main Dashboard for Purok Officials
  */
 
+import { safeGet } from '@/api/axios';
 import { FilterTabs } from '@/components/news/filter-tabs';
 import { ReportCard } from '@/components/news/report-card';
 import { DesignSystem } from '@/constants/design-system';
@@ -10,8 +11,8 @@ import { Fonts } from '@/constants/theme';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { Dimensions, FlatList, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Dimensions, Easing, FlatList, Modal, Platform, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Inline styles to avoid .styles.ts files being treated as routes
@@ -203,13 +204,68 @@ export default function NewsFeedScreen() {
   const [activeFilter, setActiveFilter] = useState<FeedSource>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [reports, setReports] = useState<EmergencyReport[]>([]);
+  const [showAckModal, setShowAckModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+
+  // Bottom sheet animation
+  const slideAnim = useRef(new Animated.Value(0)).current; // 0 hidden, 1 visible
+
+  const presentSheet = (reportId?: string) => {
+    if (reportId) setSelectedReportId(reportId);
+    setShowAckModal(true);
+    requestAnimationFrame(() => {
+      Animated.timing(slideAnim, {
+        toValue: 1,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  const dismissSheet = () => {
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setShowAckModal(false);
+      setSelectedReportId(null);
+    });
+  };
+
+  // Fetch reports by source (limited to a single mock item for now)
+  const fetchReports = async (source: FeedSource) => {
+    setLoading(true);
+    try {
+      const data = await safeGet<EmergencyReport[]>(`/reports?source=${source}` as string, () => [
+        {
+          id: 'UW-2025-001',
+          type: 'suspicious',
+          title: 'Suspicious Activity',
+          description: "There's a person suddenly collapsed.",
+          location: 'Barangay 176, Near Metroplaza',
+          timestamp: new Date(),
+          status: 'pending',
+          severity: 'high',
+          source: 'cctv',
+        },
+      ]);
+      setReports(Array.isArray(data) ? [data[0]] : []);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReports(activeFilter);
+  }, [activeFilter]);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => {
-      // TODO: Fetch reports from API
-      setRefreshing(false);
-    }, 1000);
+    fetchReports(activeFilter).finally(() => setRefreshing(false));
   };
 
   const handleFilterChange = (filter: FeedSource) => {
@@ -218,18 +274,24 @@ export default function NewsFeedScreen() {
   };
 
   const handleReportPress = (reportId: string) => {
-    // Navigate to report details
-    console.log('Report pressed:', reportId);
+    router.push({ pathname: 'report-details', params: { reportId } } as any);
   };
 
   const handleAcknowledge = (reportId: string) => {
+    // Open confirmation modal first; do not change state yet
+    presentSheet(reportId);
+  };
+
+  const confirmAcknowledge = () => {
+    if (!selectedReportId) return dismissSheet();
     setReports(prevReports =>
       prevReports.map(report =>
-        report.id === reportId
+        report.id === selectedReportId
           ? { ...report, status: 'acknowledged' as const }
           : report
       )
     );
+    dismissSheet();
   };
 
   const handleEmergencyReport = () => {
@@ -250,7 +312,7 @@ export default function NewsFeedScreen() {
             </View>
             <View>
               <Text style={styles.headerTitle}>UrbanWatch</Text>
-              <Text style={styles.headerSubtitle}>Safety News</Text>
+              <Text style={styles.headerSubtitle}>Purok</Text>
             </View>
           </View>
           <View style={styles.headerRight}>
@@ -322,10 +384,96 @@ export default function NewsFeedScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="folder-open-outline" size={64} color={colors.neutral.gray600} />
-            <Text style={styles.emptyStateText}>No reports available</Text>
+            <Text style={styles.emptyStateText}>{loading ? 'Loading reports...' : 'No reports available'}</Text>
           </View>
         }
       />
+
+      {/* Bottom Acknowledgement Sheet (matches mobile UI) */}
+      <Modal visible={showAckModal} transparent animationType="none" onRequestClose={dismissSheet}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <Animated.View
+            style={{
+              transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }],
+              backgroundColor: colors.background.card,
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              padding: spacing.lg,
+              borderTopWidth: 1,
+              borderColor: colors.border.light,
+            }}
+          >
+            <View style={{ alignItems: 'center', marginBottom: spacing.md }}>
+              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.neutral.gray600 }} />
+            </View>
+            {/* Title and brief */}
+            <Text style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
+              Suspicious Activity
+            </Text>
+            <Text style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, marginTop: spacing.xs }}>
+              There's a person suddenly collapsed.
+            </Text>
+            <Text style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, marginTop: spacing.sm }}>
+              Barangay 176, Near Metroplaza • just now
+            </Text>
+
+            {/* Evidence preview */}
+            <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+              <View style={{ height: 140, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.neutral.gray700 }}>
+                <View style={{ flex: 1 }}>
+                  {/* image placeholder */}
+                  <View style={{ flex: 1, backgroundColor: colors.neutral.gray600, alignItems: 'center', justifyContent: 'center' }}>
+                    <Ionicons name="image" size={28} color={colors.text.inverse} />
+                    <Text style={{ color: colors.text.inverse, marginTop: 6, fontSize: typography.fontSize.xs }}>CCTV Snapshot</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={{ height: 100, borderRadius: 12, backgroundColor: colors.neutral.gray700, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="location" size={20} color={colors.text.inverse} />
+                <Text style={{ color: colors.text.inverse, marginTop: 6, fontSize: typography.fontSize.xs }}>Map Pin Preview</Text>
+              </View>
+            </View>
+
+            {/* Actions: See More, Dismiss, Acknowledge */}
+            <View style={{ marginTop: spacing.lg }}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  dismissSheet();
+                  router.push({ pathname: 'report-details', params: { reportId: selectedReportId || 'UW-2025-001' } } as any);
+                }}
+                style={{
+                  backgroundColor: colors.background.secondary,
+                  borderWidth: 1,
+                  borderColor: colors.text.secondary,
+                  paddingVertical: spacing.md,
+                  borderRadius: 10,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: colors.text.primary, fontWeight: typography.fontWeight.semibold }}>See More</Text>
+              </TouchableOpacity>
+
+              <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={dismissSheet}
+                  style={{ flex: 1, borderWidth: 1, borderColor: colors.neutral.gray600, paddingVertical: spacing.md, borderRadius: 10, alignItems: 'center', backgroundColor: colors.background.secondary }}
+                >
+                  <Text style={{ color: colors.text.primary, fontWeight: typography.fontWeight.semibold }}>Dismiss</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={confirmAcknowledge}
+                  style={{ flex: 1, backgroundColor: colors.accent.orange, paddingVertical: spacing.md, borderRadius: 10, alignItems: 'center' }}
+                >
+                  <Text style={{ color: colors.text.primary, fontWeight: typography.fontWeight.semibold }}>Acknowledge</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

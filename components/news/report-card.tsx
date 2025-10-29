@@ -109,6 +109,21 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
         <Text style={styles.categoryText}>Category: {getCategory(report.type)}</Text>
       </View>
 
+      {/* See More button (always visible) */}
+      <TouchableOpacity 
+        style={[
+          styles.seeMoreButton,
+          report.status === 'acknowledged' && styles.seeMoreTopOnlyRadius,
+        ]}
+        onPress={(e) => {
+          e.stopPropagation();
+          onPress();
+        }}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.seeMoreText}>See More</Text>
+      </TouchableOpacity>
+
       {report.status === 'pending' && onAcknowledge && (
         <TouchableOpacity 
           style={styles.acknowledgeButton} 
@@ -121,7 +136,13 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
         </TouchableOpacity>
       )}
 
-      {getStatusBadge()}
+      {report.status === 'acknowledged' && (
+        <View>
+          <View style={styles.acknowledgedButton}>
+            <Text style={styles.acknowledgedTextAlt}>Acknowledged</Text>
+          </View>
+        </View>
+      )}
     </Card>
   );
 }
@@ -254,6 +275,28 @@ const styles = StyleSheet.create({
   },
 
   seeMoreText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+  },
+
+  // When acknowledged, we visually attach the green button to See More
+  seeMoreTopOnlyRadius: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+
+  acknowledgedButton: {
+    backgroundColor: colors.semantic.success,
+    paddingVertical: spacing.sm,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    alignItems: 'center',
+  },
+
+  acknowledgedTextAlt: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,

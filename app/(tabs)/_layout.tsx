@@ -48,13 +48,7 @@ export default function TabLayout() {
         }}
       />
       
-      {/* Hide reports from tabs */}
-      <Tabs.Screen
-        name="reports"
-        options={{
-          href: null,
-        }}
-      />
+      {/* Removed Reports & History screen */}
       
       {/* Hide profile settings from tabs */}
       <Tabs.Screen
