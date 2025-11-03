@@ -3,11 +3,9 @@
  */
 
 import { safeGet } from '@/api/axios';
-import { FilterTabs } from '@/components/news/filter-tabs';
 import { ReportCard } from '@/components/news/report-card';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { Fonts } from '@/constants/theme';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -25,23 +23,20 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.primary.blue,
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
-    paddingBottom: spacing.md,
-    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
+    paddingTop: spacing.lg,
   },
-  
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
     maxWidth: isTablet ? '70%' : '80%',
   },
-  
   logoSmall: {
     width: isTablet ? 56 : 48,
     height: isTablet ? 56 : 48,
@@ -51,24 +46,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: spacing.sm,
   },
-  
   headerTitle: {
     fontSize: isTablet ? typography.fontSize.xl : typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.inverse,
   },
-  
   headerSubtitle: {
     fontSize: isTablet ? typography.fontSize.base : typography.fontSize.sm,
     color: colors.text.inverse,
+    opacity: 0.9,
   },
-  
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  
   iconButton: {
     width: isTablet ? 48 : 40,
     height: isTablet ? 48 : 40,
@@ -78,7 +70,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  
   badge: {
     position: 'absolute',
     top: -4,
@@ -91,111 +82,122 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 4,
   },
-  
   badgeText: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.inverse,
   },
-  
-  titleSection: {
+  headerWrapper: {
+    marginHorizontal: -(spacing.lg * (isTablet ? 1.5 : 1)),
+  },
+  // Modern feed utilities
+  utilities: {
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+    gap: spacing.md,
   },
-  
-  sectionTitle: {
-    fontSize: isTablet ? typography.fontSize['2xl'] : typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  
-  emergencySection: {
+  // Filter grid
+  filterGrid: {
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
-    paddingVertical: spacing.md,
-  },
-
-  // Report a Concern card
-  concernCard: {
-    backgroundColor: colors.background.card,
-    borderRadius: 16,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-  },
-  concernHeader: {
-    fontSize: isTablet ? typography.fontSize['2xl'] : typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-    fontFamily: Fonts.rounded,
-  },
-  concernSub: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
     marginBottom: spacing.md,
   },
-  concernOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
+  filterBox: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    backgroundColor: colors.background.card,
     borderWidth: 1,
     borderColor: colors.border.light,
-    backgroundColor: colors.background.secondary,
-    borderRadius: 16,
-  },
-  concernIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#E6F4FE',
-    justifyContent: 'center',
+    borderRadius: 14,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacing.md,
+    justifyContent: 'space-between',
   },
-  concernTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
+  filterIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconAll: { backgroundColor: '#E6ECF2' },
+  iconCctv: { backgroundColor: '#E6F0FF' },
+  iconSensor: { backgroundColor: '#EAF7EE' },
+  iconCitizen: { backgroundColor: '#F1EAFE' },
+  filterBoxLabel: {
     color: colors.text.primary,
+    fontWeight: typography.fontWeight.medium,
   },
-  concernDesc: {
-    fontSize: typography.fontSize.sm,
+  filterBoxActive: {
+    borderColor: colors.primary.blue,
+    backgroundColor: '#EFF6FF',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background.card,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    borderRadius: 14,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  searchText: {
+    marginLeft: spacing.sm,
     color: colors.text.secondary,
+    fontSize: typography.fontSize.sm,
+    flex: 1,
+  },
+  statRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.background.card,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    borderRadius: 14,
+    padding: spacing.md,
+  },
+  statLabel: {
+    color: colors.text.secondary,
+    fontSize: typography.fontSize.xs,
+  },
+  statValue: {
+    color: colors.text.primary,
+    fontWeight: typography.fontWeight.bold,
+    fontSize: isTablet ? typography.fontSize['2xl'] : typography.fontSize.xl,
     marginTop: 2,
   },
-  
   currentReportSection: {
     marginBottom: spacing.sm,
   },
-  
   currentReportHeader: {
-    paddingHorizontal: 0,
+    paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
     paddingTop: spacing.sm,
     overflow: 'hidden',
   },
-  
   currentReportTitle: {
     fontSize: isTablet ? typography.fontSize.lg : typography.fontSize.base,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
     marginBottom: spacing.sm,
-    paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
   },
-  
   listContent: {
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
     paddingBottom: spacing.xl,
   },
-  headerWrapper: {
-    marginHorizontal: -(spacing.lg * (isTablet ? 1.5 : 1)),
-  },
-  
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing['4xl'] * (isTablet ? 1.3 : 1),
   },
-  
   emptyStateText: {
     fontSize: typography.fontSize.base,
     color: colors.text.secondary,
@@ -297,16 +299,13 @@ export default function NewsFeedScreen() {
     dismissSheet();
   };
 
-  const handleEmergencyReport = () => {
-    // Navigate to emergency report screen
-    router.push('./emergency-report');
-  };
+  // Manual reporting removed
 
   const pendingCount = reports.filter(r => r.status === 'pending').length;
 
   const renderHeader = () => (
     <View style={styles.headerWrapper}>
-      {/* Header */}
+      {/* App Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
@@ -315,7 +314,7 @@ export default function NewsFeedScreen() {
             </View>
             <View>
               <Text style={styles.headerTitle}>UrbanWatch</Text>
-              <Text style={styles.headerSubtitle}>Purok</Text>
+              <Text style={styles.headerSubtitle}>Purok Feed</Text>
             </View>
           </View>
           <View style={styles.headerRight}>
@@ -331,30 +330,105 @@ export default function NewsFeedScreen() {
         </View>
       </View>
 
-      {/* Report a Concern */}
-      <View style={styles.emergencySection}>
-        <View style={styles.concernCard}>
-          <Text style={styles.concernHeader}>Report a Concern</Text>
-          <Text style={styles.concernSub}>Choose how you'd like to report an issue</Text>
-          <TouchableOpacity onPress={handleEmergencyReport} activeOpacity={0.8} style={styles.concernOption}>
-            <View style={styles.concernIconWrap}>
-              <Ionicons name="create-outline" size={22} color={colors.primary.blue} />
-            </View>
-            <View>
-              <Text style={styles.concernTitle}>Manual Report</Text>
-            </View>
-          </TouchableOpacity>
+      {/* Utilities: Search + Stats */}
+      <View style={styles.utilities}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={18} color={colors.text.secondary} />
+          <Text style={styles.searchText}>Search incidents, locations…</Text>
+          <Ionicons name="options" size={18} color={colors.text.secondary} />
+        </View>
+
+        <View style={styles.statRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>Pending</Text>
+            <Text style={styles.statValue}>{pendingCount}</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>Acknowledged</Text>
+            <Text style={styles.statValue}>{reports.filter(r => r.status === 'acknowledged').length}</Text>
+          </View>
         </View>
       </View>
 
       {/* Current Report Section */}
       <View style={styles.currentReportSection}>
         <View style={styles.currentReportHeader}>
-          <Text style={styles.currentReportTitle}>
-            Current Report ({pendingCount})
-          </Text>
-          <FilterTabs activeFilter={activeFilter} onFilterChange={handleFilterChange} />
+          <Text style={styles.currentReportTitle}>Current Reports ({pendingCount})</Text>
         </View>
+      </View>
+      {/* Modern filter boxes */}
+      <View style={styles.filterGrid}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => handleFilterChange('all')}
+          style={[
+            styles.filterBox,
+            activeFilter === 'all' && styles.filterBoxActive,
+          ]}
+        >
+          <Text style={styles.filterBoxLabel}>All</Text>
+          <View style={[styles.filterIconWrap, styles.iconAll]}>
+            <Ionicons
+              name="apps-outline"
+              size={18}
+              color={activeFilter === 'all' ? colors.primary.blue : colors.neutral.gray700}
+            />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => handleFilterChange('cctv')}
+          style={[
+            styles.filterBox,
+            activeFilter === 'cctv' && styles.filterBoxActive,
+          ]}
+        >
+          <Text style={styles.filterBoxLabel}>CCTV</Text>
+          <View style={[styles.filterIconWrap, styles.iconCctv]}>
+            <Ionicons
+              name="videocam-outline"
+              size={18}
+              color={activeFilter === 'cctv' ? colors.primary.blue : colors.neutral.gray700}
+            />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => handleFilterChange('sensor_box')}
+          style={[
+            styles.filterBox,
+            activeFilter === 'sensor_box' && styles.filterBoxActive,
+          ]}
+        >
+          <Text style={styles.filterBoxLabel}>Sensor Box</Text>
+          <View style={[styles.filterIconWrap, styles.iconSensor]}>
+            <Ionicons
+              name="hardware-chip-outline"
+              size={18}
+              color={activeFilter === 'sensor_box' ? colors.primary.blue : colors.neutral.gray700}
+            />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => handleFilterChange('citizen_reports')}
+          style={[
+            styles.filterBox,
+            activeFilter === 'citizen_reports' && styles.filterBoxActive,
+          ]}
+        >
+          <Text style={styles.filterBoxLabel}>Citizen</Text>
+          <View style={[styles.filterIconWrap, styles.iconCitizen]}>
+            <Ionicons
+              name="people-outline"
+              size={18}
+              color={activeFilter === 'citizen_reports' ? colors.primary.blue : colors.neutral.gray700}
+            />
+          </View>
+        </TouchableOpacity>
       </View>
     </View>
   );

@@ -40,13 +40,6 @@ export default function TabLayout() {
         }}
       />
       
-      {/* Hide emergency report from tabs */}
-      <Tabs.Screen
-        name="emergency-report"
-        options={{
-          href: null,
-        }}
-      />
       
       {/* Removed Reports & History screen */}
       

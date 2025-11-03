@@ -2,18 +2,24 @@
  * Map Screen - View incidents on map with custom markers
  */
 
+import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION, isPointInBoundary } from '@/constants/barangay-boundary';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { MarkerData, markers } from '@/constants/heatmap.data';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - Metro bundler supports JSON imports
+import GEOJSON from '@/constants/geojson.json';
 import { Fonts } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
+import { router } from 'expo-router';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import MapView, { Callout, Marker } from 'react-native-maps';
+import MapView, { Callout, Marker, Polygon } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing, borderRadius, shadows } = DesignSystem;
 
+// Fallback region kept for reference; using BARANGAY_176E_REGION below
 const BRGY_176A_REGION = {
   latitude: 14.7804774,
   longitude: 121.0374894,
@@ -23,6 +29,24 @@ const BRGY_176A_REGION = {
 
 export default function MapScreen() {
   const mapRef = React.useRef<MapView | null>(null);
+
+  // Convert GeoJSON polygon (lng, lat) to { latitude, longitude } if needed
+  const geojsonCoordinates = useMemo(() => {
+    try {
+      const rings: number[][][] = GEOJSON.features?.[0]?.geometry?.coordinates ?? [];
+      const firstRing = rings[0] || [];
+      return firstRing.map(([lng, lat]) => ({ latitude: lat, longitude: lng }));
+    } catch {
+      return [] as { latitude: number; longitude: number }[];
+    }
+  }, []);
+
+  // Filter markers to only show those inside Barangay 176E boundary
+  const filteredMarkers = useMemo(() => {
+    return markers.filter((marker) =>
+      isPointInBoundary({ latitude: marker.latitude, longitude: marker.longitude })
+    );
+  }, []);
 
   const getMarkerColor = (marker: MarkerData): string => {
     switch (marker.type) {
@@ -60,7 +84,7 @@ export default function MapScreen() {
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
-      mapRef.current?.animateToRegion(BRGY_176A_REGION, 1000);
+      mapRef.current?.animateToRegion(BARANGAY_176E_REGION, 1000);
     }, 500);
     return () => clearTimeout(timer);
   }, []);
@@ -83,12 +107,29 @@ export default function MapScreen() {
         <MapView
           ref={mapRef}
           style={{ ...StyleSheet.absoluteFillObject }}
-          initialRegion={BRGY_176A_REGION}
+          initialRegion={BARANGAY_176E_REGION}
           showsUserLocation={false}
           showsMyLocationButton={false}
           showsCompass={true}
         >
-          {markers.map((marker) => (
+          {/* Barangay 176E Boundary - from constants (fills + stroke) */}
+          <Polygon
+            coordinates={BARANGAY_176E_BOUNDARY.coordinates}
+            fillColor={BARANGAY_176E_BOUNDARY.fillColor}
+            strokeColor={BARANGAY_176E_BOUNDARY.strokeColor}
+            strokeWidth={BARANGAY_176E_BOUNDARY.strokeWidth}
+          />
+
+          {/* Optional: GeoJSON overlay (same area) */}
+          {geojsonCoordinates.length > 0 && (
+            <Polygon
+              coordinates={geojsonCoordinates}
+              fillColor="transparent"
+              strokeColor="rgba(30,58,138,0.4)"
+              strokeWidth={1}
+            />
+          )}
+          {filteredMarkers.map((marker) => (
             <Marker
               key={marker.id}
               coordinate={{
@@ -122,7 +163,15 @@ export default function MapScreen() {
               </View>
 
               {/* Custom Callout (info popup when marker is tapped) */}
-              <Callout>
+              <Callout
+                tooltip
+                onPress={() =>
+                  router.push({
+                    pathname: 'report-details',
+                    params: { reportId: marker.id },
+                  } as any)
+                }
+              >
                 <View style={styles.calloutContainer}>
                   <Text style={styles.calloutTitle}>{marker.title}</Text>
                   <Text style={styles.calloutDescription}>{marker.description}</Text>
