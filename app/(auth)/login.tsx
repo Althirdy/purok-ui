@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useAuth } from './auth-context';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing } = DesignSystem;
@@ -96,6 +97,7 @@ const styles = StyleSheet.create({
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { login } = useAuth();
   const [pin, setPin] = useState<string[]>(['', '', '', '']);
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRefs = [useRef<TextInput>(null), useRef<TextInput>(null), useRef<TextInput>(null), useRef<TextInput>(null)];
@@ -127,11 +129,19 @@ export default function LoginScreen() {
     }
   };
 
-  const handleLogin = (pinString: string) => {
-    if (pinString.length === 4) {
-      router.replace('/(tabs)/news-feed');
-    } else {
+  const handleLogin = async (pinString: string) => {
+    if (pinString.length !== 4) {
       Alert.alert('Error', 'Please enter all 4 digits.');
+      setPin(['', '', '', '']);
+      setActiveIndex(0);
+      inputRefs[0].current?.focus();
+      return;
+    }
+    try {
+      await login(pinString, '176E');
+      router.replace('/(tabs)/news-feed');
+    } catch (err: any) {
+      Alert.alert('Login failed', err?.message || 'Invalid PIN');
       setPin(['', '', '', '']);
       setActiveIndex(0);
       inputRefs[0].current?.focus();
