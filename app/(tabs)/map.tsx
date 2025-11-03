@@ -29,6 +29,7 @@ const BRGY_176A_REGION = {
 
 export default function MapScreen() {
   const mapRef = React.useRef<MapView | null>(null);
+  type HeatMarker = (typeof markers)[number];
 
   // Convert GeoJSON polygon (lng, lat) to { latitude, longitude } if needed
   const geojsonCoordinates = useMemo(() => {
@@ -48,35 +49,75 @@ export default function MapScreen() {
     );
   }, []);
 
-  const getMarkerColor = (marker: MarkerData): string => {
-    switch (marker.type) {
-      case 'crime':
-        return marker.severity === 'high' ? '#DC2626' : '#EF4444';
-      case 'emergency':
-        return marker.severity === 'high' ? '#B91C1C' : '#DC2626';
-      case 'safety':
-        return marker.severity === 'high' ? '#D97706' : '#F59E0B';
-      case 'incident':
+  // Jitter markers that overlap (same/near coordinates) so bubbles don't stack
+  const displayedMarkers = useMemo(() => {
+    // Group by rounded coordinate (~7 decimals ≈ ~1cm; we'll use 5 ≈ ~1m)
+    const keyFor = (lat: number, lng: number) => `${lat.toFixed(5)}:${lng.toFixed(5)}`;
+    const groups = new Map<string, MarkerData[]>();
+    for (const m of filteredMarkers) {
+      const k = keyFor(m.latitude, m.longitude);
+      const arr = groups.get(k) || [];
+      arr.push(m);
+      groups.set(k, arr);
+    }
+
+    const result: (MarkerData & { _lat: number; _lng: number })[] = [];
+    const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~2.399
+
+    groups.forEach((group, _key) => {
+      // Base coordinate
+      const baseLat = group[0].latitude;
+      const baseLng = group[0].longitude;
+      const cosLat = Math.cos((baseLat * Math.PI) / 180);
+      const metersPerDegLat = 111_320; // approx
+      const metersPerDegLng = 111_320 * cosLat; // approx
+
+      group.forEach((m, idx) => {
+        if (group.length === 1) {
+          result.push({ ...m, _lat: baseLat, _lng: baseLng });
+          return;
+        }
+        // Spiral offset: radius grows slowly with idx; 4m step
+        const radiusMeters = 4 * Math.sqrt(idx); // 0, 4, 5.6, 6.9, ...
+        const angle = idx * GOLDEN_ANGLE;
+        const dx = (radiusMeters * Math.cos(angle)) / metersPerDegLng; // degrees lon
+        const dy = (radiusMeters * Math.sin(angle)) / metersPerDegLat; // degrees lat
+        result.push({ ...m, _lat: baseLat + dy, _lng: baseLng + dx });
+      });
+    });
+
+    return result;
+  }, [filteredMarkers]);
+
+  const getMarkerColor = (marker: HeatMarker): string => {
+    switch ((marker as any).type) {
+      case 'waste':
+        return marker.severity === 'high' ? '#DC2626' : marker.severity === 'medium' ? '#F59E0B' : '#10B981';
+      case 'garbage':
+        return marker.severity === 'high' ? '#B91C1C' : marker.severity === 'medium' ? '#DC2626' : '#EF4444';
+      case 'hazardous':
         return marker.severity === 'high' ? '#7C3AED' : '#8B5CF6';
-      case 'report':
+      case 'recycling':
         return marker.severity === 'high' ? '#059669' : '#10B981';
+      case 'littering':
+        return marker.severity === 'high' ? '#D97706' : marker.severity === 'medium' ? '#F59E0B' : '#FDE047';
       default:
         return '#6B7280';
     }
   };
 
-  const getMarkerIcon = (marker: MarkerData): keyof typeof Ionicons.glyphMap => {
-    switch (marker.type) {
-      case 'crime':
+  const getMarkerIcon = (marker: HeatMarker): keyof typeof Ionicons.glyphMap => {
+    switch ((marker as any).type) {
+      case 'waste':
+        return 'trash-bin';
+      case 'garbage':
+        return 'trash';
+      case 'hazardous':
         return 'warning';
-      case 'emergency':
-        return 'alert-circle';
-      case 'safety':
-        return 'shield-checkmark';
-      case 'incident':
-        return 'information-circle';
-      case 'report':
-        return 'flag';
+      case 'recycling':
+        return 'leaf';
+      case 'littering':
+        return 'sad';
       default:
         return 'location';
     }
@@ -129,12 +170,12 @@ export default function MapScreen() {
               strokeWidth={1}
             />
           )}
-          {filteredMarkers.map((marker) => (
+          {displayedMarkers.map((marker) => (
             <Marker
               key={marker.id}
               coordinate={{
-                latitude: marker.latitude,
-                longitude: marker.longitude,
+                latitude: (marker as any)._lat ?? marker.latitude,
+                longitude: (marker as any)._lng ?? marker.longitude,
               }}
             >
               {/* Custom Marker with Badge */}
@@ -164,7 +205,6 @@ export default function MapScreen() {
 
               {/* Custom Callout (info popup when marker is tapped) */}
               <Callout
-                tooltip
                 onPress={() =>
                   router.push({
                     pathname: 'report-details',
@@ -276,6 +316,15 @@ const styles = StyleSheet.create({
   calloutContainer: {
     width: 200,
     padding: 12,
+    backgroundColor: colors.background.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
   calloutTitle: {
     fontSize: 16,
