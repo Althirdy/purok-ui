@@ -119,10 +119,6 @@ export default function ProfileScreen() {
     router.push('./profile-settings');
   };
 
-  const handleChangePin = () => {
-    Alert.alert('Change PIN', 'This feature will be implemented soon.');
-  };
-
   const handleLogout = () => {
     Alert.alert(
       'Logout',
@@ -173,7 +169,7 @@ export default function ProfileScreen() {
                 )}
                 {user?.address && (
                   <View>
-                    <Text style={{ color: colors.text.secondary, fontSize: typography.fontSize.xs }}>Address</Text>
+                    <Text style={{ color: colors.text.secondary, fontSize: typography.fontSize.xs }}>Purok Area</Text>
                     <Text style={{ color: colors.text.primary, fontSize: typography.fontSize.sm }}>{user.address}</Text>
                   </View>
                 )}
@@ -186,11 +182,6 @@ export default function ProfileScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleChangePin}>
-            <Ionicons name="lock-closed" size={24} color={colors.text.primary} />
-            <Text style={styles.actionButtonText}>Change Pin</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={24} color={colors.text.primary} />
             <Text style={styles.actionButtonText}>Logout</Text>

@@ -46,7 +46,7 @@ const RECENT_WINDOW_MS = 5 * 60 * 1000;
 /**
  * Convert sensor data to emergency report
  */
-export function sensorDataToReport(sensorData: SensorData): EmergencyReport {
+export function anomalyToReport(sensorData: SensorData): EmergencyReport {
   // Determine report type based on sensor type and status
   let reportType: EmergencyReport['type'] = 'other';
   let severity: EmergencyReport['severity'] = 'low';
@@ -176,6 +176,37 @@ export function sensorDataToReport(sensorData: SensorData): EmergencyReport {
   };
 }
 
+/**
+ * Device status → report (only when meaningful issues occur)
+ * Emits an overheat/health report when temperature is high or health not GOOD.
+ */
+export function deviceStatusToReport(statusRec: {
+  timestamp: number;
+  cpu_temperature?: number;
+  health_status?: string;
+}): EmergencyReport | null {
+  const temp = Number(statusRec.cpu_temperature ?? 0);
+  const health = String(statusRec.health_status ?? '').toUpperCase();
+  const isOverheat = temp >= 60; // concise threshold for overheat
+  const isUnhealthy = health && health !== 'GOOD';
+  if (!isOverheat && !isUnhealthy) return null;
+  const title = isOverheat ? 'Device Overheat Detected' : 'Device Health Warning';
+  const description = isOverheat
+    ? `CPU temperature ${temp.toFixed(1)}°C`
+    : `Health status: ${health}`;
+  return {
+    id: `DEVICE-${statusRec.timestamp}`,
+    type: 'other',
+    title,
+    description,
+    location: 'Sensor Hub',
+    timestamp: new Date(statusRec.timestamp),
+    status: 'pending',
+    severity: isOverheat ? 'high' : 'medium',
+    source: 'sensor',
+  };
+}
+
 // Export thresholds for use in other files
 export { SENSOR_THRESHOLDS } from '@/constants/sensor-config';
 
@@ -184,7 +215,7 @@ export { SENSOR_THRESHOLDS } from '@/constants/sensor-config';
  * @param callback Function to call when new sensor data is received
  * @returns Cleanup function to unsubscribe
  */
-export function listenToSensorData(
+export function listenToAnomalies(
   callback: (sensorData: SensorData, report: EmergencyReport) => void
 ): () => void {
   const sensorsRef = ref(database, 'urbanwatch/anomaly_data');
@@ -235,7 +266,7 @@ export function listenToSensorData(
             status: decibelStatus,
             metadata: { amplitude: record.amplitude, sound: record.sound, ...record.metadata },
           };
-          const report = sensorDataToReport(sensorData);
+          const report = anomalyToReport(sensorData);
           callback(sensorData, report);
         }
       }
@@ -263,7 +294,7 @@ export function listenToSensorData(
             status: soundStatus,
             metadata: { amplitude: record.amplitude, decibels: record.decibels, ...record.metadata },
           };
-          const report = sensorDataToReport(sensorData);
+          const report = anomalyToReport(sensorData);
           callback(sensorData, report);
         }
       }
@@ -294,7 +325,7 @@ export function listenToSensorData(
             status: hallStatus,
             metadata: { magnetic_deviation: magneticDeviationValue, is_tampering: record.is_tampering, tampering_type: record.tampering_type, ...record.metadata },
           };
-          const report = sensorDataToReport(sensorData);
+          const report = anomalyToReport(sensorData);
           callback(sensorData, report);
         }
       }
@@ -320,7 +351,7 @@ export function listenToSensorData(
         status: 'critical',
         metadata: { tampering_type: record.tampering_type || 'Unknown', magnetic_deviation: magneticDeviationValue, hall_effect: hallValue, ...record.metadata },
       };
-      const report = sensorDataToReport(sensorData);
+      const report = anomalyToReport(sensorData);
       callback(sensorData, report);
     }
 
@@ -348,7 +379,7 @@ export function listenToSensorData(
           status: magStatus,
           metadata: { is_tampering: record.is_tampering, tampering_type: record.tampering_type, hall_effect: hallValue, ...record.metadata },
         };
-        const report = sensorDataToReport(sensorData);
+        const report = anomalyToReport(sensorData);
         callback(sensorData, report);
       }
     }
@@ -364,235 +395,6 @@ export function listenToSensorData(
   };
 }
 
-/**
- * Fetch latest sensor data (one-time fetch)
- */
-export async function fetchLatestSensorData(limit: number = 10): Promise<SensorData[]> {
-  // Legacy helper now points to anomaly_data for consistency
-  try {
-    const sensorsRef = ref(database, 'urbanwatch/anomaly_data');
-    const cutoff = Date.now() - RECENT_WINDOW_MS;
-    // Try to fetch only the most recent items by timestamp, then filter by cutoff as safeguard
-    const recentQuery = query(
-      sensorsRef,
-      orderByChild('timestamp'),
-      startAt(new Date(cutoff).toISOString()),
-      limitToLast(limit * 5)
-    );
-    const snapshot = await get(recentQuery);
-    
-    if (!snapshot.exists()) {
-      return [];
-    }
-
-    const sensorDataList: SensorData[] = [];
-
-    snapshot.forEach((child) => {
-      const recordKey = child.key as string;
-      const record = child.val();
-      const sensorId = `sensor-${recordKey}`;
-      
-      // Parse timestamp - ensure proper date parsing
-      let timestamp: number;
-      if (record.timestamp) {
-        const date = new Date(record.timestamp);
-        timestamp = !isNaN(date.getTime()) ? date.getTime() : Date.now();
-      } else {
-        timestamp = Date.now();
-      }
-
-      // Skip stale items outside the recent window
-      if (timestamp < cutoff) {
-        return;
-      }
-      
-      // Process decibels (noise) - Only if threshold exceeded
-      // Parse as number (Firebase may return strings)
-      if (record.decibels !== undefined && record.decibels !== null) {
-        const decibelsValue = typeof record.decibels === 'string' ? parseFloat(record.decibels) : Number(record.decibels);
-        if (isNaN(decibelsValue)) return; // Skip if not a valid number
-        
-        const decibelStatus = SENSOR_RULES.statusRules.getStatus(
-          decibelsValue,
-          SENSOR_THRESHOLDS.decibels.warning,
-          SENSOR_THRESHOLDS.decibels.critical
-        );
-        
-        if (decibelStatus !== 'normal') {
-          sensorDataList.push({
-            id: `${sensorId}-decibels-${timestamp}`,
-            sensorId,
-            sensorType: 'noise',
-            value: decibelsValue,
-            unit: 'dB',
-            location: record.location || { latitude: 0, longitude: 0 },
-            timestamp,
-            threshold: {
-              min: 0,
-              max: SENSOR_THRESHOLDS.decibels.warning,
-            },
-            status: decibelStatus,
-            metadata: {
-              amplitude: record.amplitude,
-              sound: record.sound,
-            },
-          });
-        }
-      }
-      
-      // Process sound (noise) - Only if threshold exceeded
-      // Parse as number (Firebase may return strings)
-      if (record.sound !== undefined && record.sound !== null) {
-        const soundValue = typeof record.sound === 'string' ? parseFloat(record.sound) : Number(record.sound);
-        if (isNaN(soundValue)) return; // Skip if not a valid number
-        
-        const soundStatus = SENSOR_RULES.statusRules.getStatus(
-          soundValue,
-          SENSOR_THRESHOLDS.sound.warning,
-          SENSOR_THRESHOLDS.sound.critical
-        );
-        
-        if (soundStatus !== 'normal') {
-          sensorDataList.push({
-            id: `${sensorId}-sound-${timestamp}`,
-            sensorId,
-            sensorType: 'noise',
-            value: soundValue,
-            unit: '',
-            location: record.location || { latitude: 0, longitude: 0 },
-            timestamp,
-            threshold: {
-              min: 0,
-              max: SENSOR_THRESHOLDS.sound.warning,
-            },
-            status: soundStatus,
-            metadata: {
-              amplitude: record.amplitude,
-              decibels: record.decibels,
-            },
-          });
-        }
-      }
-      
-      // Process hall_effect - Only if threshold exceeded
-      // Parse as number (Firebase may return strings)
-      if (record.hall_effect !== undefined && record.hall_effect !== null) {
-        const hallValue = typeof record.hall_effect === 'string' ? parseFloat(record.hall_effect) : Number(record.hall_effect);
-        if (isNaN(hallValue)) return; // Skip if not a valid number
-        
-        const magneticDeviationValue = record.magnetic_deviation !== undefined && record.magnetic_deviation !== null
-          ? (typeof record.magnetic_deviation === 'string' ? parseFloat(record.magnetic_deviation) : Number(record.magnetic_deviation))
-          : 0;
-        
-        const hallStatus = SENSOR_RULES.statusRules.getStatus(
-          hallValue,
-          SENSOR_THRESHOLDS.hall_effect.warning,
-          SENSOR_THRESHOLDS.hall_effect.critical
-        );
-        
-        if (hallStatus !== 'normal') {
-          sensorDataList.push({
-            id: `${sensorId}-hall-${timestamp}`,
-            sensorId,
-            sensorType: magneticDeviationValue >= SENSOR_THRESHOLDS.magnetic_deviation.warning ? 'motion' : 'vibration',
-            value: hallValue,
-            unit: '',
-            location: record.location || { latitude: 0, longitude: 0 },
-            timestamp,
-            threshold: {
-              min: 0,
-              max: SENSOR_THRESHOLDS.hall_effect.warning,
-            },
-            status: hallStatus,
-            metadata: {
-              magnetic_deviation: magneticDeviationValue,
-              is_tampering: record.is_tampering,
-              tampering_type: record.tampering_type,
-            },
-          });
-        }
-      }
-      
-      // Process tampering detection - Always include if tampering detected
-      if (record.is_tampering === true) {
-        const magneticDeviationValue = record.magnetic_deviation !== undefined && record.magnetic_deviation !== null
-          ? (typeof record.magnetic_deviation === 'string' ? parseFloat(record.magnetic_deviation) : Number(record.magnetic_deviation))
-          : 0;
-        const hallValue = record.hall_effect !== undefined && record.hall_effect !== null
-          ? (typeof record.hall_effect === 'string' ? parseFloat(record.hall_effect) : Number(record.hall_effect))
-          : 0;
-        
-        sensorDataList.push({
-          id: `${sensorId}-tampering-${timestamp}`,
-          sensorId,
-          sensorType: 'motion',
-          value: magneticDeviationValue || hallValue || 0,
-          unit: '',
-          location: record.location || { latitude: 0, longitude: 0 },
-          timestamp,
-          threshold: {
-            min: 0,
-            max: SENSOR_THRESHOLDS.magnetic_deviation.critical,
-          },
-          status: 'critical',
-          metadata: {
-            tampering_type: record.tampering_type || 'Unknown',
-            magnetic_deviation: magneticDeviationValue,
-            hall_effect: hallValue,
-          },
-        });
-      }
-      
-      // Process magnetic_deviation - Only if threshold exceeded
-      // Parse as number (Firebase may return strings)
-      if (record.magnetic_deviation !== undefined && record.magnetic_deviation !== null) {
-        const magneticDeviationValue = typeof record.magnetic_deviation === 'string' 
-          ? parseFloat(record.magnetic_deviation) 
-          : Number(record.magnetic_deviation);
-        
-        if (!isNaN(magneticDeviationValue) && magneticDeviationValue >= SENSOR_THRESHOLDS.magnetic_deviation.warning) {
-          const magStatus = SENSOR_RULES.statusRules.getStatus(
-            magneticDeviationValue,
-            SENSOR_THRESHOLDS.magnetic_deviation.warning,
-            SENSOR_THRESHOLDS.magnetic_deviation.critical
-          );
-          
-          const hallValue = record.hall_effect !== undefined && record.hall_effect !== null
-            ? (typeof record.hall_effect === 'string' ? parseFloat(record.hall_effect) : Number(record.hall_effect))
-            : undefined;
-          
-          sensorDataList.push({
-            id: `${sensorId}-magnetic-${timestamp}`,
-            sensorId,
-            sensorType: 'motion',
-            value: magneticDeviationValue,
-            unit: '',
-            location: record.location || { latitude: 0, longitude: 0 },
-            timestamp,
-            threshold: {
-              min: 0,
-              max: SENSOR_THRESHOLDS.magnetic_deviation.warning,
-            },
-            status: magStatus,
-            metadata: {
-              is_tampering: record.is_tampering,
-              tampering_type: record.tampering_type,
-              hall_effect: hallValue,
-            },
-          });
-        }
-      }
-    });
-
-    // Sort by timestamp (newest first) and limit
-    return sensorDataList
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, limit);
-  } catch (error) {
-    console.error('Error fetching sensor data:', error);
-    return [];
-  }
-}
 
 /**
  * Fetch anomalies since a given timestamp (ms). Defaults to last 5 minutes window if not provided.
@@ -601,21 +403,13 @@ export async function fetchLatestAnomaliesSince(sinceMs?: number, limit: number 
   try {
     const sensorsRef = ref(database, 'urbanwatch/anomaly_data');
     const cutoff = sinceMs ?? (Date.now() - RECENT_WINDOW_MS);
-    let snapshot: DataSnapshot | null = null;
-    try {
-      const recentQuery = query(
-        sensorsRef,
-        orderByChild('timestamp'),
-        startAt(new Date(cutoff).toISOString()),
-        limitToLast(limit * 5)
-      );
-      snapshot = await get(recentQuery);
-    } catch (err) {
-      // Index missing on backend; fallback to simple limit and client-side filter
-      console.warn('Anomaly index missing, falling back to client filter:', err);
-      const fallbackQuery = query(sensorsRef, limitToLast(limit * 10));
-      snapshot = await get(fallbackQuery);
-    }
+    const recentQuery = query(
+      sensorsRef,
+      orderByChild('timestamp'),
+      startAt(new Date(cutoff).toISOString()),
+      limitToLast(limit * 5)
+    );
+    const snapshot = await get(recentQuery);
     if (!snapshot.exists()) return [];
     const list: SensorData[] = [];
     snapshot.forEach((child) => {
@@ -630,23 +424,80 @@ export async function fetchLatestAnomaliesSince(sinceMs?: number, limit: number 
         timestamp = Date.now();
       }
       if (timestamp < cutoff) return;
-      // Build minimal SensorData structure
+      // Only keep true anomalies if provided
+      if (record.is_anomaly === false) return;
+
+      // Derive sensor type from present fields and keep concise value/unit
+      let derivedType: SensorData['sensorType'] = 'noise';
+      let value = 0; let unit = '';
+      if (record.decibels != null) { derivedType = 'noise'; value = Number(record.decibels); unit = 'dB'; }
+      else if (record.sound != null) { derivedType = 'noise'; value = Number(record.sound); unit = ''; }
+      else if (record.hall_effect != null) { derivedType = 'motion'; value = Number(record.hall_effect); unit = ''; }
+      else if (record.magnetic_deviation != null) { derivedType = 'motion'; value = Number(record.magnetic_deviation); unit = ''; }
+      else if (record.amplitude != null) { derivedType = 'vibration'; value = Number(record.amplitude); unit = ''; }
+
+      // Threshold-based filtering for minimal noise (client-side safety)
+      const overNoiseWarn = (derivedType === 'noise') && (
+        (!isNaN(value)) && (
+          (unit === 'dB' && value >= SENSOR_THRESHOLDS.decibels.warning) ||
+          (unit !== 'dB' && value >= SENSOR_THRESHOLDS.sound.warning)
+        )
+      );
+      const overMotionWarn = (derivedType === 'motion') && !isNaN(value) && value >= SENSOR_THRESHOLDS.hall_effect.warning;
+      const overVibrationWarn = (derivedType === 'vibration') && !isNaN(value);
+      if (!(overNoiseWarn || overMotionWarn || overVibrationWarn || record.is_tampering === true)) {
+        return;
+      }
+
       const sensorData: SensorData = {
         id: `${sensorId}-${timestamp}`,
         sensorId,
-        sensorType: (record.sensorType || 'other') as SensorData['sensorType'],
-        value: Number(record.value ?? 0),
-        unit: record.unit ?? '',
+        sensorType: derivedType,
+        value: Number(value),
+        unit,
         location: record.location || { latitude: 0, longitude: 0 },
         timestamp,
         status: (record.status || 'warning') as SensorData['status'],
-        metadata: { ...record.metadata },
+        metadata: {
+          is_tampering: record.is_tampering,
+          tampering_type: record.tampering_type,
+        },
       };
       list.push(sensorData);
     });
     return list.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
   } catch (e) {
-    console.error('Error fetching anomalies:', e);
+    console.error('Error fetching anomalies (ensure indexOn timestamp is set under /urbanwatch/anomaly_data):', e);
+    return [];
+  }
+}
+
+/**
+ * Fetch device_status records since a given time and return raw filtered list
+ */
+export async function fetchLatestDeviceStatusSince(sinceMs?: number, limit: number = 10): Promise<{
+  timestamp: number;
+  cpu_temperature?: number;
+  health_status?: string;
+}[]> {
+  try {
+    const devRef = ref(database, 'urbanwatch/device_status');
+    const cutoff = sinceMs ?? (Date.now() - RECENT_WINDOW_MS);
+    const q = query(devRef, orderByChild('timestamp'), startAt(new Date(cutoff).toISOString()), limitToLast(limit * 4));
+    const snapshot = await get(q);
+    if (!snapshot.exists()) return [];
+    const list: { timestamp: number; cpu_temperature?: number; health_status?: string }[] = [];
+    snapshot.forEach(child => {
+      const rec = child.val() || {};
+      const tsVal = rec.timestamp;
+      const d = new Date(tsVal);
+      const ts = !isNaN(d.getTime()) ? d.getTime() : Date.now();
+      if (ts < cutoff) return;
+      list.push({ timestamp: ts, cpu_temperature: rec.cpu_temperature, health_status: rec.health_status });
+    });
+    return list.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
+  } catch (e) {
+    console.error('Error fetching device status (ensure indexOn timestamp is set under /urbanwatch/device_status):', e);
     return [];
   }
 }
@@ -654,89 +505,4 @@ export async function fetchLatestAnomaliesSince(sinceMs?: number, limit: number 
 /**
  * Generate report from sensor data
  */
-export async function generateReportFromSensor(recordKey: string): Promise<EmergencyReport | null> {
-  try {
-    const sensorRef = ref(database, `urbanwatch/sensor_data/${recordKey}`);
-    const snapshot = await get(sensorRef);
-    
-    if (!snapshot.exists()) {
-      return null;
-    }
-
-    const record = snapshot.val();
-    const sensorId = `sensor-${recordKey}`;
-    const timestamp = record.timestamp 
-      ? new Date(record.timestamp).getTime() 
-      : Date.now();
-
-    // Check which sensor value exceeded threshold and generate report
-    // Priority: tampering > magnetic_deviation > decibels > sound > hall_effect
-    if (record.is_tampering === true) {
-      const magneticDeviationValue = record.magnetic_deviation !== undefined && record.magnetic_deviation !== null
-        ? (typeof record.magnetic_deviation === 'string' ? parseFloat(record.magnetic_deviation) : Number(record.magnetic_deviation))
-        : 0;
-      const hallValue = record.hall_effect !== undefined && record.hall_effect !== null
-        ? (typeof record.hall_effect === 'string' ? parseFloat(record.hall_effect) : Number(record.hall_effect))
-        : 0;
-      
-      const sensorData: SensorData = {
-        id: `${sensorId}-tampering-${timestamp}`,
-        sensorId,
-        sensorType: 'motion',
-        value: magneticDeviationValue || hallValue || 0,
-        unit: '',
-        location: record.location || { latitude: 0, longitude: 0 },
-        timestamp,
-        threshold: {
-          min: 0,
-          max: SENSOR_THRESHOLDS.magnetic_deviation.critical,
-        },
-        status: 'critical',
-        metadata: {
-          tampering_type: record.tampering_type || 'Unknown',
-          magnetic_deviation: magneticDeviationValue,
-          hall_effect: hallValue,
-        },
-      };
-      return sensorDataToReport(sensorData);
-    }
-
-    // Parse as number (Firebase may return strings)
-    if (record.decibels !== undefined && record.decibels !== null) {
-      const decibelsValue = typeof record.decibels === 'string' ? parseFloat(record.decibels) : Number(record.decibels);
-      
-      if (!isNaN(decibelsValue) && decibelsValue >= SENSOR_THRESHOLDS.decibels.warning) {
-        const decibelStatus = SENSOR_RULES.statusRules.getStatus(
-          decibelsValue,
-          SENSOR_THRESHOLDS.decibels.warning,
-          SENSOR_THRESHOLDS.decibels.critical
-        );
-        const sensorData: SensorData = {
-          id: `${sensorId}-decibels-${timestamp}`,
-          sensorId,
-          sensorType: 'noise',
-          value: decibelsValue,
-          unit: 'dB',
-          location: record.location || { latitude: 0, longitude: 0 },
-          timestamp,
-          threshold: {
-            min: 0,
-            max: SENSOR_THRESHOLDS.decibels.warning,
-          },
-          status: decibelStatus,
-          metadata: {
-            amplitude: record.amplitude,
-            sound: record.sound,
-          },
-        };
-        return sensorDataToReport(sensorData);
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error generating report from sensor:', error);
-    return null;
-  }
-}
 

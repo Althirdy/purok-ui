@@ -2,21 +2,23 @@
  * News Feed Screen - Main Dashboard for Purok Officials
  */
 
-import { safeGet } from '@/api/axios';
 import { Toast, type ToastData } from '@/components/common/toast';
 import { ReportCard } from '@/components/news/report-card';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { MAX_REPORTS_LIMIT, SENSOR_PROCESSING_INTERVAL } from '@/constants/sensor-config';
+import { MAX_REPORTS_LIMIT } from '@/constants/sensor-config';
 import { useAuth } from '@/contexts/auth-context';
 import { useNotifications } from '@/contexts/notification-context';
-import { fetchLatestAnomaliesSince, listenToSensorData, sensorDataToReport } from '@/services/firebase-service';
+import { anomalyToReport, deviceStatusToReport, fetchLatestAnomaliesSince, fetchLatestDeviceStatusSince, listenToAnomalies } from '@/services/firebase-service';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Dimensions, Easing, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+const REPORTS_STORAGE_KEY = '@urbanwatch:reports';
 
 // Inline styles to avoid .styles.ts files being treated as routes
 const { colors, typography, spacing } = DesignSystem;
@@ -28,8 +30,8 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.primary.blue,
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
-    paddingBottom: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
+    paddingTop: spacing.sm,
   },
   headerTop: {
     flexDirection: 'row',
@@ -43,23 +45,29 @@ const styles = StyleSheet.create({
     maxWidth: isTablet ? '70%' : '80%',
   },
   logoSmall: {
-    width: isTablet ? 56 : 48,
-    height: isTablet ? 56 : 48,
-    borderRadius: isTablet ? 28 : 24,
+    width: isTablet ? 56 : 36,
+    height: isTablet ? 56 : 36,
+    borderRadius: isTablet ? 28 : 18,
     backgroundColor: colors.neutral.gray300,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.sm,
+    marginRight: spacing.xs,
   },
   headerTitle: {
-    fontSize: isTablet ? typography.fontSize.xl : typography.fontSize.lg,
+    fontSize: isTablet ? typography.fontSize.xl : typography.fontSize.base,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.inverse,
   },
   headerSubtitle: {
-    fontSize: isTablet ? typography.fontSize.base : typography.fontSize.sm,
+    fontSize: isTablet ? typography.fontSize.base : typography.fontSize.xs,
     color: colors.text.inverse,
     opacity: 0.9,
+  },
+  headerWelcome: {
+    fontSize: isTablet ? typography.fontSize.base : typography.fontSize.xs,
+    color: colors.text.inverse,
+    opacity: 0.85,
+    marginTop: 1,
   },
   headerRight: {
     flexDirection: 'row',
@@ -67,9 +75,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   iconButton: {
-    width: isTablet ? 48 : 40,
-    height: isTablet ? 48 : 40,
-    borderRadius: isTablet ? 24 : 20,
+    width: isTablet ? 48 : 32,
+    height: isTablet ? 48 : 32,
+    borderRadius: isTablet ? 24 : 16,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -211,7 +219,7 @@ const styles = StyleSheet.create({
 });
 
 export default function NewsFeedScreen() {
-  const { sessionStartMs } = useAuth();
+  const { sessionStartMs, user } = useAuth();
   const [activeFilter, setActiveFilter] = useState<FeedSource>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [reports, setReports] = useState<EmergencyReport[]>([]);
@@ -220,7 +228,7 @@ export default function NewsFeedScreen() {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [newReportCount, setNewReportCount] = useState(0);
   const [toast, setToast] = useState<ToastData | null>(null);
-  const { addNotificationFromReport, unreadCount } = useNotifications();
+  const { addNotificationFromReport, addNotification, unreadCount } = useNotifications();
   const [searchQuery, setSearchQuery] = useState('');
   const [committedQuery, setCommittedQuery] = useState('');
   
@@ -236,10 +244,12 @@ export default function NewsFeedScreen() {
   const processedReportIds = useRef<Set<string>>(new Set());
   const pendingReports = useRef<EmergencyReport[]>([]);
   const updateTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const immediateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isUpdating = useRef(false);
   // Use standardized constants from sensor-config
   const MAX_REPORTS = MAX_REPORTS_LIMIT;
-  const DATA_PROCESSING_INTERVAL = SENSOR_PROCESSING_INTERVAL; // 30 seconds interval (standardized)
+  // Use a shorter interval on mobile for a snappier experience
+  const DATA_PROCESSING_INTERVAL = 2000; // 2 seconds
 
   // Bottom sheet animation
   const slideAnim = useRef(new Animated.Value(0)).current; // 0 hidden, 1 visible
@@ -279,17 +289,25 @@ export default function NewsFeedScreen() {
       if (source === 'all' || source === 'sensor_box') {
         try {
           const sensorData = await fetchLatestAnomaliesSince(sessionStartMs, 40);
-          sensorReports = sensorData.map(data => sensorDataToReport(data));
+          sensorReports = sensorData.map(data => anomalyToReport(data));
         } catch (error) {
           console.warn('Error fetching sensor data:', error);
         }
+
+        // Device status (overheat/health) → reports
+        try {
+          const dev = await fetchLatestDeviceStatusSince(sessionStartMs, 12);
+          const devReports = dev
+            .map(deviceStatusToReport)
+            .filter((r): r is NonNullable<typeof r> => !!r);
+          sensorReports = [...sensorReports, ...devReports];
+        } catch (err) {
+          console.warn('Error fetching device status:', err);
+        }
       }
 
-      // Remove heavy mock fallback; prefer empty when API is unavailable
-      const mockData = await safeGet<EmergencyReport[]>(`/reports?source=${source}` as string, () => []);
-
-      // Combine sensor reports with mock data
-      const allReports = [...sensorReports, ...(Array.isArray(mockData) ? mockData : [])];
+      // Combine only sensor/device reports (no mock fallback)
+      const allReports = [...sensorReports];
       
       // Filter by source if not 'all'
       const filteredReports = source === 'all' 
@@ -315,7 +333,33 @@ export default function NewsFeedScreen() {
         processedReportIds.current.add(report.id);
       });
       
-      setReports(limitedReports);
+      // Merge with existing reports, preserving status
+      setReports(prevReports => {
+        if (prevReports.length === 0) {
+          return limitedReports;
+        }
+        const existingMap = new Map(prevReports.map(r => [r.id, r]));
+        const freshMap = new Map(limitedReports.map(r => [r.id, r]));
+        
+        // Merge: use existing status if report exists, otherwise use fresh
+        const merged = limitedReports.map(fresh => {
+          const existing = existingMap.get(fresh.id);
+          if (existing) {
+            return { ...fresh, status: existing.status };
+          }
+          return fresh;
+        });
+
+        // Add any existing reports that aren't in fresh (older reports)
+        existingMap.forEach((existing, id) => {
+          if (!freshMap.has(id)) {
+            merged.push(existing);
+          }
+        });
+
+        const sorted = merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        return sorted.slice(0, MAX_REPORTS);
+      });
     } finally {
       setLoading(false);
     }
@@ -384,81 +428,51 @@ export default function NewsFeedScreen() {
 
   // Batch process pending reports (throttled to prevent lag)
   const processPendingReports = useCallback(() => {
-    if (isUpdating.current || pendingReports.current.length === 0) {
+    if (isUpdating.current) return;
+    const next = pendingReports.current.shift();
+    if (!next) return;
+
+    // Skip if already processed or exists
+    if (processedReportIds.current.has(next.id)) {
       return;
     }
-
     isUpdating.current = true;
+    processedReportIds.current.add(next.id);
 
-    // Get unique new reports
-    const newReports = pendingReports.current.filter(
-      report => !processedReportIds.current.has(report.id)
-    );
-
-    if (newReports.length === 0) {
-      pendingReports.current = [];
-      isUpdating.current = false;
-      return;
-    }
-
-    // Mark as processed
-    newReports.forEach(report => {
-      processedReportIds.current.add(report.id);
-    });
-
-    // Batch update state
-    setReports(prevReports => {
-      // Filter out duplicates
-      const uniqueNewReports = newReports.filter(
-        newReport => !prevReports.some(existing => existing.id === newReport.id)
-      );
-
-      if (uniqueNewReports.length === 0) {
+    setReports(prev => {
+      if (prev.some(r => r.id === next.id)) {
         isUpdating.current = false;
-        return prevReports;
+        return prev;
       }
+      const updated = [next, ...prev].slice(0, MAX_REPORTS);
+      setNewReportCount(p => p + 1);
 
-      // Combine and limit to MAX_REPORTS
-      const updatedReports = [...uniqueNewReports, ...prevReports];
-      const limitedReports = updatedReports.slice(0, MAX_REPORTS);
+      // Defer notifications to avoid state updates during render
+      setTimeout(() => {
+        addNotificationFromReport(next);
+        if ((next.severity === 'critical' || next.severity === 'high') && !toast) {
+          setToast({
+            id: `toast-${next.id}-${Date.now()}`,
+            title: next.severity === 'critical' ? '🚨 Critical Alert' : '⚠️ Alert',
+            message: next.title,
+            severity: next.severity,
+            reportType: next.type,
+            onPress: () => handleReportPress(next.id),
+          });
+        }
+        isUpdating.current = false;
+      }, 0);
 
-      // Update count
-      setNewReportCount(prev => prev + uniqueNewReports.length);
-
-      // Add all new reports as notifications
-      uniqueNewReports.forEach(report => {
-        addNotificationFromReport(report);
-      });
-
-      // Show toast only for the most critical report
-      const criticalReport = uniqueNewReports.find(r => r.severity === 'critical') ||
-                            uniqueNewReports.find(r => r.severity === 'high');
-      
-      if (criticalReport && !toast) {
-        setToast({
-          id: `toast-${criticalReport.id}-${Date.now()}`,
-          title: criticalReport.severity === 'critical' ? '🚨 Critical Alert' : '⚠️ Alert',
-          message: criticalReport.title,
-          severity: criticalReport.severity,
-          reportType: criticalReport.type,
-          onPress: () => handleReportPress(criticalReport.id),
-        });
-      }
-
-      isUpdating.current = false;
-      return limitedReports;
+      return updated;
     });
-
-    // Clear pending
-    pendingReports.current = [];
-  }, [handleReportPress, toast]);
+  }, [handleReportPress, toast, addNotificationFromReport]);
 
   // Set up Firebase real-time listener for sensor data with throttling
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
 
     try {
-      unsubscribe = listenToSensorData((sensorData, report) => {
+      unsubscribe = listenToAnomalies((sensorData, report) => {
         // Skip if already processed
         if (processedReportIds.current.has(report.id)) {
           return;
@@ -466,6 +480,15 @@ export default function NewsFeedScreen() {
 
         // Add to pending queue
         pendingReports.current.push(report);
+
+        // Schedule an immediate, lightweight drain soon after each item arrives
+        if (immediateTimer.current) {
+          clearTimeout(immediateTimer.current);
+        }
+        immediateTimer.current = setTimeout(() => {
+          processPendingReports();
+          immediateTimer.current = null;
+        }, 300); // small debounce for bursts
       });
 
       // Set up interval to process pending reports every 30 seconds (standardized interval)
@@ -483,6 +506,10 @@ export default function NewsFeedScreen() {
       if (updateTimer.current) {
         clearInterval(updateTimer.current);
       }
+      if (immediateTimer.current) {
+        clearTimeout(immediateTimer.current);
+        immediateTimer.current = null;
+      }
       if (unsubscribe) {
         unsubscribe();
       }
@@ -491,14 +518,52 @@ export default function NewsFeedScreen() {
     };
   }, [handleReportPress, processPendingReports, addNotificationFromReport]);
 
+  // Load cached reports on mount
   useEffect(() => {
+    const loadCachedReports = async () => {
+      try {
+        const cached = await AsyncStorage.getItem(REPORTS_STORAGE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          // Convert timestamp strings back to Date objects
+          const withDates = parsed.map((r: any) => ({
+            ...r,
+            timestamp: new Date(r.timestamp),
+          }));
+          setReports(withDates);
+          // Mark as processed to avoid duplicates
+          withDates.forEach((r: EmergencyReport) => {
+            processedReportIds.current.add(r.id);
+          });
+        }
+      } catch (error) {
+        console.error('Error loading cached reports:', error);
+      }
+    };
+    loadCachedReports();
     fetchReports(activeFilter);
   }, [activeFilter]);
 
-  const handleRefresh = () => {
+  // Save reports to cache whenever they change
+  useEffect(() => {
+    const saveReports = async () => {
+      try {
+        // Limit to last 100 reports to prevent storage bloat
+        const toSave = reports.slice(0, 100);
+        await AsyncStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(toSave));
+      } catch (error) {
+        console.error('Error saving reports:', error);
+      }
+    };
+    if (reports.length > 0) {
+      saveReports();
+    }
+  }, [reports]);
+
+  const handleRefresh = async () => {
     setRefreshing(true);
     setNewReportCount(0); // Reset new report count on refresh
-    processedReportIds.current.clear(); // Clear processed IDs
+    // Don't clear processedReportIds - keep existing reports
     pendingReports.current = []; // Clear pending
     
     // Restart the interval after refresh
@@ -509,7 +574,75 @@ export default function NewsFeedScreen() {
       processPendingReports();
     }, DATA_PROCESSING_INTERVAL);
     
-    fetchReports(activeFilter).finally(() => setRefreshing(false));
+    try {
+      // Fetch fresh reports and merge with existing (preserving status)
+      const freshReports = await (async () => {
+        let sensorReports: EmergencyReport[] = [];
+        
+        if (activeFilter === 'all' || activeFilter === 'sensor_box') {
+          try {
+            const sensorData = await fetchLatestAnomaliesSince(sessionStartMs, 40);
+            sensorReports = sensorData.map(data => anomalyToReport(data));
+          } catch (error) {
+            console.warn('Error fetching sensor data:', error);
+          }
+
+          try {
+            const dev = await fetchLatestDeviceStatusSince(sessionStartMs, 12);
+            const devReports = dev
+              .map(deviceStatusToReport)
+              .filter((r): r is NonNullable<typeof r> => !!r);
+            sensorReports = [...sensorReports, ...devReports];
+          } catch (err) {
+            console.warn('Error fetching device status:', err);
+          }
+        }
+
+        const allReports = [...sensorReports];
+        const filteredReports = activeFilter === 'all' 
+          ? allReports 
+          : allReports.filter(r => {
+              if (activeFilter === 'sensor_box') return r.source === 'sensor';
+              if (activeFilter === 'cctv') return r.source === 'cctv';
+              if (activeFilter === 'citizen_reports') return r.source === 'citizen';
+              return true;
+            });
+
+        filteredReports.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        const uniqueReports = filteredReports.filter((report, index, self) =>
+          index === self.findIndex(r => r.id === report.id)
+        );
+        return uniqueReports.slice(0, MAX_REPORTS);
+      })();
+
+      // Merge with existing reports, preserving status from existing reports
+      setReports(prevReports => {
+        const existingMap = new Map(prevReports.map(r => [r.id, r]));
+        const freshMap = new Map(freshReports.map(r => [r.id, r]));
+        
+        // Merge: use existing status if report exists, otherwise use fresh
+        const merged = freshReports.map(fresh => {
+          const existing = existingMap.get(fresh.id);
+          if (existing) {
+            // Preserve status from existing report
+            return { ...fresh, status: existing.status };
+          }
+          return fresh;
+        });
+
+        // Add any existing reports that aren't in fresh (older reports)
+        existingMap.forEach((existing, id) => {
+          if (!freshMap.has(id)) {
+            merged.push(existing);
+          }
+        });
+
+        const sorted = merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        return sorted.slice(0, MAX_REPORTS);
+      });
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleFilterChange = (filter: FeedSource) => {
@@ -532,6 +665,18 @@ export default function NewsFeedScreen() {
             : report
         )
       );
+      const r = reports.find(r => r.id === selectedReportId);
+      if (r) {
+        addNotification({
+          id: `update-${r.id}-${Date.now()}`,
+          type: 'report_update',
+          title: 'Report Acknowledged',
+          message: r.title,
+          reportId: r.id,
+          timestamp: new Date(),
+          read: false,
+        });
+      }
     } else {
       setReports(prevReports =>
         prevReports.map(report =>
@@ -540,6 +685,18 @@ export default function NewsFeedScreen() {
             : report
         )
       );
+      const r = reports.find(r => r.id === selectedReportId);
+      if (r) {
+        addNotification({
+          id: `update-${r.id}-${Date.now()}`,
+          type: 'report_update',
+          title: 'Report Resolved',
+          message: r.title,
+          reportId: r.id,
+          timestamp: new Date(),
+          read: false,
+        });
+      }
     }
     dismissSheet();
   };
@@ -547,6 +704,9 @@ export default function NewsFeedScreen() {
   // Manual reporting removed
 
   function renderHeader() {
+    const name = (user?.name || '').trim();
+    const parts = name.split(/\s+/);
+    const displayName = parts.length >= 2 ? `${parts[0]} ${parts[parts.length - 1]}` : (name || 'Purok Leader');
     return (
     <View style={styles.headerWrapper}>
       {/* App Header */}
@@ -554,11 +714,12 @@ export default function NewsFeedScreen() {
         <View style={styles.headerTop}>
           <View style={styles.headerLeft}>
             <View style={styles.logoSmall}>
-              <Ionicons name="shield" size={24} color={colors.primary.blue} />
+              <Ionicons name="shield" size={isTablet ? 24 : 18} color={colors.primary.blue} />
             </View>
             <View>
               <Text style={styles.headerTitle}>UrbanWatch</Text>
               <Text style={styles.headerSubtitle}>Purok Feed</Text>
+              <Text style={styles.headerWelcome}>Welcome, {displayName}</Text>
             </View>
           </View>
           <View style={styles.headerRight}>
@@ -567,7 +728,7 @@ export default function NewsFeedScreen() {
               onPress={() => router.push('/(tabs)/notifications' as any)}
               activeOpacity={0.7}
             >
-              <Ionicons name="notifications" size={24} color={colors.text.inverse} />
+              <Ionicons name="notifications" size={isTablet ? 24 : 20} color={colors.text.inverse} />
               {unreadCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
@@ -588,7 +749,7 @@ export default function NewsFeedScreen() {
           </TouchableOpacity>
           <TextInput
             style={styles.searchText}
-            placeholder="Search incidents, locations…"
+            placeholder="Search incidents"
             placeholderTextColor={colors.text.secondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -605,7 +766,7 @@ export default function NewsFeedScreen() {
             <Text style={styles.statValue}>{pendingCount}</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Acknowledged</Text>
+            <Text style={styles.statLabel}>Ack'd</Text>
             <Text style={styles.statValue}>{acknowledgedCount}</Text>
           </View>
           <View style={styles.statCard}>

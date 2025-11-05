@@ -79,7 +79,7 @@ export function ModernTabBar({ state, descriptors, navigation }: BottomTabBarPro
             <View style={styles.iconContainer}>
               <Ionicons
                 name={tabConfig.icon(isFocused) as any}
-                size={isFocused ? 28 : 24}
+                size={isFocused ? 22 : 20}
                 color={isFocused ? colors.text.inverse : colors.neutral.gray400}
               />
             </View>
@@ -103,8 +103,8 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: colors.primary.blue,
-    paddingBottom: spacing.sm,
-    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+    paddingTop: spacing.xs,
     elevation: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.xs / 2,
     position: 'relative',
     zIndex: 1,
   },
@@ -124,16 +124,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: '20%',
     right: '20%',
-    height: 3,
+    height: 2.5,
     backgroundColor: colors.accent.orange,
     borderRadius: borderRadius.sm,
   },
   iconContainer: {
-    marginBottom: spacing.xs,
+    marginBottom: spacing.xs / 2,
     zIndex: 2,
   },
   label: {
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.xs * 0.9,
     fontWeight: typography.fontWeight.medium,
     color: colors.neutral.gray400,
     zIndex: 2,

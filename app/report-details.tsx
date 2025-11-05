@@ -91,7 +91,7 @@ export default function ReportDetailsScreen() {
             "There's a person suddenly collapsed on the road of Barangay 176, Near Metroplaza. With a heat index of 38°C, it is suspected to be a Heat Stroke. Immediate Medical Response is needed.",
           location: 'Barangay 176, Near Metroplaza',
           timestamp: new Date(),
-          status: 'acknowledged',
+          status: 'pending',
           severity: 'high',
           source: 'cctv',
         }));

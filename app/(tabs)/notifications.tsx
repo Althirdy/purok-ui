@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
   markAllRead: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.accent.orange,
+    color: colors.primary.blue,
   },
   unreadSection: {
     paddingHorizontal: spacing.lg,
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   iconContainerUnread: {
-    backgroundColor: `${colors.accent.orange}20`,
+    backgroundColor: `${colors.primary.blue}20`,
   },
   textContent: {
     flex: 1,
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.accent.orange,
+    backgroundColor: colors.primary.blue,
     marginLeft: spacing.xs,
   },
   notificationMessage: {
