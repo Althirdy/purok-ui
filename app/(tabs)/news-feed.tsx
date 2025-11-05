@@ -9,9 +9,10 @@ import { globalStyles } from '@/constants/global-styles';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Animated, Dimensions, Easing, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { listenToSensorData, fetchLatestSensorData, sensorDataToReport } from '@/services/firebase-service';
 
 // Inline styles to avoid .styles.ts files being treated as routes
 const { colors, typography, spacing } = DesignSystem;
@@ -212,6 +213,7 @@ export default function NewsFeedScreen() {
   const [showAckModal, setShowAckModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [newReportCount, setNewReportCount] = useState(0);
 
   // Bottom sheet animation
   const slideAnim = useRef(new Animated.Value(0)).current; // 0 hidden, 1 visible
@@ -245,7 +247,20 @@ export default function NewsFeedScreen() {
   const fetchReports = async (source: FeedSource) => {
     setLoading(true);
     try {
-      const data = await safeGet<EmergencyReport[]>(`/reports?source=${source}` as string, () => [
+      // Try to fetch from Firebase first
+      let sensorReports: EmergencyReport[] = [];
+      
+      if (source === 'all' || source === 'sensor_box') {
+        try {
+          const sensorData = await fetchLatestSensorData(20);
+          sensorReports = sensorData.map(data => sensorDataToReport(data));
+        } catch (error) {
+          console.warn('Error fetching sensor data:', error);
+        }
+      }
+
+      // Fallback to mock data if needed
+      const mockData = await safeGet<EmergencyReport[]>(`/reports?source=${source}` as string, () => [
         {
           id: 'UW-2025-001',
           type: 'suspicious',
@@ -258,11 +273,76 @@ export default function NewsFeedScreen() {
           source: 'cctv',
         },
       ]);
-      setReports(Array.isArray(data) ? [data[0]] : []);
+
+      // Combine sensor reports with mock data
+      const allReports = [...sensorReports, ...(Array.isArray(mockData) ? mockData : [])];
+      
+      // Filter by source if not 'all'
+      const filteredReports = source === 'all' 
+        ? allReports 
+        : allReports.filter(r => {
+            if (source === 'sensor_box') return r.source === 'sensor';
+            if (source === 'cctv') return r.source === 'cctv';
+            if (source === 'citizen_reports') return r.source === 'citizen';
+            return true;
+          });
+
+      // Sort by timestamp (newest first)
+      filteredReports.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      
+      setReports(filteredReports);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleReportPress = useCallback((reportId: string) => {
+    router.push({ pathname: 'report-details', params: { reportId } } as any);
+  }, []);
+
+  // Set up Firebase real-time listener for sensor data
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+
+    try {
+      unsubscribe = listenToSensorData((sensorData, report) => {
+        // Check if this report already exists
+        setReports(prevReports => {
+          const exists = prevReports.some(r => r.id === report.id);
+          if (exists) {
+            return prevReports;
+          }
+
+          // Add new report and show notification
+          setNewReportCount(prev => prev + 1);
+          
+          // Show alert for critical/high severity reports
+          if (report.severity === 'critical' || report.severity === 'high') {
+            Alert.alert(
+              '🚨 New Sensor Alert',
+              `${report.title}\n\n${report.description}\n\nLocation: ${report.location}`,
+              [
+                { text: 'View', onPress: () => handleReportPress(report.id) },
+                { text: 'OK', style: 'cancel' },
+              ]
+            );
+          }
+
+          // Add new report at the beginning
+          return [report, ...prevReports];
+        });
+      });
+    } catch (error) {
+      console.error('Error setting up Firebase listener:', error);
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [handleReportPress]);
 
   useEffect(() => {
     fetchReports(activeFilter);
@@ -270,16 +350,13 @@ export default function NewsFeedScreen() {
 
   const handleRefresh = () => {
     setRefreshing(true);
+    setNewReportCount(0); // Reset new report count on refresh
     fetchReports(activeFilter).finally(() => setRefreshing(false));
   };
 
   const handleFilterChange = (filter: FeedSource) => {
     setActiveFilter(filter);
     // TODO: Filter reports based on source
-  };
-
-  const handleReportPress = (reportId: string) => {
-    router.push({ pathname: 'report-details', params: { reportId } } as any);
   };
 
   const handleAcknowledge = (reportId: string) => {
@@ -320,9 +397,9 @@ export default function NewsFeedScreen() {
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.iconButton}>
               <Ionicons name="notifications" size={24} color={colors.text.inverse} />
-              {pendingCount > 0 && (
+              {(pendingCount > 0 || newReportCount > 0) && (
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{pendingCount}</Text>
+                  <Text style={styles.badgeText}>{pendingCount + newReportCount}</Text>
                 </View>
               )}
             </TouchableOpacity>
