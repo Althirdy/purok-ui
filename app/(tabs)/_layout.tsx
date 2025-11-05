@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 
 import { ModernTabBar } from '@/components/modern-tab-bar';
+import { NotificationProvider } from '@/contexts/notification-context';
 
 export const unstable_settings = {
   initialRouteName: 'news-feed',
@@ -8,11 +9,12 @@ export const unstable_settings = {
 
 export default function TabLayout() {
   return (
-    <Tabs
-      tabBar={(props) => <ModernTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-      }}>
+    <NotificationProvider>
+      <Tabs
+        tabBar={(props) => <ModernTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+        }}>
       <Tabs.Screen
         name="news-feed"
         options={{
@@ -51,5 +53,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </NotificationProvider>
   );
 }

@@ -6,17 +6,18 @@ import { Badge } from '@/components/common/badge';
 import { Card } from '@/components/common/card';
 import { DesignSystem } from '@/constants/design-system';
 import type { EmergencyReport } from '@/types';
+import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { colors, typography, spacing } = DesignSystem;
 
 interface ReportCardProps {
   report: EmergencyReport;
-  onPress: () => void;
-  onAcknowledge?: () => void;
+  onPress: (reportId: string) => void;
+  onAcknowledge?: (reportId: string) => void;
 }
 
-export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) {
+function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps) {
   const getSourceIcon = (source?: string) => {
     switch (source) {
       case 'cctv':
@@ -68,13 +69,22 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
 
   const formatTimestamp = (date: Date) => {
     const now = new Date();
-    const diff = now.getTime() - new Date(date).getTime();
+    const reportDate = new Date(date);
+    const diff = now.getTime() - reportDate.getTime();
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
     
+    if (minutes < 1) return 'just now';
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
-    return new Date(date).toLocaleDateString();
+    if (days === 1) return 'yesterday';
+    
+    // Format date: MM/DD/YYYY
+    const month = reportDate.getMonth() + 1;
+    const day = reportDate.getDate();
+    const year = reportDate.getFullYear();
+    return `${month}/${day}/${year}`;
   };
 
   const getStatusBadge = () => {
@@ -89,7 +99,7 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
   };
 
   return (
-    <Card onPress={onPress} variant="elevated" style={styles.card}>
+    <Card onPress={() => onPress(report.id)} variant="elevated" style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>{report.title}</Text>
         {getSeverityBadge(report.severity)}
@@ -107,9 +117,6 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
         </Text>
       </View>
 
-      <View style={styles.categoryContainer}>
-        <Text style={styles.categoryText}>Category: {getCategory(report.type)}</Text>
-      </View>
 
       {/* See More button (always visible) */}
       <TouchableOpacity 
@@ -119,7 +126,7 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
         ]}
         onPress={(e) => {
           e.stopPropagation();
-          onPress();
+          onPress(report.id);
         }}
         activeOpacity={0.8}
       >
@@ -131,7 +138,7 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
           style={styles.acknowledgeButton} 
           onPress={(e) => {
             e.stopPropagation();
-            onAcknowledge();
+            onAcknowledge(report.id);
           }}
         >
           <Text style={styles.acknowledgeText}>Acknowledge</Text>
@@ -148,6 +155,23 @@ export function ReportCard({ report, onPress, onAcknowledge }: ReportCardProps) 
     </Card>
   );
 }
+
+// Memoize component to prevent unnecessary re-renders
+// Only re-render if report data actually changed (not function references)
+export const ReportCard = React.memo(ReportCardComponent, (prevProps, nextProps) => {
+  // Return true if props are equal (skip re-render), false if different (re-render)
+  // Only check report properties, not function references (functions are stable in useCallback)
+  if (prevProps.report.id !== nextProps.report.id) return false;
+  if (prevProps.report.status !== nextProps.report.status) return false;
+  if (prevProps.report.title !== nextProps.report.title) return false;
+  if (prevProps.report.description !== nextProps.report.description) return false;
+  if (prevProps.report.severity !== nextProps.report.severity) return false;
+  if (prevProps.report.timestamp.getTime() !== nextProps.report.timestamp.getTime()) return false;
+  // onAcknowledge might be undefined, so handle that case
+  if (!!prevProps.onAcknowledge !== !!nextProps.onAcknowledge) return false;
+  
+  return true; // Props are equal, skip re-render
+});
 
 const styles = StyleSheet.create({
   card: {
@@ -228,15 +252,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
-  categoryContainer: {
-    marginBottom: spacing.sm,
-  },
-
-  categoryText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    fontStyle: 'italic',
-  },
   
   acknowledgeButton: {
     backgroundColor: colors.primary.blue,

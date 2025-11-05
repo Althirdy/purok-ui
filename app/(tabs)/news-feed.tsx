@@ -3,15 +3,18 @@
  */
 
 import { safeGet } from '@/api/axios';
+import { Toast, type ToastData } from '@/components/common/toast';
 import { ReportCard } from '@/components/news/report-card';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
+import { SENSOR_PROCESSING_INTERVAL, MAX_REPORTS_LIMIT } from '@/constants/sensor-config';
 import { fetchLatestSensorData, listenToSensorData, sensorDataToReport } from '@/services/firebase-service';
+import { useNotifications } from '@/contexts/notification-context';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Dimensions, Easing, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Dimensions, Easing, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Inline styles to avoid .styles.ts files being treated as routes
@@ -214,11 +217,22 @@ export default function NewsFeedScreen() {
   const [loading, setLoading] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [newReportCount, setNewReportCount] = useState(0);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const { addNotificationFromReport, unreadCount } = useNotifications();
+
+  // Performance optimization: Track processed IDs and batch updates
+  const processedReportIds = useRef<Set<string>>(new Set());
+  const pendingReports = useRef<EmergencyReport[]>([]);
+  const updateTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isUpdating = useRef(false);
+  // Use standardized constants from sensor-config
+  const MAX_REPORTS = MAX_REPORTS_LIMIT;
+  const DATA_PROCESSING_INTERVAL = SENSOR_PROCESSING_INTERVAL; // 30 seconds interval (standardized)
 
   // Bottom sheet animation
   const slideAnim = useRef(new Animated.Value(0)).current; // 0 hidden, 1 visible
 
-  const presentSheet = (reportId?: string) => {
+  const presentSheet = useCallback((reportId?: string) => {
     if (reportId) setSelectedReportId(reportId);
     setShowAckModal(true);
     requestAnimationFrame(() => {
@@ -229,9 +243,9 @@ export default function NewsFeedScreen() {
         useNativeDriver: true,
       }).start();
     });
-  };
+  }, [slideAnim]);
 
-  const dismissSheet = () => {
+  const dismissSheet = useCallback(() => {
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: 220,
@@ -241,7 +255,7 @@ export default function NewsFeedScreen() {
       setShowAckModal(false);
       setSelectedReportId(null);
     });
-  };
+  }, [slideAnim]);
 
   // Fetch reports by source (limited to a single mock item for now)
   const fetchReports = async (source: FeedSource) => {
@@ -290,7 +304,18 @@ export default function NewsFeedScreen() {
       // Sort by timestamp (newest first)
       filteredReports.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       
-      setReports(filteredReports);
+      // Remove duplicates and limit to MAX_REPORTS
+      const uniqueReports = filteredReports.filter((report, index, self) =>
+        index === self.findIndex(r => r.id === report.id)
+      );
+      const limitedReports = uniqueReports.slice(0, MAX_REPORTS);
+      
+      // Add to processed set to prevent listener duplicates
+      limitedReports.forEach(report => {
+        processedReportIds.current.add(report.id);
+      });
+      
+      setReports(limitedReports);
     } finally {
       setLoading(false);
     }
@@ -300,49 +325,142 @@ export default function NewsFeedScreen() {
     router.push({ pathname: 'report-details', params: { reportId } } as any);
   }, []);
 
-  // Set up Firebase real-time listener for sensor data
+  // Memoize acknowledge handler to prevent re-renders
+  const handleAcknowledgePress = useCallback((reportId: string) => {
+    presentSheet(reportId);
+  }, [presentSheet]);
+
+  // Optimized renderItem with memoized callbacks
+  const renderReportItem = useCallback(({ item }: { item: EmergencyReport }) => {
+    return (
+      <ReportCard
+        report={item}
+        onPress={handleReportPress}
+        onAcknowledge={item.status === 'pending' ? handleAcknowledgePress : undefined}
+      />
+    );
+  }, [handleReportPress, handleAcknowledgePress]);
+
+  // Memoize keyExtractor
+  const keyExtractor = useCallback((item: EmergencyReport) => item.id, []);
+
+  // Calculate counts for header (memoized to prevent recalculation)
+  const pendingCount = useMemo(() => reports.filter(r => r.status === 'pending').length, [reports]);
+  const acknowledgedCount = useMemo(() => reports.filter(r => r.status === 'acknowledged').length, [reports]);
+  
+  // Memoize header component - only recompute when dependencies change
+  const memoizedHeader = useMemo(() => {
+    return renderHeader();
+  }, [activeFilter, pendingCount, acknowledgedCount, newReportCount, unreadCount]);
+
+  // Batch process pending reports (throttled to prevent lag)
+  const processPendingReports = useCallback(() => {
+    if (isUpdating.current || pendingReports.current.length === 0) {
+      return;
+    }
+
+    isUpdating.current = true;
+
+    // Get unique new reports
+    const newReports = pendingReports.current.filter(
+      report => !processedReportIds.current.has(report.id)
+    );
+
+    if (newReports.length === 0) {
+      pendingReports.current = [];
+      isUpdating.current = false;
+      return;
+    }
+
+    // Mark as processed
+    newReports.forEach(report => {
+      processedReportIds.current.add(report.id);
+    });
+
+    // Batch update state
+    setReports(prevReports => {
+      // Filter out duplicates
+      const uniqueNewReports = newReports.filter(
+        newReport => !prevReports.some(existing => existing.id === newReport.id)
+      );
+
+      if (uniqueNewReports.length === 0) {
+        isUpdating.current = false;
+        return prevReports;
+      }
+
+      // Combine and limit to MAX_REPORTS
+      const updatedReports = [...uniqueNewReports, ...prevReports];
+      const limitedReports = updatedReports.slice(0, MAX_REPORTS);
+
+      // Update count
+      setNewReportCount(prev => prev + uniqueNewReports.length);
+
+      // Add all new reports as notifications
+      uniqueNewReports.forEach(report => {
+        addNotificationFromReport(report);
+      });
+
+      // Show toast only for the most critical report
+      const criticalReport = uniqueNewReports.find(r => r.severity === 'critical') ||
+                            uniqueNewReports.find(r => r.severity === 'high');
+      
+      if (criticalReport && !toast) {
+        setToast({
+          id: `toast-${criticalReport.id}-${Date.now()}`,
+          title: criticalReport.severity === 'critical' ? '🚨 Critical Alert' : '⚠️ Alert',
+          message: criticalReport.title,
+          severity: criticalReport.severity,
+          reportType: criticalReport.type,
+          onPress: () => handleReportPress(criticalReport.id),
+        });
+      }
+
+      isUpdating.current = false;
+      return limitedReports;
+    });
+
+    // Clear pending
+    pendingReports.current = [];
+  }, [handleReportPress, toast]);
+
+  // Set up Firebase real-time listener for sensor data with throttling
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
 
     try {
       unsubscribe = listenToSensorData((sensorData, report) => {
-        // Check if this report already exists
-        setReports(prevReports => {
-          const exists = prevReports.some(r => r.id === report.id);
-          if (exists) {
-            return prevReports;
-          }
+        // Skip if already processed
+        if (processedReportIds.current.has(report.id)) {
+          return;
+        }
 
-          // Add new report and show notification
-          setNewReportCount(prev => prev + 1);
-          
-          // Show alert for critical/high severity reports
-          if (report.severity === 'critical' || report.severity === 'high') {
-            Alert.alert(
-              '🚨 New Sensor Alert',
-              `${report.title}\n\n${report.description}\n\nLocation: ${report.location}`,
-              [
-                { text: 'View', onPress: () => handleReportPress(report.id) },
-                { text: 'OK', style: 'cancel' },
-              ]
-            );
-          }
-
-          // Add new report at the beginning
-          return [report, ...prevReports];
-        });
+        // Add to pending queue
+        pendingReports.current.push(report);
       });
+
+      // Set up interval to process pending reports every 30 seconds (standardized interval)
+      // This ensures we only process incoming data at fixed 30-second intervals
+      // All incoming sensor data is batched and processed together to prevent UI lag
+      updateTimer.current = setInterval(() => {
+        processPendingReports();
+      }, DATA_PROCESSING_INTERVAL);
     } catch (error) {
       console.error('Error setting up Firebase listener:', error);
     }
 
     // Cleanup on unmount
     return () => {
+      if (updateTimer.current) {
+        clearInterval(updateTimer.current);
+      }
       if (unsubscribe) {
         unsubscribe();
       }
+      processedReportIds.current.clear();
+      pendingReports.current = [];
     };
-  }, [handleReportPress]);
+  }, [handleReportPress, processPendingReports, addNotificationFromReport]);
 
   useEffect(() => {
     fetchReports(activeFilter);
@@ -351,6 +469,17 @@ export default function NewsFeedScreen() {
   const handleRefresh = () => {
     setRefreshing(true);
     setNewReportCount(0); // Reset new report count on refresh
+    processedReportIds.current.clear(); // Clear processed IDs
+    pendingReports.current = []; // Clear pending
+    
+    // Restart the interval after refresh
+    if (updateTimer.current) {
+      clearInterval(updateTimer.current);
+    }
+    updateTimer.current = setInterval(() => {
+      processPendingReports();
+    }, DATA_PROCESSING_INTERVAL);
+    
     fetchReports(activeFilter).finally(() => setRefreshing(false));
   };
 
@@ -378,8 +507,6 @@ export default function NewsFeedScreen() {
 
   // Manual reporting removed
 
-  const pendingCount = reports.filter(r => r.status === 'pending').length;
-
   const renderHeader = () => (
     <View style={styles.headerWrapper}>
       {/* App Header */}
@@ -395,11 +522,17 @@ export default function NewsFeedScreen() {
             </View>
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.iconButton}>
+            <TouchableOpacity 
+              style={styles.iconButton}
+              onPress={() => router.push('/(tabs)/notifications' as any)}
+              activeOpacity={0.7}
+            >
               <Ionicons name="notifications" size={24} color={colors.text.inverse} />
-              {(pendingCount > 0 || newReportCount > 0) && (
+              {unreadCount > 0 && (
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{pendingCount + newReportCount}</Text>
+                  <Text style={styles.badgeText}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -422,7 +555,7 @@ export default function NewsFeedScreen() {
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Acknowledged</Text>
-            <Text style={styles.statValue}>{reports.filter(r => r.status === 'acknowledged').length}</Text>
+            <Text style={styles.statValue}>{acknowledgedCount}</Text>
           </View>
         </View>
       </View>
@@ -515,15 +648,9 @@ export default function NewsFeedScreen() {
       {/* Reports List */}
       <FlatList
         data={reports}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ReportCard
-            report={item}
-            onPress={() => handleReportPress(item.id)}
-            onAcknowledge={() => handleAcknowledge(item.id)}
-          />
-        )}
-        ListHeaderComponent={renderHeader}
+        keyExtractor={keyExtractor}
+        renderItem={renderReportItem}
+        ListHeaderComponent={memoizedHeader}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
@@ -538,6 +665,13 @@ export default function NewsFeedScreen() {
             <Text style={styles.emptyStateText}>{loading ? 'Loading reports...' : 'No reports available'}</Text>
           </View>
         }
+        // Performance optimizations for rapid data
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={10}
+        windowSize={10}
+        // Note: getItemLayout removed - items have variable heights based on content
       />
 
       {/* Bottom Acknowledgement Sheet (matches mobile UI) */}
@@ -600,6 +734,9 @@ export default function NewsFeedScreen() {
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Modern Toast Notification */}
+      <Toast toast={toast} onDismiss={() => setToast(null)} duration={5000} />
     </SafeAreaView>
   );
 }

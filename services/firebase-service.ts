@@ -3,6 +3,7 @@
  */
 
 import { database } from '@/config/firebase';
+import { SENSOR_RULES, SENSOR_THRESHOLDS } from '@/constants/sensor-config';
 import type { EmergencyReport } from '@/types';
 import { DataSnapshot, get, off, onValue, ref } from 'firebase/database';
 
@@ -51,35 +52,31 @@ export function sensorDataToReport(sensorData: SensorData): EmergencyReport {
 
   switch (sensorData.sensorType) {
     case 'smoke':
-      reportType = 'fire';
-      severity = sensorData.status === 'critical' ? 'critical' : 'high';
+      reportType = SENSOR_RULES.reportTypeMapping.smoke;
+      severity = SENSOR_RULES.severityMapping.smoke(sensorData.status);
       title = 'Smoke Detected';
       description = `Smoke sensor detected ${sensorData.value} ${sensorData.unit} of smoke particles. Status: ${sensorData.status.toUpperCase()}`;
       break;
     
     case 'temperature':
-      if (sensorData.value > 50) {
-        reportType = 'fire';
-        severity = 'high';
+      reportType = SENSOR_RULES.reportTypeMapping.temperature(sensorData.value);
+      severity = SENSOR_RULES.severityMapping.temperature(sensorData.value);
+      if (sensorData.value > SENSOR_THRESHOLDS.temperature.critical) {
         title = 'High Temperature Detected';
         description = `Temperature sensor reading: ${sensorData.value}°C. Possible fire risk.`;
       } else {
-        reportType = 'other';
-        severity = 'medium';
         title = 'Temperature Alert';
         description = `Temperature sensor reading: ${sensorData.value}°C`;
       }
       break;
     
     case 'humidity':
-      if (sensorData.value > 80) {
-        reportType = 'other';
-        severity = 'medium';
+      reportType = SENSOR_RULES.reportTypeMapping.humidity;
+      severity = SENSOR_RULES.severityMapping.humidity(sensorData.value);
+      if (sensorData.value > SENSOR_THRESHOLDS.humidity.critical) {
         title = 'High Humidity Detected';
         description = `Humidity sensor reading: ${sensorData.value}%. High moisture levels detected.`;
       } else {
-        reportType = 'other';
-        severity = 'low';
         title = 'Humidity Alert';
         description = `Humidity sensor reading: ${sensorData.value}%`;
       }
@@ -87,52 +84,57 @@ export function sensorDataToReport(sensorData: SensorData): EmergencyReport {
     
     case 'motion':
       // Check if this is a tampering alert
+      const motionMetadata = sensorData.metadata ? {
+        is_tampering: sensorData.metadata.is_tampering,
+        magnetic_deviation: typeof sensorData.metadata.magnetic_deviation === 'string' 
+          ? parseFloat(sensorData.metadata.magnetic_deviation) 
+          : (typeof sensorData.metadata.magnetic_deviation === 'number' ? sensorData.metadata.magnetic_deviation : undefined)
+      } : undefined;
+      
+      reportType = SENSOR_RULES.reportTypeMapping.motion(motionMetadata);
       if (sensorData.metadata?.is_tampering === true || sensorData.metadata?.tampering_type) {
-        reportType = 'suspicious';
         severity = 'critical';
         title = 'Device Tampering Detected';
-        description = `Tampering detected! Type: ${sensorData.metadata.tampering_type || 'Unknown'}. Magnetic deviation: ${sensorData.metadata.magnetic_deviation || 'N/A'}. Immediate attention required.`;
+        description = `Tampering detected. Type: ${sensorData.metadata.tampering_type || 'Unknown'}. Immediate attention required.`;
       } else if (sensorData.metadata?.magnetic_deviation) {
         const magDevValue = typeof sensorData.metadata.magnetic_deviation === 'string' 
           ? parseFloat(sensorData.metadata.magnetic_deviation) 
           : Number(sensorData.metadata.magnetic_deviation);
-        if (!isNaN(magDevValue) && magDevValue >= 10) {
-          reportType = 'suspicious';
+        if (!isNaN(magDevValue) && magDevValue >= SENSOR_THRESHOLDS.magnetic_deviation.critical) {
           severity = 'high';
           title = 'Suspicious Magnetic Activity';
-          description = `Unusual magnetic deviation detected: ${magDevValue}. Possible tampering attempt.`;
+          description = `Unusual magnetic deviation detected. Possible tampering attempt.`;
+        } else {
+          severity = SENSOR_RULES.severityMapping.motion(sensorData.status, motionMetadata);
+          title = 'Motion Detected';
+          description = `Unusual activity detected.`;
         }
       } else {
-        reportType = 'suspicious';
-        severity = sensorData.status === 'critical' ? 'high' : 'medium';
+        severity = SENSOR_RULES.severityMapping.motion(sensorData.status, motionMetadata);
         title = 'Motion Detected';
-        description = `Motion sensor detected unusual activity. Sensor value: ${sensorData.value}`;
+        description = `Unusual activity detected.`;
       }
       break;
     
     case 'noise':
       // Use status from threshold check (already done in listener)
+      reportType = SENSOR_RULES.reportTypeMapping.noise;
+      severity = SENSOR_RULES.severityMapping.noise(sensorData.status);
       if (sensorData.status === 'critical') {
-        reportType = 'other';
-        severity = 'high';
         title = 'Critical Noise Level Detected';
         description = `High noise level detected: ${sensorData.value}${sensorData.unit ? ' ' + sensorData.unit : ''}. May indicate disturbance or emergency.`;
       } else if (sensorData.status === 'warning') {
-        reportType = 'other';
-        severity = 'medium';
         title = 'High Noise Level';
-        description = `Noise sensor detected ${sensorData.value}${sensorData.unit ? ' ' + sensorData.unit : ''}. May indicate disturbance.`;
+        description = `Noise level detected: ${sensorData.value}${sensorData.unit ? ' ' + sensorData.unit : ''}.`;
       } else {
-        reportType = 'other';
-        severity = 'low';
         title = 'Noise Alert';
         description = `Noise level: ${sensorData.value}${sensorData.unit ? ' ' + sensorData.unit : ''}`;
       }
       break;
     
     case 'vibration':
-      reportType = 'accident';
-      severity = sensorData.status === 'critical' ? 'high' : 'medium';
+      reportType = SENSOR_RULES.reportTypeMapping.vibration;
+      severity = SENSOR_RULES.severityMapping.vibration(sensorData.status);
       title = 'Vibration Detected';
       description = `Vibration sensor detected unusual movement. Value: ${sensorData.value}`;
       break;
@@ -148,8 +150,15 @@ export function sensorDataToReport(sensorData: SensorData): EmergencyReport {
   const location = sensorData.location.address || 
     `Lat: ${sensorData.location.latitude.toFixed(6)}, Lng: ${sensorData.location.longitude.toFixed(6)}`;
 
-  // Generate report ID
-  const reportId = `SENSOR-${sensorData.sensorId}-${Date.now()}`;
+  // Generate truly unique report ID with random suffix
+  const randomSuffix = Math.random().toString(36).substring(2, 11); // 9 chars random
+  const timestamp = sensorData.timestamp || Date.now();
+  const sensorFieldType = sensorData.metadata?.is_tampering ? 'tampering' :
+    sensorData.metadata?.magnetic_deviation ? 'magnetic' :
+    sensorData.sensorType === 'noise' ? (sensorData.unit === 'dB' ? 'decibels' : 'sound') :
+    sensorData.sensorType === 'motion' || sensorData.sensorType === 'vibration' ? 'hall' :
+    sensorData.sensorType;
+  const reportId = `SENSOR-${sensorData.sensorId}-${sensorFieldType}-${timestamp}-${randomSuffix}`;
 
   return {
     id: reportId,
@@ -165,25 +174,8 @@ export function sensorDataToReport(sensorData: SensorData): EmergencyReport {
   };
 }
 
-// Threshold levels for sensor alerts
-const SENSOR_THRESHOLDS = {
-  decibels: {
-    warning: 80,   // dB - Moderate noise level
-    critical: 90,   // dB - High noise level
-  },
-  sound: {
-    warning: 100,  // Raw sound value
-    critical: 150,  // Raw sound value
-  },
-  hall_effect: {
-    warning: 500,  // Hall effect sensor value
-    critical: 800,  // Hall effect sensor value
-  },
-  magnetic_deviation: {
-    warning: 5,    // Magnetic deviation
-    critical: 10,  // Magnetic deviation - indicates tampering
-  },
-};
+// Export thresholds for use in other files
+export { SENSOR_THRESHOLDS } from '@/constants/sensor-config';
 
 /**
  * Listen to sensor data from Firebase Realtime Database
@@ -210,9 +202,15 @@ export function listenToSensorData(
       const sensorId = `sensor-${recordKey}`;
       
       // Parse timestamp (format: "2025-11-04T06:25:27.317730")
-      const timestamp = record.timestamp 
-        ? new Date(record.timestamp).getTime() 
-        : Date.now();
+      // Ensure proper date parsing - Firebase timestamp is in ISO format
+      let timestamp: number;
+      if (record.timestamp) {
+        const date = new Date(record.timestamp);
+        // Validate that date is valid
+        timestamp = !isNaN(date.getTime()) ? date.getTime() : Date.now();
+      } else {
+        timestamp = Date.now();
+      }
       
       // Process decibels (noise sensor) - Check threshold
       // Parse as number (Firebase may return strings)
@@ -220,11 +218,11 @@ export function listenToSensorData(
         const decibelsValue = typeof record.decibels === 'string' ? parseFloat(record.decibels) : Number(record.decibels);
         if (isNaN(decibelsValue)) return; // Skip if not a valid number
         
-        const decibelStatus = decibelsValue >= SENSOR_THRESHOLDS.decibels.critical 
-          ? 'critical' 
-          : decibelsValue >= SENSOR_THRESHOLDS.decibels.warning 
-          ? 'warning' 
-          : 'normal';
+        const decibelStatus = SENSOR_RULES.statusRules.getStatus(
+          decibelsValue,
+          SENSOR_THRESHOLDS.decibels.warning,
+          SENSOR_THRESHOLDS.decibels.critical
+        );
         
         // Only generate report if threshold is exceeded
         if (decibelStatus !== 'normal') {
@@ -258,11 +256,11 @@ export function listenToSensorData(
         const soundValue = typeof record.sound === 'string' ? parseFloat(record.sound) : Number(record.sound);
         if (isNaN(soundValue)) return; // Skip if not a valid number
         
-        const soundStatus = soundValue >= SENSOR_THRESHOLDS.sound.critical 
-          ? 'critical' 
-          : soundValue >= SENSOR_THRESHOLDS.sound.warning 
-          ? 'warning' 
-          : 'normal';
+        const soundStatus = SENSOR_RULES.statusRules.getStatus(
+          soundValue,
+          SENSOR_THRESHOLDS.sound.warning,
+          SENSOR_THRESHOLDS.sound.critical
+        );
         
         // Only generate report if threshold is exceeded
         if (soundStatus !== 'normal') {
@@ -300,11 +298,11 @@ export function listenToSensorData(
           ? (typeof record.magnetic_deviation === 'string' ? parseFloat(record.magnetic_deviation) : Number(record.magnetic_deviation))
           : 0;
         
-        const hallStatus = hallValue >= SENSOR_THRESHOLDS.hall_effect.critical 
-          ? 'critical' 
-          : hallValue >= SENSOR_THRESHOLDS.hall_effect.warning 
-          ? 'warning' 
-          : 'normal';
+        const hallStatus = SENSOR_RULES.statusRules.getStatus(
+          hallValue,
+          SENSOR_THRESHOLDS.hall_effect.warning,
+          SENSOR_THRESHOLDS.hall_effect.critical
+        );
         
         // Only generate report if threshold is exceeded
         if (hallStatus !== 'normal') {
@@ -374,9 +372,11 @@ export function listenToSensorData(
           : Number(record.magnetic_deviation);
         
         if (!isNaN(magneticDeviationValue) && magneticDeviationValue >= SENSOR_THRESHOLDS.magnetic_deviation.warning) {
-          const magStatus = magneticDeviationValue >= SENSOR_THRESHOLDS.magnetic_deviation.critical 
-            ? 'critical' 
-            : 'warning';
+          const magStatus = SENSOR_RULES.statusRules.getStatus(
+            magneticDeviationValue,
+            SENSOR_THRESHOLDS.magnetic_deviation.warning,
+            SENSOR_THRESHOLDS.magnetic_deviation.critical
+          );
           
           const hallValue = record.hall_effect !== undefined && record.hall_effect !== null
             ? (typeof record.hall_effect === 'string' ? parseFloat(record.hall_effect) : Number(record.hall_effect))
@@ -438,10 +438,14 @@ export async function fetchLatestSensorData(limit: number = 10): Promise<SensorD
       const record = sensorDataRecords[recordKey];
       const sensorId = `sensor-${recordKey}`;
       
-      // Parse timestamp
-      const timestamp = record.timestamp 
-        ? new Date(record.timestamp).getTime() 
-        : Date.now();
+      // Parse timestamp - ensure proper date parsing
+      let timestamp: number;
+      if (record.timestamp) {
+        const date = new Date(record.timestamp);
+        timestamp = !isNaN(date.getTime()) ? date.getTime() : Date.now();
+      } else {
+        timestamp = Date.now();
+      }
       
       // Process decibels (noise) - Only if threshold exceeded
       // Parse as number (Firebase may return strings)
@@ -449,11 +453,11 @@ export async function fetchLatestSensorData(limit: number = 10): Promise<SensorD
         const decibelsValue = typeof record.decibels === 'string' ? parseFloat(record.decibels) : Number(record.decibels);
         if (isNaN(decibelsValue)) return; // Skip if not a valid number
         
-        const decibelStatus = decibelsValue >= SENSOR_THRESHOLDS.decibels.critical 
-          ? 'critical' 
-          : decibelsValue >= SENSOR_THRESHOLDS.decibels.warning 
-          ? 'warning' 
-          : 'normal';
+        const decibelStatus = SENSOR_RULES.statusRules.getStatus(
+          decibelsValue,
+          SENSOR_THRESHOLDS.decibels.warning,
+          SENSOR_THRESHOLDS.decibels.critical
+        );
         
         if (decibelStatus !== 'normal') {
           sensorDataList.push({
@@ -483,11 +487,11 @@ export async function fetchLatestSensorData(limit: number = 10): Promise<SensorD
         const soundValue = typeof record.sound === 'string' ? parseFloat(record.sound) : Number(record.sound);
         if (isNaN(soundValue)) return; // Skip if not a valid number
         
-        const soundStatus = soundValue >= SENSOR_THRESHOLDS.sound.critical 
-          ? 'critical' 
-          : soundValue >= SENSOR_THRESHOLDS.sound.warning 
-          ? 'warning' 
-          : 'normal';
+        const soundStatus = SENSOR_RULES.statusRules.getStatus(
+          soundValue,
+          SENSOR_THRESHOLDS.sound.warning,
+          SENSOR_THRESHOLDS.sound.critical
+        );
         
         if (soundStatus !== 'normal') {
           sensorDataList.push({
@@ -521,11 +525,11 @@ export async function fetchLatestSensorData(limit: number = 10): Promise<SensorD
           ? (typeof record.magnetic_deviation === 'string' ? parseFloat(record.magnetic_deviation) : Number(record.magnetic_deviation))
           : 0;
         
-        const hallStatus = hallValue >= SENSOR_THRESHOLDS.hall_effect.critical 
-          ? 'critical' 
-          : hallValue >= SENSOR_THRESHOLDS.hall_effect.warning 
-          ? 'warning' 
-          : 'normal';
+        const hallStatus = SENSOR_RULES.statusRules.getStatus(
+          hallValue,
+          SENSOR_THRESHOLDS.hall_effect.warning,
+          SENSOR_THRESHOLDS.hall_effect.critical
+        );
         
         if (hallStatus !== 'normal') {
           sensorDataList.push({
@@ -588,9 +592,11 @@ export async function fetchLatestSensorData(limit: number = 10): Promise<SensorD
           : Number(record.magnetic_deviation);
         
         if (!isNaN(magneticDeviationValue) && magneticDeviationValue >= SENSOR_THRESHOLDS.magnetic_deviation.warning) {
-          const magStatus = magneticDeviationValue >= SENSOR_THRESHOLDS.magnetic_deviation.critical 
-            ? 'critical' 
-            : 'warning';
+          const magStatus = SENSOR_RULES.statusRules.getStatus(
+            magneticDeviationValue,
+            SENSOR_THRESHOLDS.magnetic_deviation.warning,
+            SENSOR_THRESHOLDS.magnetic_deviation.critical
+          );
           
           const hallValue = record.hall_effect !== undefined && record.hall_effect !== null
             ? (typeof record.hall_effect === 'string' ? parseFloat(record.hall_effect) : Number(record.hall_effect))
@@ -684,7 +690,11 @@ export async function generateReportFromSensor(recordKey: string): Promise<Emerg
       const decibelsValue = typeof record.decibels === 'string' ? parseFloat(record.decibels) : Number(record.decibels);
       
       if (!isNaN(decibelsValue) && decibelsValue >= SENSOR_THRESHOLDS.decibels.warning) {
-        const decibelStatus = decibelsValue >= SENSOR_THRESHOLDS.decibels.critical ? 'critical' : 'warning';
+        const decibelStatus = SENSOR_RULES.statusRules.getStatus(
+          decibelsValue,
+          SENSOR_THRESHOLDS.decibels.warning,
+          SENSOR_THRESHOLDS.decibels.critical
+        );
         const sensorData: SensorData = {
           id: `${sensorId}-decibels-${timestamp}`,
           sensorId,
