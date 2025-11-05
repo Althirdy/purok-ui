@@ -11,10 +11,11 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { colors, typography, spacing } = DesignSystem;
 
-interface ReportCardProps {
+export interface ReportCardProps {
   report: EmergencyReport;
-  onPress: (reportId: string) => void;
+  onPress?: (reportId: string) => void;
   onAcknowledge?: (reportId: string) => void;
+  [key: string]: any;
 }
 
 function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps) {
@@ -95,15 +96,25 @@ function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps
         </View>
       );
     }
+    if (report.status === 'resolved') {
+      return (
+        <View style={[styles.statusBadge, { backgroundColor: colors.semantic.success }]}>
+          <Text style={styles.statusText}>Resolved ✓</Text>
+        </View>
+      );
+    }
     return null;
   };
 
+  const canOpenDetails = !!onPress && report.status === 'pending';
+
   return (
-    <Card onPress={() => onPress(report.id)} variant="elevated" style={styles.card}>
+    <Card onPress={canOpenDetails ? () => onPress!(report.id) : undefined} variant="elevated" style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>{report.title}</Text>
         {getSeverityBadge(report.severity)}
       </View>
+      {getStatusBadge()}
 
       <View style={styles.descriptionContainer}>
         <Text style={styles.descriptionText} numberOfLines={4}>
@@ -118,20 +129,18 @@ function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps
       </View>
 
 
-      {/* See More button (always visible) */}
-      <TouchableOpacity 
-        style={[
-          styles.seeMoreButton,
-          report.status === 'acknowledged' && styles.seeMoreTopOnlyRadius,
-        ]}
-        onPress={(e) => {
-          e.stopPropagation();
-          onPress(report.id);
-        }}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.seeMoreText}>See More</Text>
-      </TouchableOpacity>
+      {report.status === 'pending' && onPress && (
+        <TouchableOpacity 
+          style={styles.seeMoreButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            onPress(report.id);
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.seeMoreText}>See More</Text>
+        </TouchableOpacity>
+      )}
 
       {report.status === 'pending' && onAcknowledge && (
         <TouchableOpacity 
@@ -145,12 +154,16 @@ function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps
         </TouchableOpacity>
       )}
 
-      {report.status === 'acknowledged' && (
-        <View>
-          <View style={styles.acknowledgedButton}>
-            <Text style={styles.acknowledgedTextAlt}>Acknowledged</Text>
-          </View>
-        </View>
+      {report.status === 'acknowledged' && onAcknowledge && (
+        <TouchableOpacity 
+          style={styles.acknowledgeButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            onAcknowledge(report.id);
+          }}
+        >
+          <Text style={styles.acknowledgeText}>Resolve</Text>
+        </TouchableOpacity>
       )}
     </Card>
   );
@@ -158,7 +171,7 @@ function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps
 
 // Memoize component to prevent unnecessary re-renders
 // Only re-render if report data actually changed (not function references)
-export const ReportCard = React.memo(ReportCardComponent, (prevProps, nextProps) => {
+export const ReportCard: React.MemoExoticComponent<React.NamedExoticComponent<ReportCardProps>> = React.memo(ReportCardComponent, (prevProps, nextProps) => {
   // Return true if props are equal (skip re-render), false if different (re-render)
   // Only check report properties, not function references (functions are stable in useCallback)
   if (prevProps.report.id !== nextProps.report.id) return false;
@@ -169,6 +182,7 @@ export const ReportCard = React.memo(ReportCardComponent, (prevProps, nextProps)
   if (prevProps.report.timestamp.getTime() !== nextProps.report.timestamp.getTime()) return false;
   // onAcknowledge might be undefined, so handle that case
   if (!!prevProps.onAcknowledge !== !!nextProps.onAcknowledge) return false;
+  if (!!prevProps.onPress !== !!nextProps.onPress) return false;
   
   return true; // Props are equal, skip re-render
 });

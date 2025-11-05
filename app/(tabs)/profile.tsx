@@ -4,9 +4,13 @@
 
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
+import { useAuth } from '@/contexts/auth-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing } = DesignSystem;
@@ -94,12 +98,22 @@ const styles = StyleSheet.create({
 });
 
 export default function ProfileScreen() {
-  // Mock user data
-  const user = {
-    name: 'Julius Bailon',
-    email: 'Juliusbailon@gmail.com',
-    initials: 'JB',
-  };
+  const { user, logout, refreshUser } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Refresh user data whenever the profile screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      setIsLoading(true);
+      refreshUser().finally(() => setIsLoading(false));
+    }, [refreshUser])
+  );
+  const initials = (user?.name || 'User')
+    .split(' ')
+    .map((p) => p[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   const handleProfileSettings = () => {
     router.push('./profile-settings');
@@ -118,7 +132,7 @@ export default function ProfileScreen() {
         { 
           text: 'Logout', 
           style: 'destructive',
-          onPress: () => router.replace('/(auth)/login') 
+          onPress: async () => { await logout(); router.replace('/(auth)/login'); }
         },
       ]
     );
@@ -136,15 +150,38 @@ export default function ProfileScreen() {
         {/* Avatar */}
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user.initials}</Text>
+            <Text style={styles.avatarText}>{initials}</Text>
           </View>
-          <Text style={styles.userName}>{user.name}</Text>
-          <Text style={styles.userEmail}>{user.email}</Text>
+          <Text style={styles.userName}>{user?.name || 'Purok Leader'}</Text>
+          <Text style={styles.userEmail}>{user?.purokName || ''}</Text>
+          {/* Personal info when available */}
+          {(user?.email || user?.phoneNumber || user?.address) && (
+            <View style={{ width: '100%', marginTop: spacing.lg }}>
+              <View style={{ backgroundColor: colors.background.card, borderWidth: 1, borderColor: colors.border.light, borderRadius: 14, padding: spacing.lg }}>
+                <Text style={{ fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.semibold, color: colors.text.primary, marginBottom: spacing.md }}>Personal Information</Text>
+                {user?.email && (
+                  <View style={{ marginBottom: spacing.sm }}>
+                    <Text style={{ color: colors.text.secondary, fontSize: typography.fontSize.xs }}>Email Address</Text>
+                    <Text style={{ color: colors.text.primary, fontSize: typography.fontSize.sm }}>{user.email}</Text>
+                  </View>
+                )}
+                {user?.phoneNumber && (
+                  <View style={{ marginBottom: spacing.sm }}>
+                    <Text style={{ color: colors.text.secondary, fontSize: typography.fontSize.xs }}>Phone Number</Text>
+                    <Text style={{ color: colors.text.primary, fontSize: typography.fontSize.sm }}>{user.phoneNumber}</Text>
+                  </View>
+                )}
+                {user?.address && (
+                  <View>
+                    <Text style={{ color: colors.text.secondary, fontSize: typography.fontSize.xs }}>Address</Text>
+                    <Text style={{ color: colors.text.primary, fontSize: typography.fontSize.sm }}>{user.address}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
           
-          {/* Profile Settings Button */}
-          <TouchableOpacity style={styles.profileSettingsButton} onPress={handleProfileSettings}>
-            <Text style={styles.profileSettingsText}>Profile Settings</Text>
-          </TouchableOpacity>
+          {/* Profile Settings removed for purok leader profile */}
         </View>
 
         {/* Action Buttons */}
@@ -160,6 +197,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      {isLoading && <LoadingSpinner />}
     </SafeAreaView>
   );
 }

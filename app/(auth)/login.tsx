@@ -2,8 +2,10 @@
  * Login Screen with PIN Authentication
  */
 
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
+import { useAuth } from '@/contexts/auth-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -92,16 +94,27 @@ const styles = StyleSheet.create({
   loginButton: {
     marginBottom: spacing.md,
   },
+  errorText: {
+    color: '#dc2626',
+    fontSize: typography.fontSize.sm,
+    marginTop: spacing.xs,
+  },
+  pinBoxError: {
+    borderColor: '#dc2626',
+  },
 });
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { loginWithPin, isSubmitting } = useAuth();
   const [pin, setPin] = useState<string[]>(['', '', '', '']);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const inputRefs = [useRef<TextInput>(null), useRef<TextInput>(null), useRef<TextInput>(null), useRef<TextInput>(null)];
 
   const handleChange = (value: string, index: number) => {
     const sanitized = value.replace(/[^0-9]/g, '').slice(-1);
+    if (errorMessage) setErrorMessage('');
     const nextPin = [...pin];
     nextPin[index] = sanitized;
     setPin(nextPin);
@@ -127,11 +140,19 @@ export default function LoginScreen() {
     }
   };
 
-  const handleLogin = (pinString: string) => {
-    if (pinString.length === 4) {
+  const handleLogin = async (pinString: string) => {
+    if (pinString.length !== 4) {
+      setErrorMessage('Please enter all 4 digits.');
+      setPin(['', '', '', '']);
+      setActiveIndex(0);
+      inputRefs[0].current?.focus();
+      return;
+    }
+    try {
+      await loginWithPin(pinString);
       router.replace('/(tabs)/news-feed');
-    } else {
-      Alert.alert('Error', 'Please enter all 4 digits.');
+    } catch (err: any) {
+      setErrorMessage('Incorrect PIN. Please try again.');
       setPin(['', '', '', '']);
       setActiveIndex(0);
       inputRefs[0].current?.focus();
@@ -143,6 +164,7 @@ export default function LoginScreen() {
   };
 
   return (
+    <>
     <SafeAreaView style={globalStyles.container}>
       <View style={styles.content}>
         {/* Logo Section */}
@@ -164,7 +186,11 @@ export default function LoginScreen() {
               <TextInput
                 key={index}
                 ref={inputRefs[index]}
-                style={[styles.pinBox, index === activeIndex && styles.pinBoxActive]}
+                style={[
+                  styles.pinBox,
+                  index === activeIndex && styles.pinBoxActive,
+                  !!errorMessage && styles.pinBoxError,
+                ]}
                 value={digit}
                 onChangeText={(text) => handleChange(text, index)}
                 onFocus={() => setActiveIndex(index)}
@@ -175,9 +201,14 @@ export default function LoginScreen() {
                 autoCorrect={false}
                 textContentType="oneTimeCode"
                 importantForAutofill="yes"
+                editable={!isSubmitting}
               />
             ))}
           </View>
+
+          {!!errorMessage && (
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          )}
 
           <TouchableOpacity onPress={handleForgotPin}>
             <Text style={styles.forgotPin}>Forgot PIN?</Text>
@@ -189,5 +220,7 @@ export default function LoginScreen() {
 
       </View>
     </SafeAreaView>
+    {isSubmitting && <LoadingSpinner />}
+    </>
   );
 }

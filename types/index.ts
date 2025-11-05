@@ -10,6 +10,9 @@ export interface User {
   purokId: string;
   purokName: string;
   pin?: string;
+  email?: string;
+  phoneNumber?: string;
+  address?: string;
 }
 
 // Report Types

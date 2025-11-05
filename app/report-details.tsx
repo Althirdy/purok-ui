@@ -9,7 +9,7 @@ import type { EmergencyReport } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, spacing, typography } = DesignSystem;
@@ -36,6 +36,11 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border.light,
+  },
+  rowBetween: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   sectionTitle: {
     color: colors.text.primary,
@@ -98,6 +103,23 @@ export default function ReportDetailsScreen() {
     run();
   }, [reportId]);
 
+  const formatTimestamp = (date?: Date) => {
+    if (!date) return '';
+    try {
+      return date.toLocaleString();
+    } catch {
+      return '';
+    }
+  };
+
+  const handleAcknowledge = () => {
+    setReport(prev => (prev ? { ...prev, status: 'acknowledged' } : prev));
+  };
+
+  const handleResolve = () => {
+    setReport(prev => (prev ? { ...prev, status: 'resolved' } : prev));
+  };
+
   return (
     <SafeAreaView style={globalStyles.container}>
       <View style={styles.headerBar}>
@@ -115,16 +137,14 @@ export default function ReportDetailsScreen() {
         ) : (
         <>
         <View style={[styles.sectionCard, { marginTop: spacing.lg }]}> 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-            <Text style={{ color: colors.text.primary, fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold }}>{report.title}</Text>
+          <View style={[styles.rowBetween, { marginBottom: spacing.sm }]}>
+            <Text style={{ color: colors.text.primary, fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold }} numberOfLines={2}>{report.title}</Text>
             <View style={styles.pill}><Text style={styles.pillText}>{report.severity.toUpperCase()}</Text></View>
           </View>
-          <Text style={styles.label}>ID</Text>
-          <Text style={styles.value}>{report.id}</Text>
           <Text style={styles.label}>Location</Text>
           <Text style={styles.value}>{report.location}</Text>
-          <Text style={styles.label}>Captured By</Text>
-          <Text style={styles.value}>CCTV-01</Text>
+          <Text style={styles.label}>Time</Text>
+          <Text style={styles.value}>{formatTimestamp(report.timestamp)}</Text>
         </View>
 
         <View style={styles.sectionCard}>
@@ -132,19 +152,33 @@ export default function ReportDetailsScreen() {
           <Text style={{ color: colors.text.secondary, fontSize: typography.fontSize.sm }}>{report.description}</Text>
         </View>
 
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Evidences</Text>
-          <View style={{ gap: spacing.sm }}>
-            <View style={{ height: 180, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.neutral.gray700 }}>
-              {/* Replace with actual snapshot URL when available */}
-              <Image source={require('@/assets/images/splash-icon.png')} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        <View style={[styles.sectionCard, { gap: spacing.sm }]}>
+          {report.status === 'pending' && (
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={handleAcknowledge}
+              style={{ backgroundColor: colors.primary.blue, paddingVertical: spacing.md, borderRadius: 10, alignItems: 'center' }}
+            >
+              <Text style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold }}>Acknowledge</Text>
+            </TouchableOpacity>
+          )}
+          {report.status === 'acknowledged' && (
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={handleResolve}
+              style={{ backgroundColor: colors.semantic.success, paddingVertical: spacing.md, borderRadius: 10, alignItems: 'center' }}
+            >
+              <Text style={{ color: colors.text.primary, fontWeight: typography.fontWeight.semibold }}>Resolve</Text>
+            </TouchableOpacity>
+          )}
+          {report.status === 'resolved' && (
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ color: colors.text.secondary }}>Report resolved</Text>
             </View>
-            <View style={{ height: 140, borderRadius: 12, backgroundColor: colors.neutral.gray700, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="location" size={22} color={colors.text.inverse} />
-              <Text style={{ color: colors.text.inverse, marginTop: 6, fontSize: typography.fontSize.xs }}>Map Pin • {report.location}</Text>
-            </View>
-          </View>
+          )}
         </View>
+
+        {/* Clean details only; evidence and internal identifiers hidden */}
         </>
         )}
       </ScrollView>

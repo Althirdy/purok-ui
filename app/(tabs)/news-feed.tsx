@@ -8,8 +8,9 @@ import { ReportCard } from '@/components/news/report-card';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { MAX_REPORTS_LIMIT, SENSOR_PROCESSING_INTERVAL } from '@/constants/sensor-config';
+import { useAuth } from '@/contexts/auth-context';
 import { useNotifications } from '@/contexts/notification-context';
-import { fetchLatestSensorData, listenToSensorData, sensorDataToReport } from '@/services/firebase-service';
+import { fetchLatestAnomaliesSince, listenToSensorData, sensorDataToReport } from '@/services/firebase-service';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -210,6 +211,7 @@ const styles = StyleSheet.create({
 });
 
 export default function NewsFeedScreen() {
+  const { sessionStartMs } = useAuth();
   const [activeFilter, setActiveFilter] = useState<FeedSource>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [reports, setReports] = useState<EmergencyReport[]>([]);
@@ -276,27 +278,15 @@ export default function NewsFeedScreen() {
       
       if (source === 'all' || source === 'sensor_box') {
         try {
-          const sensorData = await fetchLatestSensorData(20);
+          const sensorData = await fetchLatestAnomaliesSince(sessionStartMs, 40);
           sensorReports = sensorData.map(data => sensorDataToReport(data));
         } catch (error) {
           console.warn('Error fetching sensor data:', error);
         }
       }
 
-      // Fallback to mock data if needed
-      const mockData = await safeGet<EmergencyReport[]>(`/reports?source=${source}` as string, () => [
-        {
-          id: 'UW-2025-001',
-          type: 'suspicious',
-          title: 'Suspicious Activity',
-          description: "There's a person suddenly collapsed.",
-          location: 'Barangay 176, Near Metroplaza',
-          timestamp: new Date(),
-          status: 'pending',
-          severity: 'high',
-          source: 'cctv',
-        },
-      ]);
+      // Remove heavy mock fallback; prefer empty when API is unavailable
+      const mockData = await safeGet<EmergencyReport[]>(`/reports?source=${source}` as string, () => []);
 
       // Combine sensor reports with mock data
       const allReports = [...sensorReports, ...(Array.isArray(mockData) ? mockData : [])];
@@ -336,20 +326,37 @@ export default function NewsFeedScreen() {
   }, []);
 
   // Memoize acknowledge handler to prevent re-renders
+  type SheetMode = 'ack' | 'resolve';
+  const [sheetMode, setSheetMode] = useState<SheetMode>('ack');
   const handleAcknowledgePress = useCallback((reportId: string) => {
+    setSheetMode('ack');
     presentSheet(reportId);
   }, [presentSheet]);
+
+  const handleResolvePress = useCallback((reportId: string) => {
+    // Confirm before resolving
+    // Using a lightweight confirm modal via Alert
+    setSheetMode('resolve');
+    presentSheet(reportId);
+  }, []);
+
+  const handleActionPress = useCallback((reportId: string) => {
+    const r = reports.find(x => x.id === reportId);
+    if (!r) return;
+    if (r.status === 'pending') return handleAcknowledgePress(reportId);
+    if (r.status === 'acknowledged') return handleResolvePress(reportId);
+  }, [reports, handleAcknowledgePress, handleResolvePress]);
 
   // Optimized renderItem with memoized callbacks
   const renderReportItem = useCallback(({ item }: { item: EmergencyReport }) => {
     return (
       <ReportCard
         report={item}
-        onPress={handleReportPress}
-        onAcknowledge={item.status === 'pending' ? handleAcknowledgePress : undefined}
+        onPress={item.status === 'pending' ? handleReportPress : undefined}
+        onAcknowledge={item.status !== 'resolved' ? handleActionPress : undefined}
       />
     );
-  }, [handleReportPress, handleAcknowledgePress]);
+  }, [handleReportPress, handleActionPress]);
 
   // Memoize keyExtractor
   const keyExtractor = useCallback((item: EmergencyReport) => item.id, []);
@@ -357,6 +364,7 @@ export default function NewsFeedScreen() {
   // Calculate counts for header (memoized to prevent recalculation)
   const pendingCount = useMemo(() => reports.filter(r => r.status === 'pending').length, [reports]);
   const acknowledgedCount = useMemo(() => reports.filter(r => r.status === 'acknowledged').length, [reports]);
+  const resolvedCount = useMemo(() => reports.filter(r => r.status === 'resolved').length, [reports]);
   
   // Derived: reports filtered by search query
   const displayedReports = useMemo(() => {
@@ -516,13 +524,23 @@ export default function NewsFeedScreen() {
 
   const confirmAcknowledge = () => {
     if (!selectedReportId) return dismissSheet();
-    setReports(prevReports =>
-      prevReports.map(report =>
-        report.id === selectedReportId
-          ? { ...report, status: 'acknowledged' as const }
-          : report
-      )
-    );
+    if (sheetMode === 'ack') {
+      setReports(prevReports =>
+        prevReports.map(report =>
+          report.id === selectedReportId
+            ? { ...report, status: 'acknowledged' as const }
+            : report
+        )
+      );
+    } else {
+      setReports(prevReports =>
+        prevReports.map(report =>
+          report.id === selectedReportId
+            ? { ...report, status: 'resolved' as const }
+            : report
+        )
+      );
+    }
     dismissSheet();
   };
 
@@ -589,6 +607,10 @@ export default function NewsFeedScreen() {
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Acknowledged</Text>
             <Text style={styles.statValue}>{acknowledgedCount}</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>Resolved</Text>
+            <Text style={styles.statValue}>{resolvedCount}</Text>
           </View>
         </View>
       </View>
@@ -729,7 +751,7 @@ export default function NewsFeedScreen() {
             </View>
             {/* Title and brief */}
             <Text style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
-              Suspicious Activity
+              {selectedReportId ? (reports.find(r => r.id === selectedReportId)?.title ?? 'Report') : 'Report'}
             </Text>
             <Text style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, marginTop: spacing.xs }}>
               There's a person suddenly collapsed.
@@ -755,14 +777,16 @@ export default function NewsFeedScreen() {
               </View>
             </View>
 
-            {/* Actions: Acknowledge only */}
+            {/* Actions: Acknowledge / Resolve */}
             <View style={{ marginTop: spacing.lg }}>
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={confirmAcknowledge}
-                style={{ backgroundColor: colors.primary.blue, paddingVertical: spacing.md, borderRadius: 10, alignItems: 'center' }}
+                style={{ backgroundColor: sheetMode === 'ack' ? colors.primary.blue : colors.semantic.success, paddingVertical: spacing.md, borderRadius: 10, alignItems: 'center' }}
               >
-                <Text style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold }}>Acknowledge</Text>
+                <Text style={{ color: sheetMode === 'ack' ? colors.text.inverse : colors.text.primary, fontWeight: typography.fontWeight.semibold }}>
+                  {sheetMode === 'ack' ? 'Acknowledge' : 'Resolve'}
+                </Text>
               </TouchableOpacity>
             </View>
           </Animated.View>

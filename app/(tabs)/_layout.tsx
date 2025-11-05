@@ -1,6 +1,7 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 
 import { ModernTabBar } from '@/components/modern-tab-bar';
+import { useAuth } from '@/contexts/auth-context';
 import { NotificationProvider } from '@/contexts/notification-context';
 
 export const unstable_settings = {
@@ -8,6 +9,11 @@ export const unstable_settings = {
 };
 
 export default function TabLayout() {
+  const { isAuthenticated, isInitializing } = useAuth();
+  if (isInitializing) return null;
+  if (!isAuthenticated) {
+    return <Redirect href="/(auth)/login" />;
+  }
   return (
     <NotificationProvider>
       <Tabs

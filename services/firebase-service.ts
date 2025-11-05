@@ -5,7 +5,7 @@
 import { database } from '@/config/firebase';
 import { SENSOR_RULES, SENSOR_THRESHOLDS } from '@/constants/sensor-config';
 import type { EmergencyReport } from '@/types';
-import { DataSnapshot, get, off, onValue, ref, query, orderByChild, startAt, limitToLast, onChildAdded } from 'firebase/database';
+import { DataSnapshot, get, limitToLast, off, onChildAdded, orderByChild, query, ref, startAt } from 'firebase/database';
 
 export interface SensorData {
   id: string;
@@ -149,9 +149,9 @@ export function sensorDataToReport(sensorData: SensorData): EmergencyReport {
       description = `${sensorData.sensorType} sensor reading: ${sensorData.value} ${sensorData.unit}`;
   }
 
-  // Format location
+  // Format location: short lat/lng for concise UI
   const location = sensorData.location.address || 
-    `Lat: ${sensorData.location.latitude.toFixed(6)}, Lng: ${sensorData.location.longitude.toFixed(6)}`;
+    `Lat ${sensorData.location.latitude.toFixed(4)}, Lng ${sensorData.location.longitude.toFixed(4)}`;
 
   // Generate truly unique report ID with random suffix
   const randomSuffix = Math.random().toString(36).substring(2, 11); // 9 chars random
@@ -173,7 +173,6 @@ export function sensorDataToReport(sensorData: SensorData): EmergencyReport {
     status: 'pending',
     severity,
     source: 'sensor',
-    reportedBy: `Sensor ${sensorData.sensorId}`,
   };
 }
 
@@ -188,7 +187,7 @@ export { SENSOR_THRESHOLDS } from '@/constants/sensor-config';
 export function listenToSensorData(
   callback: (sensorData: SensorData, report: EmergencyReport) => void
 ): () => void {
-  const sensorsRef = ref(database, 'urbanwatch/sensor_data');
+  const sensorsRef = ref(database, 'urbanwatch/anomaly_data');
 
   // Query only recent items; also rely on onChildAdded for realtime new children
   const cutoff = Date.now() - RECENT_WINDOW_MS;
@@ -369,8 +368,9 @@ export function listenToSensorData(
  * Fetch latest sensor data (one-time fetch)
  */
 export async function fetchLatestSensorData(limit: number = 10): Promise<SensorData[]> {
+  // Legacy helper now points to anomaly_data for consistency
   try {
-    const sensorsRef = ref(database, 'urbanwatch/sensor_data');
+    const sensorsRef = ref(database, 'urbanwatch/anomaly_data');
     const cutoff = Date.now() - RECENT_WINDOW_MS;
     // Try to fetch only the most recent items by timestamp, then filter by cutoff as safeguard
     const recentQuery = query(
@@ -590,6 +590,63 @@ export async function fetchLatestSensorData(limit: number = 10): Promise<SensorD
       .slice(0, limit);
   } catch (error) {
     console.error('Error fetching sensor data:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetch anomalies since a given timestamp (ms). Defaults to last 5 minutes window if not provided.
+ */
+export async function fetchLatestAnomaliesSince(sinceMs?: number, limit: number = 20): Promise<SensorData[]> {
+  try {
+    const sensorsRef = ref(database, 'urbanwatch/anomaly_data');
+    const cutoff = sinceMs ?? (Date.now() - RECENT_WINDOW_MS);
+    let snapshot: DataSnapshot | null = null;
+    try {
+      const recentQuery = query(
+        sensorsRef,
+        orderByChild('timestamp'),
+        startAt(new Date(cutoff).toISOString()),
+        limitToLast(limit * 5)
+      );
+      snapshot = await get(recentQuery);
+    } catch (err) {
+      // Index missing on backend; fallback to simple limit and client-side filter
+      console.warn('Anomaly index missing, falling back to client filter:', err);
+      const fallbackQuery = query(sensorsRef, limitToLast(limit * 10));
+      snapshot = await get(fallbackQuery);
+    }
+    if (!snapshot.exists()) return [];
+    const list: SensorData[] = [];
+    snapshot.forEach((child) => {
+      const recordKey = child.key as string;
+      const record = child.val();
+      const sensorId = `sensor-${recordKey}`;
+      let timestamp: number;
+      if (record.timestamp) {
+        const date = new Date(record.timestamp);
+        timestamp = !isNaN(date.getTime()) ? date.getTime() : Date.now();
+      } else {
+        timestamp = Date.now();
+      }
+      if (timestamp < cutoff) return;
+      // Build minimal SensorData structure
+      const sensorData: SensorData = {
+        id: `${sensorId}-${timestamp}`,
+        sensorId,
+        sensorType: (record.sensorType || 'other') as SensorData['sensorType'],
+        value: Number(record.value ?? 0),
+        unit: record.unit ?? '',
+        location: record.location || { latitude: 0, longitude: 0 },
+        timestamp,
+        status: (record.status || 'warning') as SensorData['status'],
+        metadata: { ...record.metadata },
+      };
+      list.push(sensorData);
+    });
+    return list.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
+  } catch (e) {
+    console.error('Error fetching anomalies:', e);
     return [];
   }
 }
