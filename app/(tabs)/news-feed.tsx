@@ -372,7 +372,7 @@ export default function NewsFeedScreen() {
   // Memoize header component - only recompute when dependencies change
   const memoizedHeader = useMemo(() => {
     return renderHeader();
-  }, [activeFilter, pendingCount, acknowledgedCount, newReportCount, unreadCount]);
+  }, [activeFilter, pendingCount, acknowledgedCount, newReportCount, unreadCount, searchQuery, committedQuery]);
 
   // Batch process pending reports (throttled to prevent lag)
   const processPendingReports = useCallback(() => {
