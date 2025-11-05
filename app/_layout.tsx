@@ -13,7 +13,7 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
       </Stack>
-      <StatusBar style="light" />
+      <StatusBar style="light" backgroundColor="#1f4ea8" translucent={false} />
     </>
   );
 }

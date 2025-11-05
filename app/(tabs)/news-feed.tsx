@@ -7,14 +7,14 @@ import { Toast, type ToastData } from '@/components/common/toast';
 import { ReportCard } from '@/components/news/report-card';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { SENSOR_PROCESSING_INTERVAL, MAX_REPORTS_LIMIT } from '@/constants/sensor-config';
-import { fetchLatestSensorData, listenToSensorData, sensorDataToReport } from '@/services/firebase-service';
+import { MAX_REPORTS_LIMIT, SENSOR_PROCESSING_INTERVAL } from '@/constants/sensor-config';
 import { useNotifications } from '@/contexts/notification-context';
+import { fetchLatestSensorData, listenToSensorData, sensorDataToReport } from '@/services/firebase-service';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Easing, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Inline styles to avoid .styles.ts files being treated as routes
@@ -219,6 +219,16 @@ export default function NewsFeedScreen() {
   const [newReportCount, setNewReportCount] = useState(0);
   const [toast, setToast] = useState<ToastData | null>(null);
   const { addNotificationFromReport, unreadCount } = useNotifications();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [committedQuery, setCommittedQuery] = useState('');
+  
+  // Debounce live search so it filters shortly after typing
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setCommittedQuery(searchQuery.trim());
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [searchQuery]);
 
   // Performance optimization: Track processed IDs and batch updates
   const processedReportIds = useRef<Set<string>>(new Set());
@@ -347,6 +357,17 @@ export default function NewsFeedScreen() {
   // Calculate counts for header (memoized to prevent recalculation)
   const pendingCount = useMemo(() => reports.filter(r => r.status === 'pending').length, [reports]);
   const acknowledgedCount = useMemo(() => reports.filter(r => r.status === 'acknowledged').length, [reports]);
+  
+  // Derived: reports filtered by search query
+  const displayedReports = useMemo(() => {
+    const q = committedQuery.trim().toLowerCase();
+    if (!q) return reports;
+    return reports.filter(r => {
+      const title = r.title?.toLowerCase() ?? '';
+      const location = r.location?.toLowerCase() ?? '';
+      return title.includes(q) || location.includes(q);
+    });
+  }, [reports, committedQuery]);
   
   // Memoize header component - only recompute when dependencies change
   const memoizedHeader = useMemo(() => {
@@ -507,7 +528,8 @@ export default function NewsFeedScreen() {
 
   // Manual reporting removed
 
-  const renderHeader = () => (
+  function renderHeader() {
+    return (
     <View style={styles.headerWrapper}>
       {/* App Header */}
       <View style={styles.header}>
@@ -543,9 +565,20 @@ export default function NewsFeedScreen() {
       {/* Utilities: Search + Stats */}
       <View style={styles.utilities}>
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color={colors.text.secondary} />
-          <Text style={styles.searchText}>Search incidents, locations…</Text>
-          <Ionicons name="options" size={18} color={colors.text.secondary} />
+          <TouchableOpacity onPress={() => setCommittedQuery(searchQuery.trim())} activeOpacity={0.7}>
+            <Ionicons name="search" size={18} color={colors.text.secondary} />
+          </TouchableOpacity>
+          <TextInput
+            style={styles.searchText}
+            placeholder="Search incidents, locations…"
+            placeholderTextColor={colors.text.secondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode={isIOS ? 'while-editing' : 'never'}
+            onSubmitEditing={() => setCommittedQuery(searchQuery.trim())}
+          />
         </View>
 
         <View style={styles.statRow}>
@@ -641,13 +674,14 @@ export default function NewsFeedScreen() {
         </TouchableOpacity>
       </View>
     </View>
-  );
+    );
+  }
 
   return (
     <SafeAreaView style={globalStyles.container}>
       {/* Reports List */}
       <FlatList
-        data={reports}
+        data={displayedReports}
         keyExtractor={keyExtractor}
         renderItem={renderReportItem}
         ListHeaderComponent={memoizedHeader}
