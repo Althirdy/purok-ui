@@ -6,13 +6,13 @@ import { safeGet } from '@/api/axios';
 import { ReportCard } from '@/components/news/report-card';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
+import { fetchLatestSensorData, listenToSensorData, sensorDataToReport } from '@/services/firebase-service';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Animated, Dimensions, Easing, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Dimensions, Easing, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { listenToSensorData, fetchLatestSensorData, sensorDataToReport } from '@/services/firebase-service';
 
 // Inline styles to avoid .styles.ts files being treated as routes
 const { colors, typography, spacing } = DesignSystem;

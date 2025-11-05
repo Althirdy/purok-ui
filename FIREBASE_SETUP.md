@@ -19,50 +19,37 @@ The Firebase configuration is stored in `config/firebase.ts` with your provided 
 
 ## Firebase Database Structure
 
-The app expects sensor data to be stored in Firebase Realtime Database under the `sensors` node. The service supports multiple data structures:
+The app expects sensor data to be stored in Firebase Realtime Database under the `urbanwatch/sensor_data` node with the following structure:
 
-### Structure 1: Direct Sensor Data
+### Firebase Database Structure
 ```
-sensors/
-  {sensorId}/
-    sensorType: "temperature" | "smoke" | "motion" | "air_quality" | "noise" | "vibration"
-    value: 25.5
-    unit: "°C" | "ppm" | etc.
-    location: {
-      latitude: 14.6042,
-      longitude: 121.0823,
-      address: "Barangay 176, Near Metroplaza" (optional)
-    }
-    timestamp: 1234567890 (Unix timestamp in milliseconds)
-    status: "normal" | "warning" | "critical"
-    threshold: {
-      min: 0,
-      max: 100
-    } (optional)
-    metadata: {
-      deviceId: "device-001",
-      batteryLevel: 85,
-      signalStrength: -65
-    } (optional)
+urbanwatch/
+  sensor_data/
+    {auto-generated-key}/
+      amplitude: "12.4"
+      decibels: "91.7"
+      hall_effect: "234.1"
+      is_tampering: false
+      magnetic_deviation: "0.0"
+      sound: "156.3"
+      tampering_type: null
+      timestamp: "2025-11-04T06:25:27.317730"
+      location: {
+        latitude: 14.6042,
+        longitude: 121.0823,
+        address: "Barangay 176, Near Metroplaza" (optional)
+      } (optional)
 ```
 
-### Structure 2: Sensor with Data Array
-```
-sensors/
-  {sensorId}/
-    data: [
-      {
-        sensorType: "smoke",
-        value: 150,
-        unit: "ppm",
-        location: { latitude: 14.6042, longitude: 121.0823 },
-        timestamp: 1234567890,
-        status: "critical",
-        ...
-      },
-      ...
-    ]
-```
+### Sensor Fields
+- **decibels**: Noise level in dB (triggers alert if ≥ 80dB warning, ≥ 90dB critical)
+- **sound**: Raw sound sensor value (triggers alert if ≥ 100 warning, ≥ 150 critical)
+- **hall_effect**: Motion/vibration sensor value (triggers alert if ≥ 500 warning, ≥ 800 critical)
+- **magnetic_deviation**: Magnetic field deviation (triggers alert if ≥ 5 warning, ≥ 10 critical - indicates tampering)
+- **is_tampering**: Boolean flag for tampering detection (always triggers critical alert)
+- **tampering_type**: Type of tampering detected (string or null)
+- **amplitude**: Sound amplitude value
+- **timestamp**: ISO 8601 timestamp string
 
 ## How It Works
 
@@ -86,7 +73,6 @@ Sensor data is automatically converted to emergency reports based on:
 | `smoke` | Fire | Critical if status=critical, High otherwise |
 | `temperature` | Fire (if >50°C) or Other | High if >50°C, Medium otherwise |
 | `motion` | Suspicious | High if critical, Medium otherwise |
-| `air_quality` | Medical (if >100) or Other | High if >100, Low otherwise |
 | `noise` | Other | Medium if >80dB, Low otherwise |
 | `vibration` | Accident | High if critical, Medium otherwise |
 
