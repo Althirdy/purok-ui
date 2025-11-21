@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
   pinBox: {
     width: 45,
     height: 45,
-    borderRadius: 10,
+    borderRadius: 12,
     backgroundColor: colors.background.secondary,
     borderWidth: 1,
     borderColor: colors.border.default,

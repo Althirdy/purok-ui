@@ -270,9 +270,10 @@ const styles = StyleSheet.create({
   acknowledgeButton: {
     backgroundColor: colors.primary.blue,
     paddingVertical: spacing.sm,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: spacing.sm,
+    ...DesignSystem.shadows.sm,
   },
   
   acknowledgeText: {
@@ -300,7 +301,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.text.secondary,
     paddingVertical: spacing.sm,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: spacing.sm,
   },

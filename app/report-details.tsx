@@ -22,6 +22,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     gap: spacing.sm,
     backgroundColor: colors.primary.blue,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   headerTitle: {
     color: colors.text.inverse,
@@ -32,10 +34,11 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,
     backgroundColor: colors.background.card,
-    borderRadius: 14,
+    borderRadius: 20,
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border.light,
+    ...DesignSystem.shadows.sm,
   },
   rowBetween: {
     flexDirection: 'row',
@@ -62,7 +65,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent.orange,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    borderRadius: 999,
+    borderRadius: 20,
   },
   pillText: {
     color: colors.text.primary,
@@ -157,7 +160,7 @@ export default function ReportDetailsScreen() {
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={handleAcknowledge}
-              style={{ backgroundColor: colors.primary.blue, paddingVertical: spacing.md, borderRadius: 10, alignItems: 'center' }}
+              style={{ backgroundColor: colors.primary.blue, paddingVertical: spacing.md, borderRadius: 12, alignItems: 'center', ...DesignSystem.shadows.sm }}
             >
               <Text style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold }}>Acknowledge</Text>
             </TouchableOpacity>
@@ -166,7 +169,7 @@ export default function ReportDetailsScreen() {
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={handleResolve}
-              style={{ backgroundColor: colors.semantic.success, paddingVertical: spacing.md, borderRadius: 10, alignItems: 'center' }}
+              style={{ backgroundColor: colors.semantic.success, paddingVertical: spacing.md, borderRadius: 12, alignItems: 'center', ...DesignSystem.shadows.sm }}
             >
               <Text style={{ color: colors.text.primary, fontWeight: typography.fontWeight.semibold }}>Resolve</Text>
             </TouchableOpacity>

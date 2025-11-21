@@ -29,19 +29,23 @@ export const globalStyles = StyleSheet.create({
     padding: spacing.lg,
   },
   
-  // Card Styles
+  // Card Styles (enhanced for modern UI)
   card: {
     backgroundColor: colors.background.card,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     padding: spacing.md,
     ...shadows.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
   },
   
   cardLarge: {
     backgroundColor: colors.background.card,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius['2xl'],
     padding: spacing.lg,
     ...shadows.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
   },
   
   // Text Styles
@@ -105,7 +109,7 @@ export const globalStyles = StyleSheet.create({
   buttonPrimary: {
     backgroundColor: colors.accent.orange,
     height: 48,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -122,7 +126,7 @@ export const globalStyles = StyleSheet.create({
   buttonSecondary: {
     backgroundColor: colors.background.secondary,
     height: 48,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

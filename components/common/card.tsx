@@ -36,8 +36,10 @@ export function Card({ children, variant = 'default', onPress, style }: CardProp
 const styles = StyleSheet.create({
   base: {
     backgroundColor: colors.background.card,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
   },
   
   elevated: {

@@ -124,12 +124,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.card,
     borderWidth: 1,
     borderColor: colors.border.light,
-    borderRadius: 14,
+    borderRadius: 20,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    ...shadows.sm,
   },
   filterIconWrap: {
     width: 36,
@@ -156,9 +157,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.card,
     borderWidth: 1,
     borderColor: colors.border.light,
-    borderRadius: 14,
+    borderRadius: 20,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    ...shadows.sm,
   },
   searchText: {
     marginLeft: spacing.sm,
@@ -175,8 +177,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.card,
     borderWidth: 1,
     borderColor: colors.border.light,
-    borderRadius: 14,
+    borderRadius: 20,
     padding: spacing.md,
+    ...shadows.sm,
   },
   statLabel: {
     color: colors.text.secondary,
@@ -900,8 +903,8 @@ export default function NewsFeedScreen() {
             style={{
               transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }],
               backgroundColor: colors.background.card,
-              borderTopLeftRadius: 16,
-              borderTopRightRadius: 16,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
               padding: spacing.lg,
               borderTopWidth: 1,
               borderColor: colors.border.light,
@@ -943,7 +946,7 @@ export default function NewsFeedScreen() {
               <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={confirmAcknowledge}
-                style={{ backgroundColor: sheetMode === 'ack' ? colors.primary.blue : colors.semantic.success, paddingVertical: spacing.md, borderRadius: 10, alignItems: 'center' }}
+                style={{ backgroundColor: sheetMode === 'ack' ? colors.primary.blue : colors.semantic.success, paddingVertical: spacing.md, borderRadius: 12, alignItems: 'center', ...shadows.sm }}
               >
                 <Text style={{ color: sheetMode === 'ack' ? colors.text.inverse : colors.text.primary, fontWeight: typography.fontWeight.semibold }}>
                   {sheetMode === 'ack' ? 'Acknowledge' : 'Resolve'}

@@ -264,10 +264,11 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     padding: 10,
-    borderRadius: 12,
+    borderRadius: 16,
     backgroundColor: colors.background.secondary,
     borderWidth: 1,
     borderColor: colors.border.light,
+    ...shadows.sm,
   },
   
   // Custom Marker Styles
@@ -317,7 +318,7 @@ const styles = StyleSheet.create({
     width: 200,
     padding: 12,
     backgroundColor: colors.background.card,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border.light,
     shadowColor: '#000',

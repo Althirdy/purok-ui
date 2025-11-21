@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     borderWidth: 1,
@@ -111,12 +111,13 @@ const styles = StyleSheet.create({
   },
   updateButton: {
     backgroundColor: colors.primary.navy,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.xl,
+    ...DesignSystem.shadows.sm,
   },
   updateButtonText: {
     fontSize: typography.fontSize.base,

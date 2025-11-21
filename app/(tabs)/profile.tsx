@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.text.primary,
     alignItems: 'center',
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.text.primary,
     gap: spacing.sm,
@@ -153,7 +153,7 @@ export default function ProfileScreen() {
           {/* Personal info when available */}
           {(user?.email || user?.phoneNumber || user?.address) && (
             <View style={{ width: '100%', marginTop: spacing.lg }}>
-              <View style={{ backgroundColor: colors.background.card, borderWidth: 1, borderColor: colors.border.light, borderRadius: 14, padding: spacing.lg }}>
+              <View style={{ backgroundColor: colors.background.card, borderWidth: 1, borderColor: colors.border.light, borderRadius: 20, padding: spacing.lg, ...DesignSystem.shadows.sm }}>
                 <Text style={{ fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.semibold, color: colors.text.primary, marginBottom: spacing.md }}>Personal Information</Text>
                 {user?.email && (
                   <View style={{ marginBottom: spacing.sm }}>

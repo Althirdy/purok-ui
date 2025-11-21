@@ -126,14 +126,15 @@ export const DesignSystem = {
     '4xl': 64,
   },
   
-  // Border Radius
+  // Border Radius (enhanced for modern UI - matching citizen-ui)
   borderRadius: {
     none: 0,
-    sm: 4,
-    md: 8,
-    lg: 12,
-    xl: 16,
+    sm: 6,
+    md: 10,
+    lg: 16,
+    xl: 20,
     '2xl': 24,
+    '3xl': 28,
     full: 9999,
   },
   
@@ -167,28 +168,28 @@ export const DesignSystem = {
     button: {
       primary: {
         height: 48,
-        borderRadius: 8,
+        borderRadius: 12,
         paddingHorizontal: 24,
       },
       secondary: {
         height: 40,
-        borderRadius: 8,
+        borderRadius: 12,
         paddingHorizontal: 20,
       },
       small: {
         height: 36,
-        borderRadius: 6,
+        borderRadius: 10,
         paddingHorizontal: 16,
       },
     },
     
     card: {
       default: {
-        borderRadius: 12,
+        borderRadius: 20,
         padding: 16,
       },
       large: {
-        borderRadius: 16,
+        borderRadius: 24,
         padding: 24,
       },
     },
@@ -196,7 +197,7 @@ export const DesignSystem = {
     input: {
       default: {
         height: 48,
-        borderRadius: 8,
+        borderRadius: 12,
         paddingHorizontal: 16,
         fontSize: 16,
       },
