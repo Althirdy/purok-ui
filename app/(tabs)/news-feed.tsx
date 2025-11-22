@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const REPORTS_STORAGE_KEY = '@urbanwatch:reports';
 
 // Inline styles to avoid .styles.ts files being treated as routes
-const { colors, typography, spacing } = DesignSystem;
+const { colors, typography, spacing, shadows } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 768;
 const isIOS = Platform.OS === 'ios';

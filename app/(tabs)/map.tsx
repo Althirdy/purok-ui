@@ -1,8 +1,21 @@
 /**
  * Map Screen - View incidents on map with custom markers
+ * 
+ * Uses OSM-based tiles (CartoDB) - Uses OpenStreetMap data
+ * - No API key required
+ * - More permissive than direct OSM tiles (no User-Agent header required)
+ * - Still uses OpenStreetMap data, just rendered by CartoDB
+ * - Proper attribution included
+ * - Focused on Barangay 176E area only
+ * - Uses GeoJSON boundary data from constants/geojson.json
+ * 
+ * Note: Direct OSM tiles require User-Agent header which react-native-maps
+ * doesn't support. CartoDB uses OSM data but is more permissive.
+ * 
+ * Attribution: © OpenStreetMap contributors (data source)
  */
 
-import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION, isPointInBoundary } from '@/constants/barangay-boundary';
+import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION, BARANGAY_176E_CENTER, isPointInBoundary } from '@/constants/barangay-boundary';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { MarkerData, markers } from '@/constants/heatmap.data';
@@ -14,7 +27,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import MapView, { Callout, Marker, Polygon } from 'react-native-maps';
+import MapView, { Callout, Marker, Polygon, UrlTile } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing, borderRadius, shadows } = DesignSystem;
@@ -145,6 +158,12 @@ export default function MapScreen() {
 
       {/* Map View */}
       <View style={{ flex: 1 }}>
+        {/* OSM Attribution - Required by OpenStreetMap */}
+        <View style={styles.attributionContainer}>
+          <Text style={styles.attributionText}>
+            © OpenStreetMap contributors
+          </Text>
+        </View>
         <MapView
           ref={mapRef}
           style={{ ...StyleSheet.absoluteFillObject }}
@@ -152,7 +171,42 @@ export default function MapScreen() {
           showsUserLocation={false}
           showsMyLocationButton={false}
           showsCompass={true}
+          // Focus on Barangay 176E - reasonable zoom levels for local area
+          minZoomLevel={14}
+          maxZoomLevel={18}
+          // Use custom OSM tiles instead of Google Maps
+          mapType="none"
         >
+          {/* CartoDB Positron - Uses OSM data, more permissive than direct OSM tiles */}
+          {/* This uses OpenStreetMap data but rendered by CartoDB (no User-Agent required) */}
+          <UrlTile
+            urlTemplate="https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
+            maximumZ={19}
+            minimumZ={10}
+            tileSize={256}
+            shouldReplaceMapContent={true}
+          />
+          
+          {/* Alternative OSM-based providers (uncomment if CartoDB doesn't work): */}
+          
+          {/* Option 1: Stamen Toner (OSM data, black & white style) */}
+          {/* <UrlTile
+            urlTemplate="https://stamen-tiles-{s}.a.ssl.fastly.net/toner/{z}/{x}/{y}{r}.png"
+            maximumZ={18}
+            minimumZ={0}
+            tileSize={256}
+            shouldReplaceMapContent={true}
+          /> */}
+          
+          {/* Option 2: Stamen Terrain (OSM data, terrain style) */}
+          {/* <UrlTile
+            urlTemplate="https://stamen-tiles-{s}.a.ssl.fastly.net/terrain/{z}/{x}/{y}{r}.png"
+            maximumZ={18}
+            minimumZ={0}
+            tileSize={256}
+            shouldReplaceMapContent={true}
+          /> */}
+
           {/* Barangay 176E Boundary - from constants (fills + stroke) */}
           <Polygon
             coordinates={BARANGAY_176E_BOUNDARY.coordinates}
@@ -161,7 +215,7 @@ export default function MapScreen() {
             strokeWidth={BARANGAY_176E_BOUNDARY.strokeWidth}
           />
 
-          {/* Optional: GeoJSON overlay (same area) */}
+          {/* GeoJSON overlay (same area) - using the geojson.json data */}
           {geojsonCoordinates.length > 0 && (
             <Polygon
               coordinates={geojsonCoordinates}
@@ -353,5 +407,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     letterSpacing: 0.5,
+  },
+  
+  // OSM Attribution - Required (data source is OpenStreetMap)
+  attributionContainer: {
+    position: 'absolute',
+    bottom: 50,
+    right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    zIndex: 1000,
+    ...shadows.sm,
+  },
+  attributionText: {
+    fontSize: 10,
+    color: colors.text.secondary,
   },
 });
