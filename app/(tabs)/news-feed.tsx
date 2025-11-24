@@ -10,12 +10,14 @@ import { MAX_REPORTS_LIMIT } from '@/constants/sensor-config';
 import { useAuth } from '@/contexts/auth-context';
 import { useNotifications } from '@/contexts/notification-context';
 import { anomalyToReport, deviceStatusToReport, fetchLatestAnomaliesSince, fetchLatestDeviceStatusSince, listenToAnomalies } from '@/services/firebase-service';
+import { fetchCitizenConcerns } from '@/services/citizen-concern-service';
+import { subscribeToCitizenReports } from '@/services/realtime-service';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Dimensions, FlatList, Platform, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const REPORTS_STORAGE_KEY = '@urbanwatch:reports';
@@ -226,9 +228,7 @@ export default function NewsFeedScreen() {
   const [activeFilter, setActiveFilter] = useState<FeedSource>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [reports, setReports] = useState<EmergencyReport[]>([]);
-  const [showAckModal, setShowAckModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [newReportCount, setNewReportCount] = useState(0);
   const [toast, setToast] = useState<ToastData | null>(null);
   const { addNotificationFromReport, addNotification, unreadCount } = useNotifications();
@@ -254,40 +254,13 @@ export default function NewsFeedScreen() {
   // Use a shorter interval on mobile for a snappier experience
   const DATA_PROCESSING_INTERVAL = 2000; // 2 seconds
 
-  // Bottom sheet animation
-  const slideAnim = useRef(new Animated.Value(0)).current; // 0 hidden, 1 visible
-
-  const presentSheet = useCallback((reportId?: string) => {
-    if (reportId) setSelectedReportId(reportId);
-    setShowAckModal(true);
-    requestAnimationFrame(() => {
-      Animated.timing(slideAnim, {
-        toValue: 1,
-        duration: 280,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    });
-  }, [slideAnim]);
-
-  const dismissSheet = useCallback(() => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 220,
-      easing: Easing.in(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
-      setShowAckModal(false);
-      setSelectedReportId(null);
-    });
-  }, [slideAnim]);
-
   // Fetch reports by source (limited to a single mock item for now)
   const fetchReports = async (source: FeedSource) => {
     setLoading(true);
     try {
       // Try to fetch from Firebase first
       let sensorReports: EmergencyReport[] = [];
+      let citizenReports: EmergencyReport[] = [];
       
       if (source === 'all' || source === 'sensor_box') {
         try {
@@ -309,8 +282,17 @@ export default function NewsFeedScreen() {
         }
       }
 
-      // Combine only sensor/device reports (no mock fallback)
-      const allReports = [...sensorReports];
+      const includeCitizen = source === 'all' || source === 'citizen_reports';
+      if (includeCitizen) {
+        try {
+          citizenReports = await fetchCitizenConcerns();
+        } catch (error) {
+          console.warn('Error fetching citizen concerns:', error);
+        }
+      }
+
+      // Combine sensor/device and citizen reports
+      const allReports = [...sensorReports, ...citizenReports];
       
       // Filter by source if not 'all'
       const filteredReports = source === 'all' 
@@ -372,27 +354,42 @@ export default function NewsFeedScreen() {
     router.push({ pathname: 'report-details', params: { reportId } } as any);
   }, []);
 
-  // Memoize acknowledge handler to prevent re-renders
-  type SheetMode = 'ack' | 'resolve';
-  const [sheetMode, setSheetMode] = useState<SheetMode>('ack');
-  const handleAcknowledgePress = useCallback((reportId: string) => {
-    setSheetMode('ack');
-    presentSheet(reportId);
-  }, [presentSheet]);
-
+  // Handle resolve - directly resolve pending reports
   const handleResolvePress = useCallback((reportId: string) => {
-    // Confirm before resolving
-    // Using a lightweight confirm modal via Alert
-    setSheetMode('resolve');
-    presentSheet(reportId);
-  }, []);
+    const r = reports.find(x => x.id === reportId);
+    if (!r || r.status === 'resolved') return;
+    
+    // Directly resolve the report
+    setReports(prevReports =>
+      prevReports.map(report =>
+        report.id === reportId
+          ? { ...report, status: 'resolved' as const }
+          : report
+      )
+    );
+    
+    // Add notification
+    if (r) {
+      addNotification({
+        id: `update-${r.id}-${Date.now()}`,
+        type: 'report_update',
+        title: 'Report Resolved',
+        message: r.title,
+        reportId: r.id,
+        timestamp: new Date(),
+        read: false,
+      });
+    }
+  }, [reports, addNotification]);
 
   const handleActionPress = useCallback((reportId: string) => {
     const r = reports.find(x => x.id === reportId);
     if (!r) return;
-    if (r.status === 'pending') return handleAcknowledgePress(reportId);
-    if (r.status === 'acknowledged') return handleResolvePress(reportId);
-  }, [reports, handleAcknowledgePress, handleResolvePress]);
+    // Only allow resolving pending reports
+    if (r.status === 'pending') {
+      handleResolvePress(reportId);
+    }
+  }, [reports, handleResolvePress]);
 
   // Optimized renderItem with memoized callbacks
   const renderReportItem = useCallback(({ item }: { item: EmergencyReport }) => {
@@ -410,7 +407,6 @@ export default function NewsFeedScreen() {
 
   // Calculate counts for header (memoized to prevent recalculation)
   const pendingCount = useMemo(() => reports.filter(r => r.status === 'pending').length, [reports]);
-  const acknowledgedCount = useMemo(() => reports.filter(r => r.status === 'acknowledged').length, [reports]);
   const resolvedCount = useMemo(() => reports.filter(r => r.status === 'resolved').length, [reports]);
   
   // Derived: reports filtered by search query
@@ -427,7 +423,7 @@ export default function NewsFeedScreen() {
   // Memoize header component - only recompute when dependencies change
   const memoizedHeader = useMemo(() => {
     return renderHeader();
-  }, [activeFilter, pendingCount, acknowledgedCount, newReportCount, unreadCount, searchQuery, committedQuery]);
+  }, [activeFilter, pendingCount, resolvedCount, newReportCount, unreadCount, searchQuery, committedQuery]);
 
   // Batch process pending reports (throttled to prevent lag)
   const processPendingReports = useCallback(() => {
@@ -473,6 +469,7 @@ export default function NewsFeedScreen() {
   // Set up Firebase real-time listener for sensor data with throttling
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
+    let unsubscribeCitizen: (() => void) | null = null;
 
     try {
       unsubscribe = listenToAnomalies((sensorData, report) => {
@@ -492,6 +489,20 @@ export default function NewsFeedScreen() {
           processPendingReports();
           immediateTimer.current = null;
         }, 300); // small debounce for bursts
+      });
+      // Citizen channel subscription (Pusher)
+      unsubscribeCitizen = subscribeToCitizenReports(report => {
+        if (processedReportIds.current.has(report.id)) {
+          return;
+        }
+        processedReportIds.current.add(report.id);
+        setReports(prev => {
+          if (prev.some(r => r.id === report.id)) {
+            return prev;
+          }
+          return [report, ...prev].slice(0, MAX_REPORTS);
+        });
+        setNewReportCount(p => p + 1);
       });
 
       // Set up interval to process pending reports every 30 seconds (standardized interval)
@@ -515,6 +526,9 @@ export default function NewsFeedScreen() {
       }
       if (unsubscribe) {
         unsubscribe();
+      }
+      if (unsubscribeCitizen) {
+        unsubscribeCitizen();
       }
       processedReportIds.current.clear();
       pendingReports.current = [];
@@ -653,57 +667,6 @@ export default function NewsFeedScreen() {
     // TODO: Filter reports based on source
   };
 
-  const handleAcknowledge = (reportId: string) => {
-    // Open confirmation modal first; do not change state yet
-    presentSheet(reportId);
-  };
-
-  const confirmAcknowledge = () => {
-    if (!selectedReportId) return dismissSheet();
-    if (sheetMode === 'ack') {
-      setReports(prevReports =>
-        prevReports.map(report =>
-          report.id === selectedReportId
-            ? { ...report, status: 'acknowledged' as const }
-            : report
-        )
-      );
-      const r = reports.find(r => r.id === selectedReportId);
-      if (r) {
-        addNotification({
-          id: `update-${r.id}-${Date.now()}`,
-          type: 'report_update',
-          title: 'Report Acknowledged',
-          message: r.title,
-          reportId: r.id,
-          timestamp: new Date(),
-          read: false,
-        });
-      }
-    } else {
-      setReports(prevReports =>
-        prevReports.map(report =>
-          report.id === selectedReportId
-            ? { ...report, status: 'resolved' as const }
-            : report
-        )
-      );
-      const r = reports.find(r => r.id === selectedReportId);
-      if (r) {
-        addNotification({
-          id: `update-${r.id}-${Date.now()}`,
-          type: 'report_update',
-          title: 'Report Resolved',
-          message: r.title,
-          reportId: r.id,
-          timestamp: new Date(),
-          read: false,
-        });
-      }
-    }
-    dismissSheet();
-  };
-
   // Manual reporting removed
 
   function renderHeader() {
@@ -767,10 +730,6 @@ export default function NewsFeedScreen() {
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Pending</Text>
             <Text style={styles.statValue}>{pendingCount}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Ack'd</Text>
-            <Text style={styles.statValue}>{acknowledgedCount}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Resolved</Text>
@@ -893,69 +852,6 @@ export default function NewsFeedScreen() {
         windowSize={10}
         // Note: getItemLayout removed - items have variable heights based on content
       />
-
-      {/* Bottom Acknowledgement Sheet (matches mobile UI) */}
-      <Modal visible={showAckModal} transparent animationType="none" onRequestClose={dismissSheet}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
-          {/* Overlay press to dismiss */}
-          <Pressable onPress={dismissSheet} style={{ flex: 1 }} />
-          <Animated.View
-            style={{
-              transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }],
-              backgroundColor: colors.background.card,
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              padding: spacing.lg,
-              borderTopWidth: 1,
-              borderColor: colors.border.light,
-            }}
-          >
-            <View style={{ alignItems: 'center', marginBottom: spacing.md }}>
-              <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.neutral.gray600 }} />
-            </View>
-            {/* Title and brief */}
-            <Text style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
-              {selectedReportId ? (reports.find(r => r.id === selectedReportId)?.title ?? 'Report') : 'Report'}
-            </Text>
-            <Text style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, marginTop: spacing.xs }}>
-              There's a person suddenly collapsed.
-            </Text>
-            <Text style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, marginTop: spacing.sm }}>
-              Barangay 176, Near Metroplaza • just now
-            </Text>
-
-            {/* Evidence preview */}
-            <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
-              <View style={{ height: 140, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.neutral.gray700 }}>
-                <View style={{ flex: 1 }}>
-                  {/* image placeholder */}
-                  <View style={{ flex: 1, backgroundColor: colors.neutral.gray600, alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="image" size={28} color={colors.text.inverse} />
-                    <Text style={{ color: colors.text.inverse, marginTop: 6, fontSize: typography.fontSize.xs }}>CCTV Snapshot</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={{ height: 100, borderRadius: 12, backgroundColor: colors.neutral.gray700, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="location" size={20} color={colors.text.inverse} />
-                <Text style={{ color: colors.text.inverse, marginTop: 6, fontSize: typography.fontSize.xs }}>Map Pin Preview</Text>
-              </View>
-            </View>
-
-            {/* Actions: Acknowledge / Resolve */}
-            <View style={{ marginTop: spacing.lg }}>
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={confirmAcknowledge}
-                style={{ backgroundColor: sheetMode === 'ack' ? colors.primary.blue : colors.semantic.success, paddingVertical: spacing.md, borderRadius: 12, alignItems: 'center', ...shadows.sm }}
-              >
-                <Text style={{ color: sheetMode === 'ack' ? colors.text.inverse : colors.text.primary, fontWeight: typography.fontWeight.semibold }}>
-                  {sheetMode === 'ack' ? 'Acknowledge' : 'Resolve'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
 
       {/* Modern Toast Notification */}
       <Toast toast={toast} onDismiss={() => setToast(null)} duration={5000} />

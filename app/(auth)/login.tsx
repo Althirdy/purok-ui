@@ -152,7 +152,8 @@ export default function LoginScreen() {
       await loginWithPin(pinString);
       router.replace('/(tabs)/news-feed');
     } catch (err: any) {
-      setErrorMessage('Incorrect PIN. Please try again.');
+      const message = typeof err?.message === 'string' ? err.message : 'Incorrect PIN. Please try again.';
+      setErrorMessage(message);
       setPin(['', '', '', '']);
       setActiveIndex(0);
       inputRefs[0].current?.focus();

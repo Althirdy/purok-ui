@@ -22,6 +22,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_TOKEN_KEY = '@urbanwatch:auth_token';
 const NOTIFICATIONS_STORAGE_KEY = '@urbanwatch:notifications';
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
+const LOGIN_ENDPOINT = '/api/v1/login/purok-leader';
+const CURRENT_USER_ENDPOINT = '/api/v1/auth/user';
 // Control whether session persists across app restarts
 const PERSIST_SESSION = false;
 
@@ -83,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchCurrentUser = useCallback(async (token: string) => {
     const base = await getApiBase();
-    const resp = await fetch(`${base}/api/auth/user`, {
+    const resp = await fetch(`${base}${CURRENT_USER_ENDPOINT}`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
@@ -102,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsSubmitting(true);
     try {
       const base = await getApiBase();
-      const resp = await fetch(`${base}/api/login/purok-leader`, {
+      const resp = await fetch(`${base}${LOGIN_ENDPOINT}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -111,7 +113,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ pin }),
       });
       if (!resp.ok) {
-        const message = `Login failed: ${resp.status}`;
+        const message = await resp
+          .json()
+          .then(data => data?.message ?? `Login failed: ${resp.status}`)
+          .catch(() => `Login failed: ${resp.status}`);
         throw new Error(message);
       }
       const loginData = await resp.json();

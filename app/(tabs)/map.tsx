@@ -15,7 +15,7 @@
  * Attribution: © OpenStreetMap contributors (data source)
  */
 
-import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION, BARANGAY_176E_CENTER, isPointInBoundary } from '@/constants/barangay-boundary';
+import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION, isPointInBoundary } from '@/constants/barangay-boundary';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { MarkerData, markers } from '@/constants/heatmap.data';
