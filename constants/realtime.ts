@@ -14,6 +14,9 @@ export const realtimeConfig = {
   pusherCluster: PUSHER_CLUSTER,
   citizenChannel: 'citizen-reports',
   citizenReportEvent: 'report.created',
+  purokChannelPrefix: 'private-purok-leader.',
+  purokAssignmentEvent: 'concern.assigned',
+  authEndpoint: (process.env.EXPO_PUBLIC_PUSHER_AUTH_ENDPOINT ?? 'https://www.urbanwatch.me/broadcasting/auth'),
 } as const;
 
 export type RealtimeConfig = typeof realtimeConfig;
