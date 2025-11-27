@@ -2,11 +2,12 @@
  * Profile Screen - User profile information
  */
 
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { DesignSystem } from '@/constants/design-system';
 import { useAuth } from '@/contexts/auth-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
+import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
@@ -16,7 +17,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing, borderRadius } = DesignSystem;
@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
 });
 
 export default function ProfileScreen() {
-  const { user, logout, refreshUser, sessionStartMs } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   
   // Refresh user data whenever the profile screen gains focus
@@ -175,10 +175,8 @@ export default function ProfileScreen() {
   }, [user?.name]);
 
   const fullName = useMemo(() => formatFullName(user?.name), [user?.name]);
-  const purokLabel = user?.purokName ? `${user.purokName}` : 'Assigned Purok';
+  const purokLabel = user?.address || user?.purokName || 'Assigned Purok';
   const roleLabel = user?.role === 'admin' ? 'Municipal Admin' : 'Purok Leader';
-  const sessionStarted = useMemo(() => new Date(sessionStartMs).toLocaleString(), [sessionStartMs]);
-
   const handleLogout = () => {
     Alert.alert(
       'Logout',
@@ -241,15 +239,13 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Official Details</Text>
           <ProfileRow icon="briefcase-outline" label="Role" value={roleLabel} />
           <ProfileRow icon="id-card" label="Leader ID" value={String(user?.id ?? '—')} />
-          <ProfileRow icon="location-outline" label="Purok" value={purokLabel} />
-          <ProfileRow icon="time-outline" label="Signed in" value={sessionStarted} />
+          <ProfileRow icon="location-outline" label="Location" value={purokLabel} />
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Contact Information</Text>
           <ProfileRow icon="mail-outline" label="Email" value={user?.email || 'No email on record'} />
           <ProfileRow icon="call-outline" label="Phone" value={user?.phoneNumber || 'No phone on record'} />
-          <ProfileRow icon="map-outline" label="Office" value={user?.address || 'No address on record'} />
         </View>
 
         <View style={styles.section}>
