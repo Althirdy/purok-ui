@@ -1,35 +1,64 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Redirect, Tabs } from 'expo-router';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ModernTabBar } from '@/components/modern-tab-bar';
+import { useAuth } from '@/contexts/auth-context';
+import { NotificationProvider } from '@/contexts/notification-context';
+
+export const unstable_settings = {
+  initialRouteName: 'news-feed',
+};
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
+  const { isAuthenticated, isInitializing } = useAuth();
+  if (isInitializing) return null;
+  if (!isAuthenticated) {
+    return <Redirect href="/(auth)/login" />;
+  }
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
+    <NotificationProvider>
+      <Tabs
+        tabBar={(props) => <ModernTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+        }}>
       <Tabs.Screen
-        name="index"
+        name="news-feed"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Incident',
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="map"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Map',
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+        }}
+      />
+      
+      {/* Hide notifications from tabs */}
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null,
+        }}
+      />
+      
+      
+      {/* Removed Reports & History screen */}
+      
+      {/* Hide profile settings from tabs */}
+      <Tabs.Screen
+        name="profile-settings"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
+    </NotificationProvider>
   );
 }

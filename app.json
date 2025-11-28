@@ -1,15 +1,16 @@
 {
   "expo": {
-    "name": "citizen",
-    "slug": "citizen",
+    "name": "UrbanWatch",
+    "slug": "urbanwatch-purok",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "citizen",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "scheme": "urbanwatch",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.urbanwatchpurok"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +20,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.urbanwatchpurok"
     },
     "web": {
       "output": "static",
