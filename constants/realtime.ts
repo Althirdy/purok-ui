@@ -6,6 +6,9 @@
  * Only the public key + cluster are needed on the client.
  */
 
+// Pusher configuration - uses environment variables for security
+// Note: Pusher public keys are safe to expose in client apps, but using env vars
+// allows for easier configuration across different environments
 const PUSHER_CLUSTER = process.env.EXPO_PUBLIC_PUSHER_CLUSTER ?? 'ap1';
 const PUSHER_KEY = process.env.EXPO_PUBLIC_PUSHER_KEY ?? '8abc068a07e65df34203';
 
