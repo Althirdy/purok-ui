@@ -1,8 +1,8 @@
 import { Redirect, Tabs } from 'expo-router';
 
 import { ModernTabBar } from '@/components/modern-tab-bar';
-import { useAuth } from '@/contexts/auth-context';
-import { NotificationProvider } from '@/contexts/notification-context';
+import { useAuth } from '@/context/auth-context';
+import { NotificationProvider } from '@/context/notification-context';
 
 export const unstable_settings = {
   initialRouteName: 'news-feed',

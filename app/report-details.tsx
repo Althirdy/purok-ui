@@ -2,10 +2,11 @@
  * Report Details Screen - Comprehensive view for a single report
  */
 
-import { safeGet } from '@/api/axios';
+import { safeGet } from '@/lib/axios';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import type { EmergencyReport } from '@/types';
+import { formatTimestampDetailed } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
@@ -106,14 +107,6 @@ export default function ReportDetailsScreen() {
     run();
   }, [reportId]);
 
-  const formatTimestamp = (date?: Date) => {
-    if (!date) return '';
-    try {
-      return date.toLocaleString();
-    } catch {
-      return '';
-    }
-  };
 
   const handleAcknowledge = () => {
     setReport(prev => (prev ? { ...prev, status: 'acknowledged' } : prev));
@@ -147,7 +140,7 @@ export default function ReportDetailsScreen() {
           <Text style={styles.label}>Location</Text>
           <Text style={styles.value}>{report.location}</Text>
           <Text style={styles.label}>Time</Text>
-          <Text style={styles.value}>{formatTimestamp(report.timestamp)}</Text>
+          <Text style={styles.value}>{formatTimestampDetailed(report.timestamp)}</Text>
         </View>
 
         <View style={styles.sectionCard}>

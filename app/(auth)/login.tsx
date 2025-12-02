@@ -5,7 +5,7 @@
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/context/auth-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';

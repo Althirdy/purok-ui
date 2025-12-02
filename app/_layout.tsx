@@ -1,8 +1,8 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
-import { AuthProvider } from '@/contexts/auth-context';
-import { useAuth } from '@/contexts/auth-context';
+import { AuthProvider } from '@/context/auth-context';
+import { useAuth } from '@/context/auth-context';
 
 export const unstable_settings = {
   initialRouteName: '(auth)',

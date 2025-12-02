@@ -5,10 +5,12 @@
 import { Card } from '@/components/common/card';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { useNotifications, type Notification } from '@/contexts/notification-context';
+import { useNotifications, type Notification } from '@/context/notification-context';
+import { getNotificationIcon } from '@/utils/notificationHelpers';
+import { formatTimestamp } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -112,53 +114,6 @@ const styles = StyleSheet.create({
 
 export default function NotificationsScreen() {
   const { notifications, markAsRead, markAllAsRead, unreadCount } = useNotifications();
-
-  const formatTimestamp = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days === 1) return 'yesterday';
-    if (days < 7) return `${days}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  const getNotificationIcon = (type: string, severity?: string, reportType?: string) => {
-    // Use report type for better icons
-    if (reportType) {
-      switch (reportType) {
-        case 'fire':
-          return 'flame';
-        case 'suspicious':
-          return severity === 'critical' ? 'alert-circle' : 'warning';
-        case 'accident':
-          return 'car';
-        case 'medical':
-          return 'medical';
-        case 'crime':
-          return 'shield';
-        default:
-          return 'notifications';
-      }
-    }
-    
-    // Fallback to type
-    switch (type) {
-      case 'sensor_alert':
-        return 'hardware-chip';
-      case 'report_update':
-        return 'sync';
-      case 'system':
-        return 'information-circle';
-      default:
-        return 'notifications';
-    }
-  };
 
   const handleNotificationPress = useCallback((notification: Notification) => {
     // Mark as read when pressed

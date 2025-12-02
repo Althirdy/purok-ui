@@ -3,7 +3,7 @@
  */
 
 import type { EmergencyReport } from '@/types';
-import { sensorDataToReport, type SensorData } from './firebase-service';
+import { anomalyToReport as sensorDataToReport, type SensorData } from './firebase-service';
 
 /**
  * Generate a comprehensive report from sensor data

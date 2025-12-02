@@ -4,7 +4,8 @@
 
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/context/auth-context';
+import { getInitials } from '@/utils/userHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -21,20 +22,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors } = DesignSystem;
-
-function getInitials(name?: string) {
-  if (!name) return 'PL';
-  const parts = name.trim().split(' ');
-  const first = parts[0]?.[0] ?? '';
-  const last = parts[parts.length - 1]?.[0] ?? '';
-  return `${first}${last}`.toUpperCase();
-}
-
-function getFullAddress(user: ReturnType<typeof useAuth>['user']) {
-  if (!user) return 'No address provided';
-  const parts = [user.address, user.purokName].filter(Boolean);
-  return parts.length > 0 ? parts.join(', ') : 'No address provided';
-}
 
 export default function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
@@ -79,7 +66,15 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={globalStyles.container} edges={['top']}>
       <View style={styles.appBar}>
-        <Text style={styles.appTitle}>UrbanWatch</Text>
+        <View style={styles.appBarContent}>
+          <View>
+            <Text style={styles.appTitle}>UrbanWatch</Text>
+            <Text style={styles.appSubtitle}>Purok Profile</Text>
+          </View>
+          <View style={styles.appBarAvatar}>
+            <Ionicons name="person" size={20} color="#1e3a8a" />
+          </View>
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -102,9 +97,9 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Personal Information */}
+        {/* Contact Information */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
+          <Text style={styles.sectionTitle}>Contact Information</Text>
 
           <View style={styles.profileItem}>
             <View style={styles.profileItemHeader}>
@@ -126,13 +121,6 @@ export default function ProfileScreen() {
             </Text>
           </View>
 
-          <View style={styles.profileItem}>
-            <View style={styles.profileItemHeader}>
-              <Ionicons name="location-outline" size={20} color="#1e3a8a" />
-              <Text style={styles.profileItemLabel}>Purok Area</Text>
-            </View>
-            <Text style={styles.profileItemValue}>{getFullAddress(user)}</Text>
-          </View>
         </View>
 
         {/* Account Settings */}
@@ -146,6 +134,45 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() =>
+              Alert.alert('Change PIN', 'This option will be available in a future update.')
+            }
+          >
+            <View style={styles.settingItemLeft}>
+              <Ionicons name="key-outline" size={20} color="#1e3a8a" />
+              <Text style={styles.settingItemText}>Change PIN</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() =>
+              Alert.alert('Notifications', 'This option will be available in a future update.')
+            }
+          >
+            <View style={styles.settingItemLeft}>
+              <Ionicons name="notifications-outline" size={20} color="#1e3a8a" />
+              <Text style={styles.settingItemText}>Notifications</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() =>
+              Alert.alert('Help & Support', 'This option will be available in a future update.')
+            }
+          >
+            <View style={styles.settingItemLeft}>
+              <Ionicons name="help-circle-outline" size={20} color="#1e3a8a" />
+              <Text style={styles.settingItemText}>Help & Support</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+          </TouchableOpacity>
         </View>
 
         {/* Logout */}
@@ -154,6 +181,7 @@ export default function ProfileScreen() {
             <Ionicons name="log-out-outline" size={20} color="#ef4444" />
             <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
+          <Text style={styles.versionText}>UrbanWatch Purok v1.0.0</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -170,6 +198,24 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff',
+  },
+  appSubtitle: {
+    marginTop: 2,
+    fontSize: 14,
+    color: '#bfdbfe',
+  },
+  appBarContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  appBarAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e5e7eb',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollView: {
     flex: 1,
@@ -297,6 +343,8 @@ const styles = StyleSheet.create({
   logoutSection: {
     paddingHorizontal: 16,
     marginBottom: 24,
+    alignItems: 'center',
+    width: '100%',
   },
   logoutButton: {
     flexDirection: 'row',
@@ -304,7 +352,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#ffffff',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: '#ef4444',
     shadowColor: '#000',
@@ -312,12 +360,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    width: '80%',
   },
   logoutButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#ef4444',
     marginLeft: 8,
+  },
+  versionText: {
+    marginTop: 16,
+    fontSize: 14,
+    color: '#94a3b8',
   },
   centered: {
     flex: 1,
