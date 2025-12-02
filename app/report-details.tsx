@@ -5,13 +5,11 @@
 import { safeGet } from '@/api/axios';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { useAuth } from '@/contexts/auth-context';
-import { fetchAssignedConcernDetail, updateAssignedConcernStatus } from '@/services/purok-leader-service';
 import type { EmergencyReport } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, spacing, typography } = DesignSystem;
@@ -79,51 +77,34 @@ const styles = StyleSheet.create({
 export default function ReportDetailsScreen() {
   const params = useLocalSearchParams();
   const reportId = String(params.reportId || '');
-  const { accessToken } = useAuth();
-  const concernId = React.useMemo(
-    () => (reportId.startsWith('PUROK-') ? reportId.replace('PUROK-', '') : null),
-    [reportId],
-  );
 
   // API-ready fetch with graceful mock fallback
   const [report, setReport] = React.useState<EmergencyReport | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [statusUpdating, setStatusUpdating] = React.useState(false);
 
   React.useEffect(() => {
     const run = async () => {
       setLoading(true);
       try {
-        if (concernId) {
-          if (!accessToken) {
-            throw new Error('Missing authentication token for citizen concern.');
-          }
-          const data = await fetchAssignedConcernDetail(accessToken, concernId);
-          setReport(data);
-        } else {
-          const data = await safeGet<EmergencyReport>(`/reports/${reportId}`, () => ({
-            id: reportId || 'UW-2025-001',
-            type: 'suspicious',
-            title: 'Suspicious Activity',
-            description:
-              "There's a person suddenly collapsed on the road of Barangay 176, Near Metroplaza. With a heat index of 38°C, it is suspected to be a Heat Stroke. Immediate Medical Response is needed.",
-            location: 'Barangay 176, Near Metroplaza',
-            timestamp: new Date(),
-            status: 'pending',
-            severity: 'high',
-            source: 'cctv',
-          }));
-          setReport(data);
-        }
-      } catch (error: any) {
-        const message = error?.message ?? 'Unable to load report.';
-        Alert.alert('Error', message);
+        const data = await safeGet<EmergencyReport>(`/reports/${reportId}`, () => ({
+          id: reportId || 'UW-2025-001',
+          type: 'suspicious',
+          title: 'Suspicious Activity',
+          description:
+            "There's a person suddenly collapsed on the road of Barangay 176, Near Metroplaza. With a heat index of 38°C, it is suspected to be a Heat Stroke. Immediate Medical Response is needed.",
+          location: 'Barangay 176, Near Metroplaza',
+          timestamp: new Date(),
+          status: 'pending',
+          severity: 'high',
+          source: 'cctv',
+        }));
+        setReport(data);
       } finally {
         setLoading(false);
       }
     };
     run();
-  }, [reportId, concernId, accessToken]);
+  }, [reportId]);
 
   const formatTimestamp = (date?: Date) => {
     if (!date) return '';
@@ -134,29 +115,13 @@ export default function ReportDetailsScreen() {
     }
   };
 
-  const updateStatus = async (status: 'ongoing' | 'resolved') => {
-    if (concernId) {
-      if (!accessToken) {
-        Alert.alert('Cannot update status', 'Missing authentication token.');
-        return;
-      }
-      try {
-        setStatusUpdating(true);
-        await updateAssignedConcernStatus(accessToken, concernId, status);
-        setReport(prev => (prev ? { ...prev, status } : prev));
-      } catch (error: any) {
-        const message = error?.message ?? 'Please try again.';
-        Alert.alert('Failed to update status', message);
-      } finally {
-        setStatusUpdating(false);
-      }
-      return;
-    }
-    setReport(prev => (prev ? { ...prev, status } : prev));
+  const handleAcknowledge = () => {
+    setReport(prev => (prev ? { ...prev, status: 'acknowledged' } : prev));
   };
 
-  const handleAcknowledge = () => updateStatus('ongoing');
-  const handleResolve = () => updateStatus('resolved');
+  const handleResolve = () => {
+    setReport(prev => (prev ? { ...prev, status: 'resolved' } : prev));
+  };
 
   return (
     <SafeAreaView style={globalStyles.container}>
@@ -195,32 +160,16 @@ export default function ReportDetailsScreen() {
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={handleAcknowledge}
-              disabled={statusUpdating}
-              style={{
-                backgroundColor: colors.primary.blue,
-                paddingVertical: spacing.md,
-                borderRadius: 12,
-                alignItems: 'center',
-                opacity: statusUpdating ? 0.6 : 1,
-                ...DesignSystem.shadows.sm,
-              }}
+              style={{ backgroundColor: colors.primary.blue, paddingVertical: spacing.md, borderRadius: 12, alignItems: 'center', ...DesignSystem.shadows.sm }}
             >
               <Text style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold }}>Acknowledge</Text>
             </TouchableOpacity>
           )}
-          {report.status === 'ongoing' && (
+          {report.status === 'acknowledged' && (
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={handleResolve}
-              disabled={statusUpdating}
-              style={{
-                backgroundColor: colors.semantic.success,
-                paddingVertical: spacing.md,
-                borderRadius: 12,
-                alignItems: 'center',
-                opacity: statusUpdating ? 0.6 : 1,
-                ...DesignSystem.shadows.sm,
-              }}
+              style={{ backgroundColor: colors.semantic.success, paddingVertical: spacing.md, borderRadius: 12, alignItems: 'center', ...DesignSystem.shadows.sm }}
             >
               <Text style={{ color: colors.text.primary, fontWeight: typography.fontWeight.semibold }}>Resolve</Text>
             </TouchableOpacity>

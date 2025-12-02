@@ -10,14 +10,13 @@ import { MAX_REPORTS_LIMIT } from '@/constants/sensor-config';
 import { useAuth } from '@/contexts/auth-context';
 import { useNotifications } from '@/contexts/notification-context';
 import { anomalyToReport, deviceStatusToReport, fetchLatestAnomaliesSince, fetchLatestDeviceStatusSince, listenToAnomalies } from '@/services/firebase-service';
-import { fetchAssignedConcerns, updateAssignedConcernStatus } from '@/services/purok-leader-service';
-import { subscribeToPurokAssignments } from '@/services/realtime-service';
+import { subscribeToCitizenReports } from '@/services/realtime-service';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Dimensions, FlatList, Platform, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Dimensions, FlatList, Platform, RefreshControl, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const REPORTS_STORAGE_KEY = '@urbanwatch:reports';
@@ -27,20 +26,6 @@ const { colors, typography, spacing, shadows } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 768;
 const isIOS = Platform.OS === 'ios';
-
-function extractConcernId(reportId: string): string | null {
-  if (!reportId) return null;
-  if (reportId.startsWith('PUROK-')) {
-    return reportId.replace('PUROK-', '');
-  }
-  return null;
-}
-
-function isCitizenReport(report: EmergencyReport | undefined): boolean {
-  if (!report) return false;
-  if (report.source === 'citizen') return true;
-  return report.id.startsWith('PUROK-');
-}
 
 const styles = StyleSheet.create({
   header: {
@@ -238,7 +223,7 @@ const styles = StyleSheet.create({
 });
 
 export default function NewsFeedScreen() {
-  const { sessionStartMs, user, accessToken } = useAuth();
+  const { sessionStartMs, user } = useAuth();
   const [activeFilter, setActiveFilter] = useState<FeedSource>('all');
   const [refreshing, setRefreshing] = useState(false);
   const [reports, setReports] = useState<EmergencyReport[]>([]);
@@ -248,15 +233,6 @@ export default function NewsFeedScreen() {
   const { addNotificationFromReport, addNotification, unreadCount } = useNotifications();
   const [searchQuery, setSearchQuery] = useState('');
   const [committedQuery, setCommittedQuery] = useState('');
-  const updateReportStatusLocally = useCallback((targetId: string, status: EmergencyReport['status']) => {
-    setReports(prevReports =>
-      prevReports.map(report =>
-        report.id === targetId
-          ? { ...report, status }
-          : report
-      ),
-    );
-  }, []);
   
   // Debounce live search so it filters shortly after typing
   useEffect(() => {
@@ -283,7 +259,6 @@ export default function NewsFeedScreen() {
     try {
       // Try to fetch from Firebase first
       let sensorReports: EmergencyReport[] = [];
-      let assignedCitizenReports: EmergencyReport[] = [];
       
       if (source === 'all' || source === 'sensor_box') {
         try {
@@ -305,19 +280,8 @@ export default function NewsFeedScreen() {
         }
       }
 
-      const includeCitizen = source === 'all' || source === 'citizen_reports';
-      if (includeCitizen && accessToken) {
-        try {
-          assignedCitizenReports = await fetchAssignedConcerns(accessToken);
-        } catch (error) {
-          console.warn('Error fetching assigned citizen concerns:', error);
-        }
-      } else if (includeCitizen && !accessToken) {
-        console.warn('Cannot fetch assigned concerns without an access token.');
-      }
-
-      // Combine sensor/device and citizen reports
-      const allReports = [...sensorReports, ...assignedCitizenReports];
+      // Combine only sensor/device reports (no mock fallback)
+      const allReports = [...sensorReports];
       
       // Filter by source if not 'all'
       const filteredReports = source === 'all' 
@@ -380,11 +344,21 @@ export default function NewsFeedScreen() {
   }, []);
 
   // Handle resolve - directly resolve pending reports
-  const handleResolvePress = useCallback(async (reportId: string) => {
+  const handleResolvePress = useCallback((reportId: string) => {
     const r = reports.find(x => x.id === reportId);
     if (!r || r.status === 'resolved') return;
-
-    const notify = () => {
+    
+    // Directly resolve the report
+    setReports(prevReports =>
+      prevReports.map(report =>
+        report.id === reportId
+          ? { ...report, status: 'resolved' as const }
+          : report
+      )
+    );
+    
+    // Add notification
+    if (r) {
       addNotification({
         id: `update-${r.id}-${Date.now()}`,
         type: 'report_update',
@@ -394,33 +368,14 @@ export default function NewsFeedScreen() {
         timestamp: new Date(),
         read: false,
       });
-    };
-
-    if (isCitizenReport(r)) {
-      const concernId = extractConcernId(r.id);
-      if (!accessToken || !concernId) {
-        Alert.alert('Cannot update concern', 'Missing authentication token for citizen reports.');
-        return;
-      }
-      try {
-        await updateAssignedConcernStatus(accessToken, concernId, 'resolved');
-        updateReportStatusLocally(reportId, 'resolved');
-        notify();
-      } catch (error: any) {
-        const message = error?.message ?? 'Please try again.';
-        Alert.alert('Failed to resolve concern', message);
-      }
-      return;
     }
-
-    updateReportStatusLocally(reportId, 'resolved');
-    notify();
-  }, [reports, addNotification, accessToken, updateReportStatusLocally]);
+  }, [reports, addNotification]);
 
   const handleActionPress = useCallback((reportId: string) => {
     const r = reports.find(x => x.id === reportId);
     if (!r) return;
-    if (r.status === 'pending' || r.status === 'ongoing') {
+    // Only allow resolving pending reports
+    if (r.status === 'pending') {
       handleResolvePress(reportId);
     }
   }, [reports, handleResolvePress]);
@@ -524,33 +479,19 @@ export default function NewsFeedScreen() {
           immediateTimer.current = null;
         }, 300); // small debounce for bursts
       });
-      // Citizen channel subscription (Pusher private channel per purok leader)
-      unsubscribeCitizen = subscribeToPurokAssignments({
-        token: accessToken,
-        userId: user?.id,
-        onReport: report => {
-          if (processedReportIds.current.has(report.id)) {
-            return;
+      // Citizen channel subscription (Pusher)
+      unsubscribeCitizen = subscribeToCitizenReports(report => {
+        if (processedReportIds.current.has(report.id)) {
+          return;
+        }
+        processedReportIds.current.add(report.id);
+        setReports(prev => {
+          if (prev.some(r => r.id === report.id)) {
+            return prev;
           }
-          processedReportIds.current.add(report.id);
-          setReports(prev => {
-            if (prev.some(r => r.id === report.id)) {
-              return prev;
-            }
-            return [report, ...prev].slice(0, MAX_REPORTS);
-          });
-          setNewReportCount(p => p + 1);
-          if (report.severity === 'high' || report.severity === 'critical') {
-            setToast({
-              id: `toast-${report.id}-${Date.now()}`,
-              title: report.severity === 'critical' ? '🚨 New Critical Citizen Concern' : '⚠️ New Citizen Concern',
-              message: report.title,
-              severity: report.severity,
-              reportType: report.type,
-              onPress: () => handleReportPress(report.id),
-            });
-          }
-        },
+          return [report, ...prev].slice(0, MAX_REPORTS);
+        });
+        setNewReportCount(p => p + 1);
       });
 
       // Set up interval to process pending reports every 30 seconds (standardized interval)
@@ -581,7 +522,7 @@ export default function NewsFeedScreen() {
       processedReportIds.current.clear();
       pendingReports.current = [];
     };
-  }, [handleReportPress, processPendingReports, addNotificationFromReport, accessToken, user?.id]);
+  }, [handleReportPress, processPendingReports, addNotificationFromReport]);
 
   // Load cached reports on mount
   useEffect(() => {
@@ -607,7 +548,7 @@ export default function NewsFeedScreen() {
     };
     loadCachedReports();
     fetchReports(activeFilter);
-  }, [activeFilter, accessToken]);
+  }, [activeFilter]);
 
   // Save reports to cache whenever they change
   useEffect(() => {
@@ -640,7 +581,71 @@ export default function NewsFeedScreen() {
     }, DATA_PROCESSING_INTERVAL);
     
     try {
-      await fetchReports(activeFilter);
+      // Fetch fresh reports and merge with existing (preserving status)
+      const freshReports = await (async () => {
+        let sensorReports: EmergencyReport[] = [];
+        
+        if (activeFilter === 'all' || activeFilter === 'sensor_box') {
+          try {
+            const sensorData = await fetchLatestAnomaliesSince(sessionStartMs, 40);
+            sensorReports = sensorData.map(data => anomalyToReport(data));
+          } catch (error) {
+            console.warn('Error fetching sensor data:', error);
+          }
+
+          try {
+            const dev = await fetchLatestDeviceStatusSince(sessionStartMs, 12);
+            const devReports = dev
+              .map(deviceStatusToReport)
+              .filter((r): r is NonNullable<typeof r> => !!r);
+            sensorReports = [...sensorReports, ...devReports];
+          } catch (err) {
+            console.warn('Error fetching device status:', err);
+          }
+        }
+
+        const allReports = [...sensorReports];
+        const filteredReports = activeFilter === 'all' 
+          ? allReports 
+          : allReports.filter(r => {
+              if (activeFilter === 'sensor_box') return r.source === 'sensor';
+              if (activeFilter === 'cctv') return r.source === 'cctv';
+              if (activeFilter === 'citizen_reports') return r.source === 'citizen';
+              return true;
+            });
+
+        filteredReports.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        const uniqueReports = filteredReports.filter((report, index, self) =>
+          index === self.findIndex(r => r.id === report.id)
+        );
+        return uniqueReports.slice(0, MAX_REPORTS);
+      })();
+
+      // Merge with existing reports, preserving status from existing reports
+      setReports(prevReports => {
+        const existingMap = new Map(prevReports.map(r => [r.id, r]));
+        const freshMap = new Map(freshReports.map(r => [r.id, r]));
+        
+        // Merge: use existing status if report exists, otherwise use fresh
+        const merged = freshReports.map(fresh => {
+          const existing = existingMap.get(fresh.id);
+          if (existing) {
+            // Preserve status from existing report
+            return { ...fresh, status: existing.status };
+          }
+          return fresh;
+        });
+
+        // Add any existing reports that aren't in fresh (older reports)
+        existingMap.forEach((existing, id) => {
+          if (!freshMap.has(id)) {
+            merged.push(existing);
+          }
+        });
+
+        const sorted = merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        return sorted.slice(0, MAX_REPORTS);
+      });
     } finally {
       setRefreshing(false);
     }

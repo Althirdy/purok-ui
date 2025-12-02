@@ -23,7 +23,7 @@ export interface EmergencyReport {
   description: string;
   location: string;
   timestamp: Date;
-  status: 'pending' | 'acknowledged' | 'resolved' | 'ongoing' | 'escalated';
+  status: 'pending' | 'acknowledged' | 'resolved';
   severity: 'low' | 'medium' | 'high' | 'critical';
   reportedBy?: string;
   source?: 'cctv' | 'sensor' | 'citizen' | 'official';
