@@ -44,8 +44,10 @@ function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps
   const getSeverityBadge = (severity: string) => {
     const badgeColor = getSeverityColor(severity as EmergencyReport['severity']);
     return (
-      <View style={[styles.severityBadge, { backgroundColor: badgeColor }]}>
-        <Text style={styles.severityBadgeText}>{severity.toUpperCase()}</Text>
+      <View style={[styles.severityBadge, { backgroundColor: badgeColor + '20' }]}>
+        <Text style={[styles.severityBadgeText, { color: badgeColor }]}>
+          {severity.toUpperCase()}
+        </Text>
       </View>
     );
   };
@@ -55,82 +57,84 @@ function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps
   const statusBadgeStyle = getStatusColor(report.status);
 
   return (
-    <Card onPress={canOpenDetails ? () => onPress!(report.id) : undefined} variant="elevated" style={styles.card}>
+    <Card onPress={canOpenDetails ? () => onPress!(report.id) : undefined} variant="default" style={styles.card}>
       {/* ID Badge - Top Right */}
-      <View style={styles.idBadge}>
-        <Text style={styles.idText}>{formatReportId(report.id)}</Text>
+      <View style={styles.topRow}>
+        <View style={styles.idBadge}>
+          <Text style={styles.idText}>{formatReportId(report.id)}</Text>
+        </View>
       </View>
 
-      {/* Main Content */}
-      <View style={styles.contentRow}>
+      {/* Header: Icon, Title, Category, Severity */}
+      <View style={styles.header}>
         {/* Icon on Left */}
         <View style={styles.iconContainer}>
-          <Ionicons name="shield-outline" size={20} color={colors.accent.orange} />
+          <Ionicons name="shield-outline" size={24} color={colors.accent.orange} />
         </View>
 
         {/* Content */}
-        <View style={styles.content}>
-          {/* Title and Severity Row */}
-          <View style={styles.titleRow}>
-            <Text style={styles.title} numberOfLines={2}>{report.title}</Text>
-            {getSeverityBadge(report.severity)}
-          </View>
-
-          {/* Category */}
+        <View style={styles.info}>
+          <Text style={styles.title} numberOfLines={2}>{report.title}</Text>
           <Text style={styles.category}>{getCategory(report.type)}</Text>
+        </View>
 
-          {/* Location */}
-          <Text style={styles.location}>{report.location}</Text>
-
-          {/* Footer with timestamp and status */}
-          <View style={styles.footerRow}>
-            <View style={styles.timestampRow}>
-              <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
-              <Text style={styles.timestampText}>{formatTimestamp(report.timestamp)}</Text>
-            </View>
-            <View style={[styles.statusBadge, statusBadgeStyle]}>
-              <Text style={[styles.statusText, { color: statusBadgeStyle.borderColor }]}>
-                {getStatusText(report.status)}
-              </Text>
-            </View>
-          </View>
+        {/* Severity Badge on Right */}
+        <View style={styles.meta}>
+          {getSeverityBadge(report.severity)}
         </View>
       </View>
 
-      {/* Description (if needed, can be hidden or shown) */}
+      {/* Description - Indented */}
       {report.description && (
-        <View style={styles.descriptionContainer}>
-          <Text style={styles.descriptionText} numberOfLines={2}>
-            {report.description}
+        <Text style={styles.description} numberOfLines={2}>
+          {report.description}
+        </Text>
+      )}
+
+      {/* Location - Indented */}
+      <Text style={styles.location}>{report.location}</Text>
+
+      {/* Footer: Timestamp and Status - Indented */}
+      <View style={styles.footer}>
+        <View style={styles.timestampRow}>
+          <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
+          <Text style={styles.timestampText}>{formatTimestamp(report.timestamp)}</Text>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
+          <Text style={[styles.statusText, { color: statusBadgeStyle.borderColor }]}>
+            {getStatusText(report.status)}
           </Text>
         </View>
-      )}
+      </View>
 
-
-      {report.status === 'pending' && onPress && (
-        <TouchableOpacity 
-          style={styles.seeMoreButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            onPress(report.id);
-          }}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.seeMoreText}>See More</Text>
-        </TouchableOpacity>
-      )}
-
-      {report.status === 'pending' && onAcknowledge && (
-        <TouchableOpacity 
-          style={styles.acknowledgeButton} 
-          onPress={(e) => {
-            e.stopPropagation();
-            onAcknowledge(report.id);
-          }}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.acknowledgeText}>Acknowledge</Text>
-        </TouchableOpacity>
+      {/* Action Buttons */}
+      {report.status === 'pending' && (onPress || onAcknowledge) && (
+        <View style={styles.actionsContainer}>
+          {onPress && (
+            <TouchableOpacity 
+              style={styles.seeMoreButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                onPress(report.id);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.seeMoreText}>See More</Text>
+            </TouchableOpacity>
+          )}
+          {onAcknowledge && (
+            <TouchableOpacity 
+              style={styles.acknowledgeButton} 
+              onPress={(e) => {
+                e.stopPropagation();
+                onAcknowledge(report.id);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.acknowledgeText}>Acknowledge</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
     </Card>
   );
@@ -156,96 +160,104 @@ export const ReportCard: React.MemoExoticComponent<React.NamedExoticComponent<Re
 
 const styles = StyleSheet.create({
   card: {
-    marginBottom: spacing.md,
-    position: 'relative',
-    padding: spacing.md,
+    padding: 20,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+  },
+  
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
   },
   
   idBadge: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    backgroundColor: colors.background.secondary,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border.light,
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   
   idText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '600',
     fontFamily: 'monospace',
   },
   
-  contentRow: {
+  header: {
     flexDirection: 'row',
-    marginTop: spacing.xs,
-    marginRight: 80, // Space for ID badge
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   
   iconContainer: {
     width: 48,
     height: 48,
+    backgroundColor: '#f1f5f9',
     borderRadius: 24,
-    backgroundColor: colors.background.secondary,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    justifyContent: 'center',
+    marginRight: 16,
   },
   
-  content: {
+  info: {
     flex: 1,
-  },
-  
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
-    gap: spacing.sm,
   },
   
   title: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  
+  category: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  
+  meta: {
+    alignItems: 'flex-end',
   },
   
   severityBadge: {
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    minWidth: 50,
+    minWidth: 60,
     alignItems: 'center',
   },
   
   severityBadgeText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.inverse,
+    fontSize: 12,
+    fontWeight: '600',
   },
   
-  category: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginBottom: spacing.xs,
+  description: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
+    marginBottom: 12,
+    marginLeft: 64,
   },
   
   location: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
+    fontSize: 14,
+    color: '#475569',
+    marginBottom: 12,
+    marginLeft: 64,
   },
   
-  footerRow: {
+  footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing.xs,
+    marginLeft: 64,
   },
   
   timestampRow: {
@@ -255,99 +267,56 @@ const styles = StyleSheet.create({
   },
   
   timestampText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
+    fontSize: 12,
+    color: '#64748b',
   },
   
   statusBadge: {
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    borderWidth: 1,
-  },
-  
-  statusText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-  },
-
-  descriptionContainer: {
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
-  },
-
-  descriptionText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    lineHeight: typography.fontSize.sm * 1.5,
-  },
-
-  
-  acknowledgeButton: {
-    backgroundColor: colors.primary.blue,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    ...DesignSystem.shadows.sm,
-  },
-  
-  acknowledgeText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.inverse,
-  },
-  
-  statusBadge: {
-    backgroundColor: colors.semantic.success,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 20,
     alignItems: 'center',
   },
   
   statusText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  actionsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
   },
 
   seeMoreButton: {
-    backgroundColor: colors.background.secondary,
+    flex: 1,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: colors.text.secondary,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
+    borderColor: '#cbd5e1',
+    paddingVertical: 10,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: spacing.sm,
   },
 
   seeMoreText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
   },
-
-  // When acknowledged, we visually attach the green button to See More
-  seeMoreTopOnlyRadius: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-
-  acknowledgedButton: {
-    backgroundColor: colors.semantic.success,
-    paddingVertical: spacing.sm,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+  
+  acknowledgeButton: {
+    flex: 1,
+    backgroundColor: colors.primary.blue,
+    paddingVertical: 10,
+    borderRadius: 8,
     alignItems: 'center',
   },
-
-  acknowledgedTextAlt: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
+  
+  acknowledgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.inverse,
   },
 });
 

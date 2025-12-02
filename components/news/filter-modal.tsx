@@ -1,6 +1,7 @@
 import { DesignSystem } from '@/constants/design-system';
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Dimensions, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { colors, typography, spacing } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -41,170 +42,210 @@ export function FilterModal({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>Filter Concerns</Text>
-
-          {/* Status */}
-          <Text style={styles.modalSectionTitle}>Status</Text>
-          <View style={styles.chipGroup}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.chip, statusFilter === 'all' && styles.chipActive]}
-              onPress={() => onStatusFilterChange('all')}
-            >
-              <Text
-                style={[styles.chipLabel, statusFilter === 'all' && styles.chipLabelActive]}
-              >
-                All
-              </Text>
-              <Text
-                style={[styles.chipCount, statusFilter === 'all' && styles.chipCountActive]}
-              >
-                {totalCount}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.chip, statusFilter === 'pending' && styles.chipActive]}
-              onPress={() => onStatusFilterChange('pending')}
-            >
-              <Text
-                style={[styles.chipLabel, statusFilter === 'pending' && styles.chipLabelActive]}
-              >
-                Pending
-              </Text>
-              <Text
-                style={[styles.chipCount, statusFilter === 'pending' && styles.chipCountActive]}
-              >
-                {pendingCount}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.chip, statusFilter === 'ongoing' && styles.chipActive]}
-              onPress={() => onStatusFilterChange('ongoing')}
-            >
-              <Text
-                style={[styles.chipLabel, statusFilter === 'ongoing' && styles.chipLabelActive]}
-              >
-                Ongoing
-              </Text>
-              <Text
-                style={[styles.chipCount, statusFilter === 'ongoing' && styles.chipCountActive]}
-              >
-                {ongoingCount}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.chip, statusFilter === 'resolved' && styles.chipActive]}
-              onPress={() => onStatusFilterChange('resolved')}
-            >
-              <Text
-                style={[styles.chipLabel, statusFilter === 'resolved' && styles.chipLabelActive]}
-              >
-                Resolved
-              </Text>
-              <Text
-                style={[styles.chipCount, statusFilter === 'resolved' && styles.chipCountActive]}
-              >
-                {resolvedCount}
-              </Text>
+        <View style={styles.modalContent}>
+          {/* Modal Header */}
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Filter Concerns</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#1e293b" />
             </TouchableOpacity>
           </View>
 
-          {/* Report Type (UI only for now) */}
-          <Text style={styles.modalSectionTitle}>Report Type</Text>
-          <View style={styles.chipGroup}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.chip, reportTypeFilter === 'all' && styles.chipActive]}
-              onPress={() => onReportTypeFilterChange('all')}
-            >
-              <Text
-                style={[
-                  styles.chipLabel,
-                  reportTypeFilter === 'all' && styles.chipLabelActive,
-                ]}
-              >
-                All Types
-              </Text>
-              <Text
-                style={[
-                  styles.chipCount,
-                  reportTypeFilter === 'all' && styles.chipCountActive,
-                ]}
-              >
-                {totalCount}
-              </Text>
-            </TouchableOpacity>
+          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            {/* Status Filter */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Status</Text>
+              <View style={styles.filterOptions}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    statusFilter === 'all' && styles.filterOptionActive,
+                  ]}
+                  onPress={() => onStatusFilterChange('all')}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      statusFilter === 'all' && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    All
+                  </Text>
+                  <View style={[styles.filterBadge, statusFilter === 'all' && styles.filterBadgeActive]}>
+                    <Text style={[styles.filterBadgeText, statusFilter === 'all' && styles.filterBadgeTextActive]}>
+                      {totalCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.chip, reportTypeFilter === 'manual' && styles.chipActive]}
-              onPress={() => onReportTypeFilterChange('manual')}
-            >
-              <Text
-                style={[
-                  styles.chipLabel,
-                  reportTypeFilter === 'manual' && styles.chipLabelActive,
-                ]}
-              >
-                Manual
-              </Text>
-              <Text
-                style={[
-                  styles.chipCount,
-                  reportTypeFilter === 'manual' && styles.chipCountActive,
-                ]}
-              >
-                {totalCount}
-              </Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    statusFilter === 'pending' && styles.filterOptionActive,
+                  ]}
+                  onPress={() => onStatusFilterChange('pending')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="time" size={18} color={statusFilter === 'pending' ? '#ffffff' : '#f59e0b'} />
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      statusFilter === 'pending' && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    Pending
+                  </Text>
+                  <View style={[styles.filterBadge, statusFilter === 'pending' && styles.filterBadgeActive]}>
+                    <Text style={[styles.filterBadgeText, statusFilter === 'pending' && styles.filterBadgeTextActive]}>
+                      {pendingCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[styles.chip, reportTypeFilter === 'voice' && styles.chipActive]}
-              onPress={() => onReportTypeFilterChange('voice')}
-            >
-              <Text
-                style={[
-                  styles.chipLabel,
-                  reportTypeFilter === 'voice' && styles.chipLabelActive,
-                ]}
-              >
-                Voice
-              </Text>
-              <Text
-                style={[
-                  styles.chipCount,
-                  reportTypeFilter === 'voice' && styles.chipCountActive,
-                ]}
-              >
-                {totalCount}
-              </Text>
-            </TouchableOpacity>
-          </View>
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    statusFilter === 'ongoing' && styles.filterOptionActive,
+                  ]}
+                  onPress={() => onStatusFilterChange('ongoing')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="sync" size={18} color={statusFilter === 'ongoing' ? '#ffffff' : '#3b82f6'} />
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      statusFilter === 'ongoing' && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    Ongoing
+                  </Text>
+                  <View style={[styles.filterBadge, statusFilter === 'ongoing' && styles.filterBadgeActive]}>
+                    <Text style={[styles.filterBadgeText, statusFilter === 'ongoing' && styles.filterBadgeTextActive]}>
+                      {ongoingCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
 
-          <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    statusFilter === 'resolved' && styles.filterOptionActive,
+                  ]}
+                  onPress={() => onStatusFilterChange('resolved')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="checkmark-circle" size={18} color={statusFilter === 'resolved' ? '#ffffff' : '#22c55e'} />
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      statusFilter === 'resolved' && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    Resolved
+                  </Text>
+                  <View style={[styles.filterBadge, statusFilter === 'resolved' && styles.filterBadgeActive]}>
+                    <Text style={[styles.filterBadgeText, statusFilter === 'resolved' && styles.filterBadgeTextActive]}>
+                      {resolvedCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Type Filter */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Report Type</Text>
+              <View style={styles.filterOptions}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    reportTypeFilter === 'all' && styles.filterOptionActive,
+                  ]}
+                  onPress={() => onReportTypeFilterChange('all')}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      reportTypeFilter === 'all' && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    All Types
+                  </Text>
+                  <View style={[styles.filterBadge, reportTypeFilter === 'all' && styles.filterBadgeActive]}>
+                    <Text style={[styles.filterBadgeText, reportTypeFilter === 'all' && styles.filterBadgeTextActive]}>
+                      {totalCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    reportTypeFilter === 'manual' && styles.filterOptionActive,
+                  ]}
+                  onPress={() => onReportTypeFilterChange('manual')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="create" size={18} color={reportTypeFilter === 'manual' ? '#ffffff' : '#64748b'} />
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      reportTypeFilter === 'manual' && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    Manual
+                  </Text>
+                  <View style={[styles.filterBadge, reportTypeFilter === 'manual' && styles.filterBadgeActive]}>
+                    <Text style={[styles.filterBadgeText, reportTypeFilter === 'manual' && styles.filterBadgeTextActive]}>
+                      {totalCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    reportTypeFilter === 'voice' && styles.filterOptionActive,
+                  ]}
+                  onPress={() => onReportTypeFilterChange('voice')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="mic" size={18} color={reportTypeFilter === 'voice' ? '#ffffff' : '#64748b'} />
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      reportTypeFilter === 'voice' && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    Voice
+                  </Text>
+                  <View style={[styles.filterBadge, reportTypeFilter === 'voice' && styles.filterBadgeActive]}>
+                    <Text style={[styles.filterBadgeText, reportTypeFilter === 'voice' && styles.filterBadgeTextActive]}>
+                      {totalCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Modal Footer */}
+          <View style={styles.modalFooter}>
             <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonSecondary]}
-              activeOpacity={0.8}
+              style={styles.clearButton}
+              activeOpacity={0.7}
               onPress={onClearAll}
             >
-              <Text style={[styles.modalButtonText, styles.modalButtonTextSecondary]}>
-                Clear All
-              </Text>
+              <Text style={styles.clearButtonText}>Clear All</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonPrimary]}
-              activeOpacity={0.8}
+              style={styles.applyButton}
+              activeOpacity={0.7}
               onPress={onClose}
             >
-              <Text style={styles.modalButtonText}>Apply Filters</Text>
+              <Text style={styles.applyButtonText}>Apply Filters</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -216,92 +257,124 @@ export function FilterModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
-  modalContainer: {
+  modalContent: {
     backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 32,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
   modalTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.lg,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1e293b',
   },
-  modalSectionTitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
+  modalBody: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    paddingBottom: 40,
   },
-  chipGroup: {
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
+  filterSection: {
+    marginBottom: 24,
   },
-  chip: {
+  filterSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#475569',
+    marginBottom: 12,
+  },
+  filterOptions: {
+    gap: 10,
+  },
+  filterOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: 16,
     backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 10,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
   },
-  chipActive: {
-    backgroundColor: colors.primary.blue,
+  filterOptionActive: {
+    backgroundColor: '#1e3a8a',
+    borderColor: '#1e3a8a',
   },
-  chipLabel: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
-  chipLabelActive: {
-    color: colors.text.inverse,
-  },
-  chipCount: {
-    minWidth: 36,
-    textAlign: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    backgroundColor: '#e2e8f0',
-    color: '#0f172a',
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-  },
-  chipCountActive: {
-    backgroundColor: '#e5edff',
-    color: '#1e3a8a',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-  modalButton: {
+  filterOptionText: {
     flex: 1,
-    paddingVertical: spacing.md,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
   },
-  modalButtonSecondary: {
-    backgroundColor: '#f8fafc',
-  },
-  modalButtonPrimary: {
-    backgroundColor: '#4b5563',
-  },
-  modalButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
+  filterOptionTextActive: {
     color: '#ffffff',
   },
-  modalButtonTextSecondary: {
-    color: '#0f172a',
+  filterBadge: {
+    backgroundColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    minWidth: 28,
+    alignItems: 'center',
+  },
+  filterBadgeActive: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#1e3a8a',
+  },
+  filterBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  filterBadgeTextActive: {
+    color: '#1e3a8a',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  clearButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+  },
+  clearButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  applyButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#64748b',
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#ffffff',
   },
 });
 

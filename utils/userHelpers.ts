@@ -25,3 +25,4 @@ export function getFullAddress(user: User | null | undefined): string {
   return parts.length > 0 ? parts.join(', ') : 'No address provided';
 }
 
+

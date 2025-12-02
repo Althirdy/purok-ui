@@ -105,11 +105,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary.blue,
     paddingBottom: spacing.xs,
     paddingTop: spacing.xs,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#1e3a8a',
   },
   tabButton: {
     flex: 1,

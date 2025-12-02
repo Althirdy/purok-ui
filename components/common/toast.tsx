@@ -256,14 +256,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderRadius: borderRadius.lg,
     backgroundColor: colors.background.card,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     minHeight: 60,
   },
   leftBar: {

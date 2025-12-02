@@ -7,17 +7,17 @@ import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
 import { getInitials } from '@/utils/userHelpers';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
+import { router } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -239,11 +239,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e3a8a',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#1e3a8a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+    borderWidth: 2,
+    borderColor: '#1e3a8a',
   },
   avatarText: {
     fontSize: 36,
@@ -257,11 +254,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   userName: {
     fontSize: 24,
@@ -291,11 +285,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 12,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   sectionTitle: {
     fontSize: 18,
@@ -355,11 +346,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: '#ef4444',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
     width: '80%',
   },
   logoutButtonText: {

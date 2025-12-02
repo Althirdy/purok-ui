@@ -68,7 +68,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
     paddingTop: spacing.xl,
     paddingBottom: Platform.OS === 'ios' ? 40 : spacing.xl,
-    ...shadows.lg,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderBottomWidth: 0,
   },
   modalTitle: {
     fontSize: isTablet ? typography.fontSize.xl : typography.fontSize.lg,
@@ -106,7 +108,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.sm,
   },
   modalButtonSecondary: {
     backgroundColor: colors.background.secondary,

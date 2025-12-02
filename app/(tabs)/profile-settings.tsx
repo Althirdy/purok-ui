@@ -117,7 +117,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.xl,
-    ...DesignSystem.shadows.sm,
   },
   updateButtonText: {
     fontSize: typography.fontSize.base,

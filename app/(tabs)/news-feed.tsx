@@ -39,11 +39,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary.blue,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    borderWidth: 2,
+    borderColor: colors.primary.blue,
   },
   floatingBadge: {
     position: 'absolute',
@@ -103,7 +100,7 @@ export default function NewsFeedScreen() {
       }
     },
   });
-
+  
   // Debounce live search so it filters shortly after typing
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -124,7 +121,7 @@ export default function NewsFeedScreen() {
 
     // Mark as resolved
     updateReportStatus(reportId, 'resolved');
-
+      
     // Add notification
     addNotification({
       id: `update-${r.id}-${Date.now()}`,
@@ -186,7 +183,7 @@ export default function NewsFeedScreen() {
   const handleFilterChange = useCallback((filter: FeedSource) => {
     setActiveFilter(filter);
   }, []);
-
+  
   // Memoize header component - only recompute when dependencies change
   const memoizedHeader = useMemo(() => {
     return (
@@ -246,7 +243,7 @@ export default function NewsFeedScreen() {
             <Text style={styles.floatingBadgeText}>
               {unreadCount > 99 ? '99+' : unreadCount}
             </Text>
-          </View>
+            </View>
         )}
       </TouchableOpacity>
 

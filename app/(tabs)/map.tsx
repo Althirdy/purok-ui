@@ -322,7 +322,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.secondary,
     borderWidth: 1,
     borderColor: colors.border.light,
-    ...shadows.sm,
   },
   
   // Custom Marker Styles
@@ -337,11 +336,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 3,
     borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
   },
   markerArrow: {
     width: 0,
@@ -375,11 +369,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border.light,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
   },
   calloutTitle: {
     fontSize: 16,
@@ -419,7 +408,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 4,
     zIndex: 1000,
-    ...shadows.sm,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   attributionText: {
     fontSize: 10,

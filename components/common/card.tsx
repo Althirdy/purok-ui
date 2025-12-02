@@ -35,15 +35,14 @@ export function Card({ children, variant = 'default', onPress, style }: CardProp
 
 const styles = StyleSheet.create({
   base: {
-    backgroundColor: colors.background.card,
-    borderRadius: borderRadius.xl,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border.light,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   
   elevated: {
-    ...shadows.md,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
   },
 });
 

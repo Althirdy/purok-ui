@@ -2,14 +2,14 @@
  * Report Details Screen - Comprehensive view for a single report
  */
 
-import { safeGet } from '@/lib/axios';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
+import { useReportsFeed } from '@/hooks/use-reports-feed';
 import type { EmergencyReport } from '@/types';
 import { formatTimestampDetailed } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -39,7 +39,6 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border.light,
-    ...DesignSystem.shadows.sm,
   },
   rowBetween: {
     flexDirection: 'row',
@@ -79,41 +78,36 @@ export default function ReportDetailsScreen() {
   const params = useLocalSearchParams();
   const reportId = String(params.reportId || '');
 
-  // API-ready fetch with graceful mock fallback
+  // Get reports from feed hook
+  const { reports, updateReportStatus } = useReportsFeed();
   const [report, setReport] = React.useState<EmergencyReport | null>(null);
   const [loading, setLoading] = React.useState(true);
 
-  React.useEffect(() => {
-    const run = async () => {
-      setLoading(true);
-      try {
-        const data = await safeGet<EmergencyReport>(`/reports/${reportId}`, () => ({
-          id: reportId || 'UW-2025-001',
-          type: 'suspicious',
-          title: 'Suspicious Activity',
-          description:
-            "There's a person suddenly collapsed on the road of Barangay 176, Near Metroplaza. With a heat index of 38°C, it is suspected to be a Heat Stroke. Immediate Medical Response is needed.",
-          location: 'Barangay 176, Near Metroplaza',
-          timestamp: new Date(),
-          status: 'pending',
-          severity: 'high',
-          source: 'cctv',
-        }));
-        setReport(data);
-      } finally {
-        setLoading(false);
-      }
-    };
-    run();
-  }, [reportId]);
+  useEffect(() => {
+    // Find report from feed
+    const foundReport = reports.find(r => r.id === reportId);
+    if (foundReport) {
+      setReport(foundReport);
+      setLoading(false);
+    } else if (reports.length > 0) {
+      // If reports are loaded but this one isn't found, it might not exist
+      setLoading(false);
+    }
+  }, [reports, reportId]);
 
 
   const handleAcknowledge = () => {
-    setReport(prev => (prev ? { ...prev, status: 'acknowledged' } : prev));
+    if (report) {
+      updateReportStatus(report.id, 'acknowledged');
+      setReport(prev => (prev ? { ...prev, status: 'acknowledged' } : prev));
+    }
   };
 
   const handleResolve = () => {
-    setReport(prev => (prev ? { ...prev, status: 'resolved' } : prev));
+    if (report) {
+      updateReportStatus(report.id, 'resolved');
+      setReport(prev => (prev ? { ...prev, status: 'resolved' } : prev));
+    }
   };
 
   return (
@@ -153,7 +147,7 @@ export default function ReportDetailsScreen() {
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={handleAcknowledge}
-              style={{ backgroundColor: colors.primary.blue, paddingVertical: spacing.md, borderRadius: 12, alignItems: 'center', ...DesignSystem.shadows.sm }}
+              style={{ backgroundColor: colors.primary.blue, paddingVertical: spacing.md, borderRadius: 12, alignItems: 'center' }}
             >
               <Text style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold }}>Acknowledge</Text>
             </TouchableOpacity>
@@ -162,7 +156,7 @@ export default function ReportDetailsScreen() {
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={handleResolve}
-              style={{ backgroundColor: colors.semantic.success, paddingVertical: spacing.md, borderRadius: 12, alignItems: 'center', ...DesignSystem.shadows.sm }}
+              style={{ backgroundColor: colors.semantic.success, paddingVertical: spacing.md, borderRadius: 12, alignItems: 'center' }}
             >
               <Text style={{ color: colors.text.primary, fontWeight: typography.fontWeight.semibold }}>Resolve</Text>
             </TouchableOpacity>

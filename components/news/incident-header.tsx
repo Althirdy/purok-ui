@@ -304,7 +304,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    ...shadows.sm,
   },
   searchText: {
     marginLeft: spacing.sm,
@@ -320,7 +319,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    ...shadows.sm,
   },
   filterButtonDot: {
     position: 'absolute',
@@ -363,7 +361,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border.light,
     borderRadius: 20,
     padding: spacing.md,
-    ...shadows.sm,
   },
   statLabel: {
     color: colors.text.secondary,
@@ -408,7 +405,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...shadows.sm,
   },
   filterIconWrap: {
     width: 36,
