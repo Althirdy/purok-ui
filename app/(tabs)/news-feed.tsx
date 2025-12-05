@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/news/empty-state';
 import { FilterModal } from '@/components/news/filter-modal';
 import { IncidentHeader } from '@/components/news/incident-header';
 import { ReportCard } from '@/components/news/report-card';
+import { AcknowledgeSheet } from '@/components/news/acknowledge-sheet';
 import { ResolveSheet } from '@/components/news/resolve-sheet';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
@@ -73,6 +74,7 @@ export default function NewsFeedScreen() {
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'ongoing' | 'resolved'>('all');
   const [reportTypeFilter, setReportTypeFilter] = useState<'all' | 'manual' | 'voice'>('all');
+  const [acknowledgeTarget, setAcknowledgeTarget] = useState<EmergencyReport | null>(null);
   const [resolveTarget, setResolveTarget] = useState<EmergencyReport | null>(null);
 
   const handleReportPress = useCallback((reportId: string) => {
@@ -114,7 +116,27 @@ export default function NewsFeedScreen() {
     fetchReports(activeFilter);
   }, [activeFilter, fetchReports]);
 
-  // Handle resolve - mark report as resolved and push notification
+  // Handle acknowledge - mark report as acknowledged (first step)
+  const handleAcknowledgePress = useCallback((reportId: string) => {
+    const r = reports.find(x => x.id === reportId);
+    if (!r || r.status !== 'pending') return;
+
+    // Mark as acknowledged
+    updateReportStatus(reportId, 'acknowledged');
+      
+    // Add notification
+    addNotification({
+      id: `acknowledge-${r.id}-${Date.now()}`,
+      type: 'report_update',
+      title: 'Report Acknowledged',
+      message: r.title,
+      reportId: r.id,
+      timestamp: new Date(),
+      read: false,
+    });
+  }, [reports, addNotification, updateReportStatus]);
+
+  // Handle resolve - mark report as resolved (second step)
   const handleResolvePress = useCallback((reportId: string) => {
     const r = reports.find(x => x.id === reportId);
     if (!r || r.status === 'resolved') return;
@@ -124,7 +146,7 @@ export default function NewsFeedScreen() {
       
     // Add notification
     addNotification({
-      id: `update-${r.id}-${Date.now()}`,
+      id: `resolve-${r.id}-${Date.now()}`,
       type: 'report_update',
       title: 'Report Resolved',
       message: r.title,
@@ -134,11 +156,17 @@ export default function NewsFeedScreen() {
     });
   }, [reports, addNotification, updateReportStatus]);
 
-  // Handle acknowledge button - directly opens resolve modal
-  const handleActionPress = useCallback((reportId: string) => {
+  // Handle acknowledge button - opens acknowledge modal (first step)
+  const handleAcknowledgeAction = useCallback((reportId: string) => {
     const r = reports.find(x => x.id === reportId);
-    if (!r) return;
-    // Directly open resolve modal when acknowledge is pressed
+    if (!r || r.status !== 'pending') return;
+    setAcknowledgeTarget(r);
+  }, [reports]);
+
+  // Handle resolve button - opens resolve modal (second step)
+  const handleResolveAction = useCallback((reportId: string) => {
+    const r = reports.find(x => x.id === reportId);
+    if (!r || r.status !== 'acknowledged') return;
     setResolveTarget(r);
   }, [reports]);
 
@@ -148,10 +176,11 @@ export default function NewsFeedScreen() {
       <ReportCard
         report={item}
         onPress={item.status === 'pending' ? handleReportPress : undefined}
-        onAcknowledge={item.status === 'pending' ? handleActionPress : undefined}
+        onAcknowledge={item.status === 'pending' ? handleAcknowledgeAction : undefined}
+        onResolve={item.status === 'acknowledged' ? handleResolveAction : undefined}
       />
     );
-  }, [handleReportPress, handleActionPress]);
+  }, [handleReportPress, handleAcknowledgeAction, handleResolveAction]);
 
   // Memoize keyExtractor
   const keyExtractor = useCallback((item: EmergencyReport) => item.id, []);
@@ -266,7 +295,20 @@ export default function NewsFeedScreen() {
         }}
       />
 
-      {/* Resolve confirmation sheet */}
+      {/* Acknowledge sheet (first step) */}
+      <AcknowledgeSheet
+        visible={!!acknowledgeTarget}
+        report={acknowledgeTarget}
+        onConfirm={() => {
+          if (acknowledgeTarget) {
+            handleAcknowledgePress(acknowledgeTarget.id);
+          }
+          setAcknowledgeTarget(null);
+        }}
+        onCancel={() => setAcknowledgeTarget(null)}
+      />
+
+      {/* Resolve confirmation sheet (second step) */}
       <ResolveSheet
         visible={!!resolveTarget}
         report={resolveTarget}

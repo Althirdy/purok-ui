@@ -12,6 +12,11 @@ type CitizenReportPayload = {
   status?: EmergencyReport['status'];
   timestamp?: string | number;
   reportedBy?: string;
+  images?: string[]; // Array of image URLs
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
 };
 
 let pusherClient: Pusher | null = null;
@@ -38,6 +43,8 @@ function normalizeCitizenReport(payload: CitizenReportPayload): EmergencyReport 
     timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
     source: 'citizen',
     reportedBy: payload.reportedBy ?? 'citizen',
+    images: payload.images,
+    coordinates: payload.coordinates,
   };
 }
 

@@ -2,7 +2,6 @@ import { Redirect, Tabs } from 'expo-router';
 
 import { ModernTabBar } from '@/components/modern-tab-bar';
 import { useAuth } from '@/context/auth-context';
-import { NotificationProvider } from '@/context/notification-context';
 
 export const unstable_settings = {
   initialRouteName: 'news-feed',
@@ -15,12 +14,11 @@ export default function TabLayout() {
     return <Redirect href="/(auth)/login" />;
   }
   return (
-    <NotificationProvider>
-      <Tabs
-        tabBar={(props) => <ModernTabBar {...props} />}
-        screenOptions={{
-          headerShown: false,
-        }}>
+    <Tabs
+      tabBar={(props) => <ModernTabBar {...props} />}
+      screenOptions={{
+        headerShown: false,
+      }}>
       <Tabs.Screen
         name="news-feed"
         options={{
@@ -59,6 +57,5 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
-    </NotificationProvider>
   );
 }

@@ -19,17 +19,24 @@ const styles = StyleSheet.create({
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    gap: spacing.sm,
     backgroundColor: colors.primary.blue,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+  },
+  backButton: {
+    padding: spacing.xs,
+    marginLeft: -spacing.xs,
   },
   headerTitle: {
     color: colors.text.inverse,
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 40,
   },
   sectionCard: {
     marginHorizontal: spacing.lg,
@@ -113,10 +120,11 @@ export default function ReportDetailsScreen() {
   return (
     <SafeAreaView style={globalStyles.container}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color={colors.text.inverse} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Citizen Report</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: spacing.xl }}>
@@ -134,7 +142,7 @@ export default function ReportDetailsScreen() {
           <Text style={styles.label}>Location</Text>
           <Text style={styles.value}>{report.location}</Text>
           <Text style={styles.label}>Time</Text>
-          <Text style={styles.value}>{formatTimestampDetailed(report.timestamp)}</Text>
+          <Text style={styles.value}>{formatDateReadable(report.timestamp)} {formatTime12Hour(report.timestamp)}</Text>
         </View>
 
         <View style={styles.sectionCard}>

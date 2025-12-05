@@ -1,3 +1,9 @@
+/**
+ * Acknowledge Sheet Component
+ * First step in the two-step flow: Acknowledge → Resolve
+ * User-friendly UI for non-technical users
+ */
+
 import { DesignSystem } from '@/constants/design-system';
 import type { EmergencyReport } from '@/types';
 import {
@@ -6,26 +12,24 @@ import {
   formatTime12Hour,
   getCategory,
   getSeverityColor,
-  getStatusText,
   cleanTitle,
 } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
 
 const { colors, typography, spacing } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 768;
 
-export interface ResolveSheetProps {
+export interface AcknowledgeSheetProps {
   visible: boolean;
   report: EmergencyReport | null;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSheetProps) {
+export function AcknowledgeSheet({ visible, report, onConfirm, onCancel }: AcknowledgeSheetProps) {
   if (!report) return null;
 
   const severityColor = getSeverityColor(report.severity);
@@ -44,12 +48,6 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
   };
 
   const coords = report.coordinates || parseCoordinates(report.location);
-  const mapRegion = coords ? {
-    latitude: coords.latitude,
-    longitude: coords.longitude,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  } : null;
 
   return (
     <Modal
@@ -64,11 +62,11 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
           <View style={styles.modalHeader}>
             <View style={styles.headerContent}>
               <View style={styles.iconCircle}>
-                <Ionicons name="checkmark-done-circle" size={28} color={colors.semantic.success} />
+                <Ionicons name="checkmark-circle" size={28} color={colors.primary.blue} />
               </View>
               <View style={styles.headerText}>
-                <Text style={styles.modalTitle}>Mark as Resolved</Text>
-                <Text style={styles.modalSubtitle}>Confirm that this concern has been addressed</Text>
+                <Text style={styles.modalTitle}>Acknowledge Report</Text>
+                <Text style={styles.modalSubtitle}>Review the details below</Text>
               </View>
             </View>
             <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
@@ -92,7 +90,7 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
 
             {/* Title Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Concern</Text>
+              <Text style={styles.sectionLabel}>What happened?</Text>
               <Text style={styles.titleText}>{cleanTitle(report.title)}</Text>
               <Text style={styles.dateText}>
                 {formatDateReadable(report.timestamp)} {formatTime12Hour(report.timestamp)}
@@ -130,41 +128,22 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
               </View>
             )}
 
-            {/* Location with Map */}
+            {/* Location with Map Preview */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Location</Text>
+              <Text style={styles.sectionLabel}>Where did this happen?</Text>
               <View style={styles.locationCard}>
                 <View style={styles.locationRow}>
                   <Ionicons name="location" size={20} color={colors.primary.blue} />
                   <Text style={styles.locationText}>{report.location}</Text>
                 </View>
-                {mapRegion && (
-                  <View style={styles.mapContainer}>
-                    <MapView
-                      style={styles.map}
-                      initialRegion={mapRegion}
-                      scrollEnabled={false}
-                      zoomEnabled={false}
-                      pitchEnabled={false}
-                      rotateEnabled={false}
-                      mapType="standard"
-                    >
-                      <Marker
-                        coordinate={{
-                          latitude: coords!.latitude,
-                          longitude: coords!.longitude,
-                        }}
-                        title={report.title}
-                      >
-                        <View style={styles.markerContainer}>
-                          <Ionicons name="location" size={24} color={colors.semantic.error} />
-                        </View>
-                      </Marker>
-                    </MapView>
-                    <View style={styles.mapOverlay}>
-                      <Text style={styles.mapCoordinates}>
+                {coords && (
+                  <View style={styles.mapPreview}>
+                    <View style={styles.mapPlaceholder}>
+                      <Ionicons name="map" size={32} color={colors.text.secondary} />
+                      <Text style={styles.mapText}>
                         {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
                       </Text>
+                      <Text style={styles.mapHint}>Tap to view on map</Text>
                     </View>
                   </View>
                 )}
@@ -181,30 +160,6 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
                 </View>
                 <Text style={styles.infoLabel}>Priority</Text>
               </View>
-              {report.source && (
-                <View style={styles.infoItem}>
-                  <Ionicons 
-                    name={report.source === 'citizen' ? 'people' : report.source === 'sensor' ? 'hardware-chip' : 'videocam'} 
-                    size={18} 
-                    color={colors.text.secondary} 
-                  />
-                  <Text style={styles.infoLabel}>Source</Text>
-                  <Text style={styles.infoValue}>
-                    {report.source === 'sensor' ? 'Sensor Box' : 
-                     report.source === 'cctv' ? 'CCTV' : 
-                     report.source === 'citizen' ? 'Citizen' : 
-                     report.source}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Confirmation Message */}
-            <View style={styles.confirmationBox}>
-              <Ionicons name="information-circle" size={20} color={colors.primary.blue} />
-              <Text style={styles.confirmationText}>
-                By marking this as resolved, you confirm that the concern has been fully addressed and no further action is needed.
-              </Text>
             </View>
           </ScrollView>
 
@@ -224,8 +179,8 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
               activeOpacity={0.8}
               onPress={onConfirm}
             >
-              <Ionicons name="checkmark-done-circle" size={20} color={colors.text.inverse} style={{ marginRight: 8 }} />
-              <Text style={styles.modalButtonText}>Mark as Resolved</Text>
+              <Ionicons name="checkmark-circle" size={20} color={colors.text.inverse} style={{ marginRight: 8 }} />
+              <Text style={styles.modalButtonText}>Acknowledge</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -267,7 +222,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.semantic.success + '15',
+    backgroundColor: colors.primary.blue + '15',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -383,37 +338,31 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     flex: 1,
   },
-  mapContainer: {
+  mapPreview: {
     marginTop: spacing.sm,
-    height: 180,
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border.light,
   },
-  map: {
-    width: '100%',
-    height: '100%',
-  },
-  mapOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    padding: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
-  mapCoordinates: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-    fontFamily: 'monospace',
-    textAlign: 'center',
-  },
-  markerContainer: {
+  mapPlaceholder: {
+    height: 120,
+    backgroundColor: colors.background.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    borderRadius: 8,
+  },
+  mapText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
+    fontFamily: 'monospace',
+  },
+  mapHint: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+    fontStyle: 'italic',
   },
   infoGrid: {
     flexDirection: 'row',
@@ -458,23 +407,6 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.bold,
   },
-  confirmationBox: {
-    flexDirection: 'row',
-    backgroundColor: colors.primary.blue + '10',
-    padding: spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.primary.blue + '30',
-    marginTop: spacing.md,
-    gap: spacing.sm,
-  },
-  confirmationText: {
-    flex: 1,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
-    lineHeight: typography.fontSize.sm * 1.4,
-  },
   modalActions: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -482,7 +414,6 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
-    paddingHorizontal: spacing.xs,
   },
   modalButton: {
     flex: 1,
@@ -491,7 +422,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
-    minHeight: 48,
   },
   modalButtonSecondary: {
     backgroundColor: colors.background.secondary,
@@ -499,7 +429,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border.light,
   },
   modalButtonPrimary: {
-    backgroundColor: colors.semantic.success,
+    backgroundColor: colors.primary.blue,
   },
   modalButtonText: {
     fontSize: typography.fontSize.base,

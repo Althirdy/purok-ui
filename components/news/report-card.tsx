@@ -24,10 +24,11 @@ export interface ReportCardProps {
   report: EmergencyReport;
   onPress?: (reportId: string) => void;
   onAcknowledge?: (reportId: string) => void;
+  onResolve?: (reportId: string) => void;
   [key: string]: any;
 }
 
-function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps) {
+function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: ReportCardProps) {
   const getSourceIcon = (source?: string) => {
     switch (source) {
       case 'cctv':
@@ -134,6 +135,23 @@ function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps
               <Text style={styles.acknowledgeText}>Acknowledge</Text>
             </TouchableOpacity>
           )}
+        </View>
+      )}
+
+      {/* Resolve Button (shown after acknowledging) */}
+      {report.status === 'acknowledged' && onResolve && (
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity 
+            style={styles.resolveButton} 
+            onPress={(e) => {
+              e.stopPropagation();
+              onResolve(report.id);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="checkmark-done-circle" size={18} color={colors.text.inverse} style={{ marginRight: 6 }} />
+            <Text style={styles.resolveText}>Mark as Resolved</Text>
+          </TouchableOpacity>
         </View>
       )}
     </Card>
@@ -314,6 +332,20 @@ const styles = StyleSheet.create({
   },
   
   acknowledgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.inverse,
+  },
+  resolveButton: {
+    flex: 1,
+    backgroundColor: colors.semantic.success,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  resolveText: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text.inverse,

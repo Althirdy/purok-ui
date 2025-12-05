@@ -27,6 +27,12 @@ export interface EmergencyReport {
   severity: 'low' | 'medium' | 'high' | 'critical';
   reportedBy?: string;
   source?: 'cctv' | 'sensor' | 'citizen' | 'official';
+  // Optional fields for citizen reports
+  images?: string[]; // Array of image URLs
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 // Feed Types

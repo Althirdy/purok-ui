@@ -44,6 +44,40 @@ export function formatTimestampDetailed(date?: Date): string {
 }
 
 /**
+ * Format date to readable format (e.g., "Nov 27, 2025")
+ */
+export function formatDateReadable(date?: Date): string {
+  if (!date) return '';
+  try {
+    const options: Intl.DateTimeFormatOptions = {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    };
+    return date.toLocaleDateString('en-US', options);
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Format time to 12-hour format with AM/PM (e.g., "9:26 PM")
+ */
+export function formatTime12Hour(date?: Date): string {
+  if (!date) return '';
+  try {
+    const options: Intl.DateTimeFormatOptions = {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    };
+    return date.toLocaleTimeString('en-US', options);
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Get category display name from report type
  */
 export function getCategory(type: EmergencyReport['type']): string {
@@ -128,5 +162,27 @@ export function formatReportId(id: string): string {
   }
   return id.substring(0, 15);
 }
+
+/**
+ * Clean title by removing date patterns (e.g., "Voice Concern - Nov 27, 2025 13:26" -> "Voice Concern")
+ */
+export function cleanTitle(title: string): string {
+  // Remove patterns like " - Nov 27, 2025" or " - Nov 27, 2025 13:26" or similar date formats
+  // Match: " - " followed by date patterns
+  const datePatterns = [
+    / - \w{3}\s+\d{1,2},\s+\d{4}.*$/, // " - Nov 27, 2025" or " - Nov 27, 2025 13:26"
+    / - \d{1,2}\/\d{1,2}\/\d{4}.*$/, // " - 11/27/2025"
+    / - \d{4}-\d{2}-\d{2}.*$/, // " - 2025-11-27"
+  ];
+  
+  let cleaned = title;
+  for (const pattern of datePatterns) {
+    cleaned = cleaned.replace(pattern, '').trim();
+  }
+  
+  return cleaned;
+}
+
+
 
 
