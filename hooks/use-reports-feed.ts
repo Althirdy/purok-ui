@@ -3,7 +3,7 @@ import { useAuth } from '@/context/auth-context';
 import { useNotifications } from '@/context/notification-context';
 import { anomalyToReport, deviceStatusToReport, fetchLatestAnomaliesSince, fetchLatestDeviceStatusSince, listenToAnomalies } from '@/services/firebase-service';
 import { updateConcernStatusAPI } from '@/services/purok-leader-service';
-import { subscribeToCitizenReports } from '@/services/realtime-service';
+import { subscribeToPurokAssignments } from '@/services/realtime-service';
 import type { EmergencyReport, FeedSource } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -17,7 +17,7 @@ interface UseReportsFeedOptions {
 }
 
 export function useReportsFeed(options: UseReportsFeedOptions = {}) {
-  const { sessionStartMs, user } = useAuth();
+  const { sessionStartMs, user, accessToken } = useAuth();
   const { addNotificationFromReport } = useNotifications();
   const { onNewReport, onToastRequest } = options;
 
@@ -92,10 +92,18 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
       const freshMap = new Map(freshReports.map(r => [r.id, r]));
 
       // Merge: use existing status if report exists, otherwise use fresh
+      // Preserve audio and reportType from fresh reports (they have the latest data)
       const merged = freshReports.map(fresh => {
         const existing = existingMap.get(fresh.id);
         if (existing) {
-          return { ...fresh, status: existing.status };
+          // Preserve status from existing, but use fresh audio/reportType if available
+          return { 
+            ...fresh, 
+            status: existing.status,
+            // Preserve audio and reportType from fresh (newer data)
+            audio: fresh.audio ?? existing.audio,
+            reportType: fresh.reportType ?? existing.reportType,
+          };
         }
         return fresh;
       });
@@ -162,6 +170,9 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
   }, [addNotificationFromReport, onNewReport, MAX_REPORTS]);
 
   // Set up Firebase real-time listener for sensor data with throttling
+  // Use ref to prevent duplicate subscriptions
+  const pusherSubscriptionRef = useRef<(() => void) | null>(null);
+  
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
     let unsubscribeCitizen: (() => void) | null = null;
@@ -186,62 +197,27 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
         }, 300); // small debounce for bursts
       });
 
-      // Citizen channel subscription (Pusher) - Private channel for purok leader
-      // Only subscribe if user is authenticated
-      if (user?.id) {
-        // Get auth token from AsyncStorage
-        AsyncStorage.getItem('@urbanwatch:auth_token').then(authToken => {
-          if (authToken) {
-            // Subscribe to private channel: private-purok-leader.{userId}
-            // user.id is already a string from normalizeUser
-            console.log('[ReportsFeed] Setting up Pusher subscription for user ID:', user.id);
-            subscribeToCitizenReports(user.id, authToken, report => {
-              console.log('[ReportsFeed] 🔔 Processing new concern from Pusher:', {
-                reportId: report.id,
-                title: report.title,
-                status: report.status,
-                source: report.source,
-              });
-              if (processedReportIds.current.has(report.id)) {
-                console.log('[ReportsFeed] ⚠️ Report already processed, skipping:', report.id);
-                return;
-              }
-              processedReportIds.current.add(report.id);
-              setReports(prev => {
-                if (prev.some(r => r.id === report.id)) {
-                  console.log('[ReportsFeed] ⚠️ Report already in list, skipping:', report.id);
-                  return prev;
-                }
-                console.log('[ReportsFeed] ✅ Adding new report to feed:', report.id);
-                return [report, ...prev].slice(0, MAX_REPORTS);
-              });
-              setNewReportCount(p => p + 1);
-              
-              // Add notification for new concern (updates notification bell badge)
-              addNotificationFromReport(report);
-              
-              // Trigger toast notification callback (for high/critical severity)
-              // Defer to avoid state updates during render
-              setTimeout(() => {
-                onNewReport?.(report);
-              }, 0);
-              
-              console.log('[ReportsFeed] ✅ Real-time update complete for report:', report.id);
-            }).then(cleanup => {
-              unsubscribeCitizen = cleanup;
-              console.log('[ReportsFeed] ✅ Pusher subscription active for user:', user.id);
-            }).catch(error => {
-              console.error('[ReportsFeed] ❌ Failed to subscribe to Pusher:', error);
-            });
-          } else {
-            console.warn('[ReportsFeed] No auth token available for Pusher subscription');
+      // Citizen channel subscription (Pusher private channel per purok leader)
+      unsubscribeCitizen = subscribeToPurokAssignments({
+        token: accessToken,
+        userId: user?.id,
+        onReport: report => {
+          if (processedReportIds.current.has(report.id)) {
+            return;
           }
-        }).catch(error => {
-          console.error('[ReportsFeed] Error getting auth token:', error);
-        });
-      } else {
-        console.warn('[ReportsFeed] No user ID available for Pusher subscription');
-      }
+          processedReportIds.current.add(report.id);
+          setReports(prev => {
+            if (prev.some(r => r.id === report.id)) {
+              return prev;
+            }
+            return [report, ...prev].slice(0, MAX_REPORTS);
+          });
+          setNewReportCount(p => p + 1);
+          if (report.severity === 'high' || report.severity === 'critical') {
+            onNewReport?.(report);
+          }
+        },
+      });
 
       // Set up interval to process pending reports
       updateTimer.current = setInterval(() => {
@@ -265,11 +241,12 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
       }
       if (unsubscribeCitizen) {
         unsubscribeCitizen();
+        pusherSubscriptionRef.current = null; // Clear ref on cleanup
       }
       processedReportIds.current.clear();
       pendingReports.current = [];
     };
-  }, [processPendingReports, user?.id, addNotificationFromReport]);
+  }, [processPendingReports, user?.id, addNotificationFromReport, onNewReport]);
 
   // Load cached reports on mount
   useEffect(() => {
@@ -278,11 +255,21 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
         const cached = await AsyncStorage.getItem(REPORTS_STORAGE_KEY);
         if (cached) {
           const parsed = JSON.parse(cached);
-          // Convert timestamp strings back to Date objects
-          const withDates = parsed.map((r: any) => ({
-            ...r,
-            timestamp: new Date(r.timestamp),
-          }));
+          // Convert timestamp strings back to Date objects and re-normalize missing fields
+          const withDates = parsed.map((r: any) => {
+            const report = {
+              ...r,
+              timestamp: new Date(r.timestamp),
+            };
+            // Re-normalize audio and reportType if missing (for citizen reports)
+            if (report.source === 'citizen' && !report.reportType) {
+              const hasAudio = report.audio && report.audio.trim().length > 0;
+              const isVoiceCategory = report.title?.toLowerCase().includes('voice concern') || 
+                                      report.description?.toLowerCase().includes('audio recording');
+              report.reportType = (hasAudio || isVoiceCategory) ? 'voice' : 'manual';
+            }
+            return report;
+          });
           setReports(withDates);
           // Mark as processed to avoid duplicates
           withDates.forEach((r: EmergencyReport) => {

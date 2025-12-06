@@ -16,9 +16,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Linking } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Audio } from 'expo-av';
 
 const { colors, spacing, typography } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -226,6 +227,40 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     fontStyle: 'italic',
   },
+  audioSection: {
+    marginTop: spacing.sm,
+  },
+  audioPlayer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background.secondary,
+    borderRadius: 12,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  audioButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primary.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  audioInfo: {
+    flex: 1,
+  },
+  audioLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  audioUrl: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    fontFamily: 'monospace',
+  },
 });
 
 export default function ReportDetailsScreen() {
@@ -236,6 +271,8 @@ export default function ReportDetailsScreen() {
   const { reports, updateReportStatus, fetchReports } = useReportsFeed();
   const [report, setReport] = React.useState<EmergencyReport | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [sound, setSound] = React.useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = React.useState(false);
 
   // Fetch reports on mount to ensure we have the latest data
   useEffect(() => {
@@ -246,6 +283,13 @@ export default function ReportDetailsScreen() {
     // Find report from feed
     const foundReport = reports.find(r => r.id === reportId);
     if (foundReport) {
+      console.log('[ReportDetails] Found report:', {
+        id: foundReport.id,
+        title: foundReport.title,
+        audio: foundReport.audio,
+        reportType: foundReport.reportType,
+        hasAudio: !!foundReport.audio,
+      });
       setReport(foundReport);
       setLoading(false);
     } else if (reports.length > 0) {
@@ -253,6 +297,13 @@ export default function ReportDetailsScreen() {
       const timer = setTimeout(() => {
         const retryReport = reports.find(r => r.id === reportId);
         if (retryReport) {
+          console.log('[ReportDetails] Found report (retry):', {
+            id: retryReport.id,
+            title: retryReport.title,
+            audio: retryReport.audio,
+            reportType: retryReport.reportType,
+            hasAudio: !!retryReport.audio,
+          });
           setReport(retryReport);
           setLoading(false);
         } else {
@@ -320,6 +371,65 @@ export default function ReportDetailsScreen() {
       } as any);
     }
   };
+
+  // Audio playback handlers
+  const playAudio = async () => {
+    if (!report?.audio) return;
+
+    try {
+      // Stop any currently playing sound
+      if (sound) {
+        await sound.unloadAsync();
+        setSound(null);
+      }
+
+      // Load and play the audio
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: report.audio },
+        { shouldPlay: true }
+      );
+
+      setSound(newSound);
+      setIsPlaying(true);
+
+      // Handle playback status updates
+      newSound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded) {
+          if (status.didJustFinish) {
+            setIsPlaying(false);
+            newSound.unloadAsync();
+            setSound(null);
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      // Fallback: open audio URL in browser
+      if (report.audio) {
+        Linking.openURL(report.audio).catch(err => {
+          console.error('Error opening audio URL:', err);
+        });
+      }
+    }
+  };
+
+  const stopAudio = async () => {
+    if (sound) {
+      await sound.stopAsync();
+      await sound.unloadAsync();
+      setSound(null);
+      setIsPlaying(false);
+    }
+  };
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, [sound]);
 
   if (loading) {
     return (
@@ -403,6 +513,55 @@ export default function ReportDetailsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Details</Text>
             <Text style={styles.descriptionText}>{report.description}</Text>
+            
+            {/* Audio Player for Voice Concerns */}
+            {/* Show audio player if audio exists OR if it's a voice concern (by title/description) */}
+            {(report.audio || 
+              report.reportType === 'voice' || 
+              report.title?.toLowerCase().includes('voice concern') ||
+              report.description?.toLowerCase().includes('audio recording')) && (
+              <View style={styles.audioSection}>
+                <View style={styles.audioPlayer}>
+                  {report.audio ? (
+                    <>
+                      <TouchableOpacity
+                        style={styles.audioButton}
+                        onPress={isPlaying ? stopAudio : playAudio}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name={isPlaying ? 'pause' : 'play'}
+                          size={24}
+                          color={colors.text.inverse}
+                        />
+                      </TouchableOpacity>
+                      <View style={styles.audioInfo}>
+                        <Text style={styles.audioLabel}>Voice Recording</Text>
+                        <Text style={styles.audioUrl} numberOfLines={1}>
+                          {report.audio}
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View style={[styles.audioButton, { backgroundColor: colors.neutral.gray600 }]}>
+                        <Ionicons
+                          name="mic"
+                          size={24}
+                          color={colors.text.inverse}
+                        />
+                      </View>
+                      <View style={styles.audioInfo}>
+                        <Text style={styles.audioLabel}>Voice Recording</Text>
+                        <Text style={styles.audioUrl}>
+                          Audio file not available yet
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+              </View>
+            )}
           </View>
         )}
 

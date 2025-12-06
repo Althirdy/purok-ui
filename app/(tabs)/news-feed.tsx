@@ -198,6 +198,37 @@ export default function NewsFeedScreen() {
   const ongoingCount = useMemo(() => reports.filter(r => r.status === 'acknowledged').length, [reports]);
   const totalCount = reports.length;
   
+  // Calculate report type counts (manual vs voice) - only for citizen reports
+  const manualCount = useMemo(() => {
+    return reports.filter(r => {
+      if (r.source !== 'citizen') return false;
+      // Check reportType field first, then fallback to audio field or category
+      if (r.reportType) {
+        return r.reportType === 'manual';
+      }
+      // Fallback: determine from audio field or category
+      const hasAudio = r.audio && r.audio.trim().length > 0;
+      const isVoiceCategory = r.title?.toLowerCase().includes('voice concern') || 
+                              r.description?.toLowerCase().includes('audio recording');
+      return !hasAudio && !isVoiceCategory;
+    }).length;
+  }, [reports]);
+  
+  const voiceCount = useMemo(() => {
+    return reports.filter(r => {
+      if (r.source !== 'citizen') return false;
+      // Check reportType field first, then fallback to audio field or category
+      if (r.reportType) {
+        return r.reportType === 'voice';
+      }
+      // Fallback: determine from audio field or category
+      const hasAudio = r.audio && r.audio.trim().length > 0;
+      const isVoiceCategory = r.title?.toLowerCase().includes('voice concern') || 
+                              r.description?.toLowerCase().includes('audio recording');
+      return hasAudio || isVoiceCategory;
+    }).length;
+  }, [reports]);
+  
   // Derived: reports filtered by search query and source (category)
   const displayedReports = useMemo(() => {
     const q = committedQuery.trim().toLowerCase();
@@ -216,14 +247,34 @@ export default function NewsFeedScreen() {
       const targetStatus = statusFilter === 'ongoing' ? 'acknowledged' : statusFilter;
       base = base.filter(r => r.status === targetStatus);
     }
-    // Note: reportTypeFilter is reserved for future manual/voice classification
+    // Apply report type filter (manual vs voice)
+    // Only applies to citizen reports (sensor reports don't have reportType)
+    if (reportTypeFilter !== 'all') {
+      base = base.filter(r => {
+        // For citizen reports, filter by reportType
+        if (r.source === 'citizen') {
+          // Check reportType field first
+          if (r.reportType) {
+            return r.reportType === reportTypeFilter;
+          }
+          // Fallback: determine from audio field or title/description
+          const hasAudio = r.audio && r.audio.trim().length > 0;
+          const isVoiceCategory = r.title?.toLowerCase().includes('voice concern') || 
+                                  r.description?.toLowerCase().includes('audio recording');
+          const determinedType = (hasAudio || isVoiceCategory) ? 'voice' : 'manual';
+          return determinedType === reportTypeFilter;
+        }
+        // For non-citizen reports (sensor, cctv), show all when filtering by type
+        return true; // Show sensor/cctv reports in all type filters
+      });
+    }
     if (!q) return base;
     return base.filter(r => {
       const title = r.title?.toLowerCase() ?? '';
       const location = r.location?.toLowerCase() ?? '';
       return title.includes(q) || location.includes(q);
     });
-  }, [reports, committedQuery, statusFilter, activeFilter]);
+  }, [reports, committedQuery, statusFilter, activeFilter, reportTypeFilter]);
   
   const handleFilterChange = useCallback((filter: FeedSource) => {
     setActiveFilter(filter);
@@ -301,6 +352,8 @@ export default function NewsFeedScreen() {
         pendingCount={pendingCount}
         ongoingCount={ongoingCount}
         resolvedCount={resolvedCount}
+        manualCount={manualCount}
+        voiceCount={voiceCount}
         onStatusFilterChange={setStatusFilter}
         onReportTypeFilterChange={setReportTypeFilter}
         onClose={() => setIsFilterModalVisible(false)}

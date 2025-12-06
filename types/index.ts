@@ -29,10 +29,13 @@ export interface EmergencyReport {
   source?: 'cctv' | 'sensor' | 'citizen' | 'official';
   // Optional fields for citizen reports
   images?: string[]; // Array of image URLs
+  audio?: string | null; // Audio URL for voice concerns
   coordinates?: {
     latitude: number;
     longitude: number;
   };
+  // Report type classification (manual vs voice)
+  reportType?: 'manual' | 'voice'; // 'voice' if has audio or category is 'voice_concern', 'manual' otherwise
 }
 
 // Feed Types

@@ -1,8 +1,8 @@
 // Lightweight API helper using fetch (no axios dependency)
 // Defaults to production API if env is not provided
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
+export const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
 
-async function httpGet<T = any>(path: string, init?: RequestInit): Promise<T> {
+export async function httpGet<T = any>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method: 'GET',
     headers: { 'Accept': 'application/json', ...(init?.headers || {}) },

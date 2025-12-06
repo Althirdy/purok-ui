@@ -1,7 +1,7 @@
 import { DesignSystem } from '@/constants/design-system';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Dimensions, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const { colors, typography, spacing } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -15,6 +15,8 @@ export interface FilterModalProps {
   pendingCount: number;
   ongoingCount: number;
   resolvedCount: number;
+  manualCount: number; // Count of manual reports
+  voiceCount: number; // Count of voice reports
   onStatusFilterChange: (filter: 'all' | 'pending' | 'ongoing' | 'resolved') => void;
   onReportTypeFilterChange: (filter: 'all' | 'manual' | 'voice') => void;
   onClose: () => void;
@@ -29,6 +31,8 @@ export function FilterModal({
   pendingCount,
   ongoingCount,
   resolvedCount,
+  manualCount,
+  voiceCount,
   onStatusFilterChange,
   onReportTypeFilterChange,
   onClose,
@@ -199,7 +203,7 @@ export function FilterModal({
                   </Text>
                   <View style={[styles.filterBadge, reportTypeFilter === 'manual' && styles.filterBadgeActive]}>
                     <Text style={[styles.filterBadgeText, reportTypeFilter === 'manual' && styles.filterBadgeTextActive]}>
-                      {totalCount}
+                      {manualCount}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -223,7 +227,7 @@ export function FilterModal({
                   </Text>
                   <View style={[styles.filterBadge, reportTypeFilter === 'voice' && styles.filterBadgeActive]}>
                     <Text style={[styles.filterBadgeText, reportTypeFilter === 'voice' && styles.filterBadgeTextActive]}>
-                      {totalCount}
+                      {voiceCount}
                     </Text>
                   </View>
                 </TouchableOpacity>

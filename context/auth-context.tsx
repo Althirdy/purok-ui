@@ -11,6 +11,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isInitializing: boolean;
   isSubmitting: boolean;
+  accessToken: string | null;
   loginWithPin: (pin: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sessionStartMs, setSessionStartMs] = useState<number>(Date.now());
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   useEffect(() => {
     initialize();
@@ -47,12 +49,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!PERSIST_SESSION) {
         await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, NOTIFICATIONS_STORAGE_KEY]);
         setUser(null);
+        setAccessToken(null);
         return;
       }
       const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
       if (token) {
         await fetchCurrentUser(token);
         setSessionStartMs(Date.now());
+        setAccessToken(token);
       }
     } catch (err) {
       // noop; stay unauthenticated on init failure
@@ -129,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Login response missing token');
       }
       await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+      setAccessToken(token);
       // Optimistically set user from login response if available
       if (loginData?.data?.user) {
         setUser(normalizeUser(loginData.data.user));
@@ -143,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, NOTIFICATIONS_STORAGE_KEY]);
     setUser(null);
+    setAccessToken(null);
   }, []);
 
   const refreshUser = useCallback(async () => {
@@ -156,11 +162,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user,
     isInitializing,
     isSubmitting,
+    accessToken,
     loginWithPin,
     logout,
     refreshUser,
     sessionStartMs,
-  }), [user, isInitializing, isSubmitting, loginWithPin, logout, refreshUser, sessionStartMs]);
+  }), [user, isInitializing, isSubmitting, accessToken, loginWithPin, logout, refreshUser, sessionStartMs]);
 
   return (
     <AuthContext.Provider value={value}>
