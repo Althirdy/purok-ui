@@ -3,11 +3,11 @@
  */
 
 import { Toast, type ToastData } from '@/components/common/toast';
+import { AcknowledgeSheet } from '@/components/news/acknowledge-sheet';
 import { EmptyState } from '@/components/news/empty-state';
 import { FilterModal } from '@/components/news/filter-modal';
 import { IncidentHeader } from '@/components/news/incident-header';
 import { ReportCard } from '@/components/news/report-card';
-import { AcknowledgeSheet } from '@/components/news/acknowledge-sheet';
 import { ResolveSheet } from '@/components/news/resolve-sheet';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
@@ -111,10 +111,11 @@ export default function NewsFeedScreen() {
     return () => clearTimeout(handle);
   }, [searchQuery]);
 
-  // Fetch reports when filter changes
+  // Fetch reports only on initial mount (not on filter change)
+  // Filtering is done client-side in displayedReports for better performance
   useEffect(() => {
-    fetchReports(activeFilter);
-  }, [activeFilter, fetchReports]);
+    fetchReports('all'); // Always fetch all reports, filter client-side
+  }, [fetchReports]);
 
   // Handle acknowledge - mark report as acknowledged (first step)
   const handleAcknowledgePress = useCallback((reportId: string) => {
@@ -171,13 +172,19 @@ export default function NewsFeedScreen() {
   }, [reports]);
 
   // Optimized renderItem with memoized callbacks
+  // All cards are clickable regardless of status
+  // Use useMemo to create stable props object per item
   const renderReportItem = useCallback(({ item }: { item: EmergencyReport }) => {
+    // Create stable callback references based on item status
+    const acknowledgeCallback = item.status === 'pending' ? handleAcknowledgeAction : undefined;
+    const resolveCallback = item.status === 'acknowledged' ? handleResolveAction : undefined;
+    
     return (
       <ReportCard
         report={item}
-        onPress={item.status === 'pending' ? handleReportPress : undefined}
-        onAcknowledge={item.status === 'pending' ? handleAcknowledgeAction : undefined}
-        onResolve={item.status === 'acknowledged' ? handleResolveAction : undefined}
+        onPress={handleReportPress}
+        onAcknowledge={acknowledgeCallback}
+        onResolve={resolveCallback}
       />
     );
   }, [handleReportPress, handleAcknowledgeAction, handleResolveAction]);
@@ -191,11 +198,20 @@ export default function NewsFeedScreen() {
   const ongoingCount = useMemo(() => reports.filter(r => r.status === 'acknowledged').length, [reports]);
   const totalCount = reports.length;
   
-  // Derived: reports filtered by search query
+  // Derived: reports filtered by search query and source (category)
   const displayedReports = useMemo(() => {
     const q = committedQuery.trim().toLowerCase();
-    // Apply status filter
+    // Apply source filter (category: all, cctv, sensor_box, citizen_reports)
     let base = reports;
+    if (activeFilter !== 'all') {
+      base = base.filter(r => {
+        if (activeFilter === 'sensor_box') return r.source === 'sensor';
+        if (activeFilter === 'cctv') return r.source === 'cctv';
+        if (activeFilter === 'citizen_reports') return r.source === 'citizen';
+        return true;
+      });
+    }
+    // Apply status filter
     if (statusFilter !== 'all') {
       const targetStatus = statusFilter === 'ongoing' ? 'acknowledged' : statusFilter;
       base = base.filter(r => r.status === targetStatus);
@@ -207,7 +223,7 @@ export default function NewsFeedScreen() {
       const location = r.location?.toLowerCase() ?? '';
       return title.includes(q) || location.includes(q);
     });
-  }, [reports, committedQuery, statusFilter]);
+  }, [reports, committedQuery, statusFilter, activeFilter]);
   
   const handleFilterChange = useCallback((filter: FeedSource) => {
     setActiveFilter(filter);
@@ -246,17 +262,17 @@ export default function NewsFeedScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => handleRefresh(activeFilter)}
+            onRefresh={() => handleRefresh('all')} // Always refresh all, filter client-side
             tintColor={colors.primary.blue}
           />
         }
         ListEmptyComponent={<EmptyState loading={loading} />}
         // Performance optimizations for rapid data
         removeClippedSubviews={true}
-        maxToRenderPerBatch={5}
-        updateCellsBatchingPeriod={50}
-        initialNumToRender={10}
-        windowSize={10}
+        maxToRenderPerBatch={10}
+        updateCellsBatchingPeriod={100}
+        initialNumToRender={15}
+        windowSize={21}
         // Note: getItemLayout removed - items have variable heights based on content
       />
 

@@ -62,7 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const normalizeUser = (raw: any): User => {
-    const id = raw?.id ?? raw?.userId ?? raw?.uid ?? String(raw?.id ?? '');
+    // Ensure ID is a string (Pusher channel names need string IDs)
+    const id = raw?.id != null ? String(raw.id) : raw?.userId ?? raw?.uid ?? '';
     // Build name from common variants and split fields
     const firstName = raw?.firstName ?? raw?.first_name ?? '';
     const middleName = raw?.middleName ?? raw?.middle_name ?? '';
@@ -96,7 +97,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(`Failed to fetch user: ${resp.status}`);
     }
     const data = await resp.json();
-    const rawUser = (data && (data.user ?? data.data?.user)) ? (data.user ?? data.data?.user) : data;
+    // API returns flat user object: { id, name, email, role_id, created_at }
+    // Not nested in data.user or data.data.user
+    const rawUser = data?.user ?? data?.data?.user ?? data;
+    console.log('[Auth] Fetched user data:', { id: rawUser?.id, name: rawUser?.name, role_id: rawUser?.role_id });
     setUser(normalizeUser(rawUser));
   }, []);
 

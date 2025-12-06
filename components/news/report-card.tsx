@@ -54,7 +54,8 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
   };
 
 
-  const canOpenDetails = !!onPress && report.status === 'pending';
+  // All cards are clickable if onPress is provided, regardless of status
+  const canOpenDetails = !!onPress;
   const statusBadgeStyle = getStatusColor(report.status);
 
   return (
@@ -160,20 +161,26 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
 
 // Memoize component to prevent unnecessary re-renders
 // Only re-render if report data actually changed (not function references)
+// Optimized memo comparison - only re-render if report data or callbacks change
 export const ReportCard: React.MemoExoticComponent<React.NamedExoticComponent<ReportCardProps>> = React.memo(ReportCardComponent, (prevProps, nextProps) => {
-  // Return true if props are equal (skip re-render), false if different (re-render)
-  // Only check report properties, not function references (functions are stable in useCallback)
+  // Compare report by ID and key fields that affect rendering
   if (prevProps.report.id !== nextProps.report.id) return false;
   if (prevProps.report.status !== nextProps.report.status) return false;
   if (prevProps.report.title !== nextProps.report.title) return false;
-  if (prevProps.report.description !== nextProps.report.description) return false;
   if (prevProps.report.severity !== nextProps.report.severity) return false;
   if (prevProps.report.timestamp.getTime() !== nextProps.report.timestamp.getTime()) return false;
-  // onAcknowledge might be undefined, so handle that case
-  if (!!prevProps.onAcknowledge !== !!nextProps.onAcknowledge) return false;
-  if (!!prevProps.onPress !== !!nextProps.onPress) return false;
   
-  return true; // Props are equal, skip re-render
+  // Compare callbacks by reference (they should be stable with useCallback)
+  // Handle undefined callbacks properly
+  if (!!prevProps.onPress !== !!nextProps.onPress) return false;
+  if (prevProps.onPress && prevProps.onPress !== nextProps.onPress) return false;
+  if (!!prevProps.onAcknowledge !== !!nextProps.onAcknowledge) return false;
+  if (prevProps.onAcknowledge && prevProps.onAcknowledge !== nextProps.onAcknowledge) return false;
+  if (!!prevProps.onResolve !== !!nextProps.onResolve) return false;
+  if (prevProps.onResolve && prevProps.onResolve !== nextProps.onResolve) return false;
+  
+  // Props are equal, skip re-render
+  return true;
 });
 
 const styles = StyleSheet.create({

@@ -14,11 +14,11 @@ export default function TabLayout() {
     return <Redirect href="/(auth)/login" />;
   }
   return (
-    <Tabs
-      tabBar={(props) => <ModernTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-      }}>
+      <Tabs
+        tabBar={(props) => <ModernTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+        }}>
       <Tabs.Screen
         name="news-feed"
         options={{

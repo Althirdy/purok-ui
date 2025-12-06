@@ -2,6 +2,7 @@ import { MAX_REPORTS_LIMIT } from '@/constants/sensor-config';
 import { useAuth } from '@/context/auth-context';
 import { useNotifications } from '@/context/notification-context';
 import { anomalyToReport, deviceStatusToReport, fetchLatestAnomaliesSince, fetchLatestDeviceStatusSince, listenToAnomalies } from '@/services/firebase-service';
+import { updateConcernStatusAPI } from '@/services/purok-leader-service';
 import { subscribeToCitizenReports } from '@/services/realtime-service';
 import type { EmergencyReport, FeedSource } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,7 +17,7 @@ interface UseReportsFeedOptions {
 }
 
 export function useReportsFeed(options: UseReportsFeedOptions = {}) {
-  const { sessionStartMs } = useAuth();
+  const { sessionStartMs, user } = useAuth();
   const { addNotificationFromReport } = useNotifications();
   const { onNewReport, onToastRequest } = options;
 
@@ -33,10 +34,11 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
   const isUpdating = useRef(false);
   const MAX_REPORTS = MAX_REPORTS_LIMIT;
 
-  // Fetch sensor reports by source
+  // Fetch sensor reports by source (Firebase real-time only)
   const fetchSensorReports = useCallback(async (source: FeedSource): Promise<EmergencyReport[]> => {
     let sensorReports: EmergencyReport[] = [];
 
+    // Only fetch sensor reports from Firebase (sensor_box or all)
     if (source === 'all' || source === 'sensor_box') {
       try {
         const sensorData = await fetchLatestAnomaliesSince(sessionStartMs, 40);
@@ -56,12 +58,14 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
       }
     }
 
-    const allReports = [...sensorReports];
+    // Note: Citizen reports come from Pusher real-time (not API fetch)
+    // They are added via the Pusher subscription in useEffect
+    // Filtering by source will work based on the report.source field
 
     // Filter by source if not 'all'
     const filteredReports = source === 'all'
-      ? allReports
-      : allReports.filter(r => {
+      ? sensorReports
+      : sensorReports.filter(r => {
           if (source === 'sensor_box') return r.source === 'sensor';
           if (source === 'cctv') return r.source === 'cctv';
           if (source === 'citizen_reports') return r.source === 'citizen';
@@ -182,20 +186,62 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
         }, 300); // small debounce for bursts
       });
 
-      // Citizen channel subscription (Pusher)
-      unsubscribeCitizen = subscribeToCitizenReports(report => {
-        if (processedReportIds.current.has(report.id)) {
-          return;
-        }
-        processedReportIds.current.add(report.id);
-        setReports(prev => {
-          if (prev.some(r => r.id === report.id)) {
-            return prev;
+      // Citizen channel subscription (Pusher) - Private channel for purok leader
+      // Only subscribe if user is authenticated
+      if (user?.id) {
+        // Get auth token from AsyncStorage
+        AsyncStorage.getItem('@urbanwatch:auth_token').then(authToken => {
+          if (authToken) {
+            // Subscribe to private channel: private-purok-leader.{userId}
+            // user.id is already a string from normalizeUser
+            console.log('[ReportsFeed] Setting up Pusher subscription for user ID:', user.id);
+            subscribeToCitizenReports(user.id, authToken, report => {
+              console.log('[ReportsFeed] 🔔 Processing new concern from Pusher:', {
+                reportId: report.id,
+                title: report.title,
+                status: report.status,
+                source: report.source,
+              });
+              if (processedReportIds.current.has(report.id)) {
+                console.log('[ReportsFeed] ⚠️ Report already processed, skipping:', report.id);
+                return;
+              }
+              processedReportIds.current.add(report.id);
+              setReports(prev => {
+                if (prev.some(r => r.id === report.id)) {
+                  console.log('[ReportsFeed] ⚠️ Report already in list, skipping:', report.id);
+                  return prev;
+                }
+                console.log('[ReportsFeed] ✅ Adding new report to feed:', report.id);
+                return [report, ...prev].slice(0, MAX_REPORTS);
+              });
+              setNewReportCount(p => p + 1);
+              
+              // Add notification for new concern (updates notification bell badge)
+              addNotificationFromReport(report);
+              
+              // Trigger toast notification callback (for high/critical severity)
+              // Defer to avoid state updates during render
+              setTimeout(() => {
+                onNewReport?.(report);
+              }, 0);
+              
+              console.log('[ReportsFeed] ✅ Real-time update complete for report:', report.id);
+            }).then(cleanup => {
+              unsubscribeCitizen = cleanup;
+              console.log('[ReportsFeed] ✅ Pusher subscription active for user:', user.id);
+            }).catch(error => {
+              console.error('[ReportsFeed] ❌ Failed to subscribe to Pusher:', error);
+            });
+          } else {
+            console.warn('[ReportsFeed] No auth token available for Pusher subscription');
           }
-          return [report, ...prev].slice(0, MAX_REPORTS);
+        }).catch(error => {
+          console.error('[ReportsFeed] Error getting auth token:', error);
         });
-        setNewReportCount(p => p + 1);
-      });
+      } else {
+        console.warn('[ReportsFeed] No user ID available for Pusher subscription');
+      }
 
       // Set up interval to process pending reports
       updateTimer.current = setInterval(() => {
@@ -223,7 +269,7 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
       processedReportIds.current.clear();
       pendingReports.current = [];
     };
-  }, [processPendingReports]);
+  }, [processPendingReports, user?.id, addNotificationFromReport]);
 
   // Load cached reports on mount
   useEffect(() => {
@@ -288,13 +334,41 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
     }
   }, [fetchSensorReports, mergeReports, processPendingReports]);
 
-  // Update report status
-  const updateReportStatus = useCallback((reportId: string, status: EmergencyReport['status']) => {
+  // Update report status (with API call for citizen reports)
+  const updateReportStatus = useCallback(async (reportId: string, status: EmergencyReport['status']) => {
+    // Optimistic UI update
     setReports(prevReports =>
       prevReports.map(report =>
         report.id === reportId ? { ...report, status } : report
       )
     );
+
+    // If it's a citizen report (PUROK- prefix), update via API
+    if (reportId.startsWith('PUROK-')) {
+      try {
+        const authToken = await AsyncStorage.getItem('@urbanwatch:auth_token');
+        if (authToken) {
+          const success = await updateConcernStatusAPI(reportId, status, authToken);
+          if (!success) {
+            // Rollback on failure
+            setReports(prevReports =>
+              prevReports.map(report =>
+                report.id === reportId ? { ...report, status: 'pending' } : report
+              )
+            );
+            console.error('[ReportsFeed] Failed to update concern status via API');
+          }
+        }
+      } catch (error) {
+        console.error('[ReportsFeed] Error updating concern status:', error);
+        // Rollback on error
+        setReports(prevReports =>
+          prevReports.map(report =>
+            report.id === reportId ? { ...report, status: 'pending' } : report
+          )
+        );
+      }
+    }
   }, []);
 
   return {
