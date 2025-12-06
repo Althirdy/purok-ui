@@ -307,8 +307,8 @@ export default function ReportDetailsScreen() {
           setReport(retryReport);
           setLoading(false);
         } else {
-          setLoading(false);
-        }
+        setLoading(false);
+      }
       }, 1000);
       return () => clearTimeout(timer);
     }
@@ -506,7 +506,7 @@ export default function ReportDetailsScreen() {
           <Text style={styles.dateText}>
             {formatDateReadable(report.timestamp)} {formatTime12Hour(report.timestamp)}
           </Text>
-        </View>
+      </View>
 
         {/* Description */}
         {report.description && (
@@ -540,10 +540,10 @@ export default function ReportDetailsScreen() {
                         <Text style={styles.audioUrl} numberOfLines={1}>
                           {report.audio}
                         </Text>
-                      </View>
+          </View>
                     </>
-                  ) : (
-                    <>
+        ) : (
+        <>
                       <View style={[styles.audioButton, { backgroundColor: colors.neutral.gray600 }]}>
                         <Ionicons
                           name="mic"
@@ -644,7 +644,7 @@ export default function ReportDetailsScreen() {
               </View>
               <Text style={styles.infoLabel}>Priority</Text>
             </View>
-          </View>
+        </View>
 
           {/* Action Buttons */}
           {report.status === 'pending' && (

@@ -90,10 +90,19 @@ export default function NewsFeedScreen() {
     updateReportStatus,
   } = useReportsFeed({
     onNewReport: (report) => {
-      if ((report.severity === 'critical' || report.severity === 'high') && !toast) {
+      // Show toast notification for ALL reports from Pusher
+      if (!toast) {
+        const title = report.severity === 'critical' 
+          ? '🚨 New Critical Concern' 
+          : report.severity === 'high'
+          ? '⚠️ New High Priority Concern'
+          : report.severity === 'medium'
+          ? '📋 New Medium Priority Concern'
+          : '📝 New Concern';
+        
         setToast({
           id: `toast-${report.id}-${Date.now()}`,
-          title: report.severity === 'critical' ? '🚨 Critical Alert' : '⚠️ Alert',
+          title,
           message: report.title,
           severity: report.severity,
           reportType: report.type,

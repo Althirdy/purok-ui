@@ -75,15 +75,33 @@ export async function updateAssignedConcernStatus(
   id: number | string,
   status: UpdateStatusRequest['status'],
 ): Promise<UpdateStatusResponse> {
-  return httpPut<UpdateStatusResponse>(
-    `/api/v1/purok-leader/concerns/${id}/status`,
-    { status },
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
+  try {
+    console.log('[PurokLeaderService] Updating concern status:', {
+      id,
+      status,
+      endpoint: `/api/v1/purok-leader/concerns/${id}/status`,
+    });
+    
+    const response = await httpPut<UpdateStatusResponse>(
+      `/api/v1/purok-leader/concerns/${id}/status`,
+      { status },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       },
-    },
-  );
+    );
+    
+    console.log('[PurokLeaderService] Status update successful:', response);
+    return response;
+  } catch (error: any) {
+    console.error('[PurokLeaderService] Error updating concern status:', {
+      id,
+      status,
+      error: error?.message || error,
+    });
+    throw error;
+  }
 }
 
 export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyReport {

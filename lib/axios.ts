@@ -42,10 +42,43 @@ export async function httpPut<T = any>(path: string, body?: any, init?: RequestI
     body: body !== undefined ? JSON.stringify(body) : undefined,
     ...init,
   });
+  
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+    // Try to parse error message from response
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        const errorData = await response.json();
+        const errorMessage = errorData?.message || errorData?.error || `HTTP ${response.status}`;
+        throw new Error(errorMessage);
+      } catch (parseError) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    } else {
+      // HTML response (error page) - read text to see what the error is
+      try {
+        const text = await response.text();
+        console.error('[HTTP] Non-JSON error response:', text.substring(0, 200));
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      } catch (textError) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    }
   }
-  return (await response.json()) as T;
+  
+  // Check if response has content before parsing JSON
+  const contentType = response.headers.get('content-type');
+  if (!contentType || !contentType.includes('application/json')) {
+    // Empty response or non-JSON - return empty object
+    return {} as T;
+  }
+  
+  try {
+    return (await response.json()) as T;
+  } catch (parseError) {
+    console.error('[HTTP] JSON parse error:', parseError);
+    throw new Error('Invalid JSON response from server');
+  }
 }
 
 // Helper to gracefully fallback to mock during development

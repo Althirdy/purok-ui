@@ -51,10 +51,12 @@ function getPusherClient(token?: string | null) {
   if (pusherClient && currentAuthToken === normalizedToken) {
     return pusherClient;
   }
+
   if (pusherClient) {
     pusherClient.disconnect();
     pusherClient = null;
   }
+
   Pusher.logToConsole = __DEV__;
   pusherClient = new Pusher(realtimeConfig.pusherKey, {
     cluster: realtimeConfig.pusherCluster,
@@ -79,13 +81,13 @@ function normalizeCitizenReport(payload: CitizenReportPayload): EmergencyReport 
     id: payload.id,
     title: payload.title,
     description: payload.description,
-    type: (payload.category as EmergencyReport['type']) ?? 'other',
-    location: payload.location ?? 'Unknown location',
-    timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
-    status: payload.status ?? 'pending',
+    type: (payload.category?.toLowerCase() as EmergencyReport['type']) ?? 'other',
+    location: payload.location ?? 'Citizen submitted location',
     severity: payload.severity ?? 'medium',
+    status: payload.status ?? 'pending',
+    timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
     source: 'citizen',
-    reportedBy: payload.reportedBy,
+    reportedBy: payload.reportedBy ?? 'citizen',
   };
 }
 
@@ -93,6 +95,7 @@ function normalizeAssignment(payload: PurokAssignmentPayload): EmergencyReport {
   const concern = payload.concern ?? ({} as PurokAssignmentPayload['concern']);
   const latitude = concern.latitude != null ? Number(concern.latitude) : null;
   const longitude = concern.longitude != null ? Number(concern.longitude) : null;
+
   return {
     id: `PUROK-${concern.id}`,
     title: concern.title ?? 'Citizen Concern',
@@ -116,83 +119,40 @@ export function subscribeToPurokAssignments(options: {
   onReport: (report: EmergencyReport) => void;
 }) {
   if (!options.token || !options.userId) {
-    console.warn('[Pusher] Cannot subscribe: missing token or userId', {
-      hasToken: !!options.token,
-      hasUserId: !!options.userId,
-    });
     return () => undefined;
   }
-  
+
   const client = getPusherClient(options.token);
   const channelName = `${realtimeConfig.purokChannelPrefix}${options.userId}`;
-  console.log('[Pusher] Subscribing to channel:', channelName);
-  
   const channel = client.subscribe(channelName);
-  let handlerBound = false;
   
   const handler = (data: PurokAssignmentPayload) => {
+    console.log('[Pusher] Received concern.assigned event:', data);
     try {
-      console.log('[Pusher] 🔔 Event received:', {
-        event: realtimeConfig.purokAssignmentEvent,
-        channel: channelName,
-        concernId: data.concern?.id,
-        title: data.concern?.title,
-      });
       const normalized = normalizeAssignment(data);
-      console.log('[Pusher] ✅ Normalized report:', {
-        id: normalized.id,
-        title: normalized.title,
-      });
+      console.log('[Pusher] Normalized report:', normalized.id);
       options.onReport(normalized);
     } catch (error) {
-      console.error('[Pusher] ❌ Failed to normalize assignment payload', error, data);
+      console.warn('[Pusher] Failed to normalize assignment payload', error);
     }
   };
+
+  // Bind event handler - Pusher will queue events until subscription succeeds
+  channel.bind(realtimeConfig.purokAssignmentEvent, handler);
   
-  const bindHandler = () => {
-    if (handlerBound) {
-      console.log('[Pusher] Handler already bound, skipping');
-      return;
-    }
-    console.log('[Pusher] Binding handler to event:', realtimeConfig.purokAssignmentEvent);
-    channel.bind(realtimeConfig.purokAssignmentEvent, handler);
-    handlerBound = true;
-    console.log('[Pusher] ✅ Handler bound and ready to receive events');
-  };
-  
-  // Wait for subscription to succeed before binding handler
+  // Log when subscription succeeds
   channel.bind('pusher:subscription_succeeded', () => {
-    console.log('[Pusher] ✅ Successfully subscribed to', channelName);
-    bindHandler();
+    console.log('[Pusher] Subscription succeeded for channel:', channelName);
   });
-  
-  channel.bind('pusher:subscription_error', (err: any) => {
-    console.error('[Pusher] ❌ Subscription error:', {
-      channel: channelName,
-      error: err?.error,
-      status: err?.status,
-      type: err?.type,
-    });
-    if (err?.status === 403) {
-      console.error('[Pusher] 403 Forbidden - Authorization failed. Check auth token and backend authorization.');
-    }
-    if (err?.status === 0) {
-      console.error('[Pusher] Status 0 - Network/CORS issue. Check auth endpoint accessibility.');
-    }
-  });
-  
-  // Check if channel is already subscribed (for instant subscriptions)
-  if (channel.subscribed) {
-    console.log('[Pusher] Channel already subscribed, binding handler immediately');
-    bindHandler();
-  }
-  
+
   return () => {
-    console.log('[Pusher] Unsubscribing from', channelName);
-    channel.unbind(realtimeConfig.purokAssignmentEvent, handler);
-    channel.unbind('pusher:subscription_succeeded');
-    channel.unbind('pusher:subscription_error');
-    client.unsubscribe(channelName);
+    try {
+      channel.unbind(realtimeConfig.purokAssignmentEvent, handler);
+      channel.unbind('pusher:subscription_succeeded');
+      client.unsubscribe(channelName);
+    } catch (error) {
+      console.warn('[Pusher] Error during unsubscribe:', error);
+    }
   };
 }
 
@@ -204,10 +164,11 @@ export function subscribeToCitizenReports(onReport: (report: EmergencyReport) =>
       const normalized = normalizeCitizenReport(data);
       onReport(normalized);
     } catch (error) {
-      console.warn('Failed to normalize citizen report payload', error);
+      console.warn('Failed to normalize citizen report', error);
     }
   };
   channel.bind(realtimeConfig.citizenReportEvent, handler);
+
   return () => {
     channel.unbind(realtimeConfig.citizenReportEvent, handler);
     client.unsubscribe(realtimeConfig.citizenChannel);

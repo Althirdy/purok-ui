@@ -2,7 +2,7 @@ import { MAX_REPORTS_LIMIT } from '@/constants/sensor-config';
 import { useAuth } from '@/context/auth-context';
 import { useNotifications } from '@/context/notification-context';
 import { anomalyToReport, deviceStatusToReport, fetchLatestAnomaliesSince, fetchLatestDeviceStatusSince, listenToAnomalies } from '@/services/firebase-service';
-import { updateConcernStatusAPI } from '@/services/purok-leader-service';
+import { updateAssignedConcernStatus } from '@/services/purok-leader-service';
 import { subscribeToPurokAssignments } from '@/services/realtime-service';
 import type { EmergencyReport, FeedSource } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -198,26 +198,32 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
       });
 
       // Citizen channel subscription (Pusher private channel per purok leader)
-      unsubscribeCitizen = subscribeToPurokAssignments({
-        token: accessToken,
-        userId: user?.id,
-        onReport: report => {
-          if (processedReportIds.current.has(report.id)) {
-            return;
-          }
-          processedReportIds.current.add(report.id);
-          setReports(prev => {
-            if (prev.some(r => r.id === report.id)) {
-              return prev;
+      if (accessToken && user?.id) {
+        unsubscribeCitizen = subscribeToPurokAssignments({
+          token: accessToken,
+          userId: user.id,
+          onReport: report => {
+            if (processedReportIds.current.has(report.id)) {
+              return;
             }
-            return [report, ...prev].slice(0, MAX_REPORTS);
-          });
-          setNewReportCount(p => p + 1);
-          if (report.severity === 'high' || report.severity === 'critical') {
+            processedReportIds.current.add(report.id);
+            setReports(prev => {
+              if (prev.some(r => r.id === report.id)) {
+                return prev;
+              }
+              return [report, ...prev].slice(0, MAX_REPORTS);
+            });
+            setNewReportCount(p => p + 1);
+            
+            // Add notification for new concern (updates notification bell badge)
+            addNotificationFromReport(report);
+            
+            // Trigger toast notification callback for ALL reports from Pusher
             onNewReport?.(report);
-          }
-        },
-      });
+          },
+        });
+        pusherSubscriptionRef.current = unsubscribeCitizen;
+      }
 
       // Set up interval to process pending reports
       updateTimer.current = setInterval(() => {
@@ -246,7 +252,7 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
       processedReportIds.current.clear();
       pendingReports.current = [];
     };
-  }, [processPendingReports, user?.id, addNotificationFromReport, onNewReport]);
+  }, [processPendingReports, user?.id, accessToken, addNotificationFromReport, onNewReport]);
 
   // Load cached reports on mount
   useEffect(() => {
@@ -335,16 +341,15 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
       try {
         const authToken = await AsyncStorage.getItem('@urbanwatch:auth_token');
         if (authToken) {
-          const success = await updateConcernStatusAPI(reportId, status, authToken);
-          if (!success) {
-            // Rollback on failure
-            setReports(prevReports =>
-              prevReports.map(report =>
-                report.id === reportId ? { ...report, status: 'pending' } : report
-              )
-            );
-            console.error('[ReportsFeed] Failed to update concern status via API');
-          }
+          // Extract numeric ID from PUROK-{id} format
+          const numericId = reportId.replace('PUROK-', '');
+          // Map frontend status to backend status
+          const apiStatus: 'pending' | 'ongoing' | 'escalated' | 'resolved' = 
+            status === 'acknowledged' ? 'ongoing' : 
+            status === 'resolved' ? 'resolved' : 
+            'pending';
+          
+          await updateAssignedConcernStatus(authToken, numericId, apiStatus);
         }
       } catch (error) {
         console.error('[ReportsFeed] Error updating concern status:', error);
