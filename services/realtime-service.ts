@@ -124,6 +124,14 @@ export function subscribeToPurokAssignments(options: {
 
   const client = getPusherClient(options.token);
   const channelName = `${realtimeConfig.purokChannelPrefix}${options.userId}`;
+  
+  // Unsubscribe from existing channel if already subscribed
+  try {
+    client.unsubscribe(channelName);
+  } catch (e) {
+    // Ignore if not subscribed
+  }
+  
   const channel = client.subscribe(channelName);
   
   const handler = (data: PurokAssignmentPayload) => {
@@ -137,18 +145,23 @@ export function subscribeToPurokAssignments(options: {
     }
   };
 
+  // Unbind any existing handlers first to prevent duplicates
+  channel.unbind(realtimeConfig.purokAssignmentEvent);
+  channel.unbind('pusher:subscription_succeeded');
+  
   // Bind event handler - Pusher will queue events until subscription succeeds
   channel.bind(realtimeConfig.purokAssignmentEvent, handler);
   
-  // Log when subscription succeeds
-  channel.bind('pusher:subscription_succeeded', () => {
+  // Log when subscription succeeds (only bind once)
+  const subscriptionHandler = () => {
     console.log('[Pusher] Subscription succeeded for channel:', channelName);
-  });
+  };
+  channel.bind('pusher:subscription_succeeded', subscriptionHandler);
 
   return () => {
     try {
       channel.unbind(realtimeConfig.purokAssignmentEvent, handler);
-      channel.unbind('pusher:subscription_succeeded');
+      channel.unbind('pusher:subscription_succeeded', subscriptionHandler);
       client.unsubscribe(channelName);
     } catch (error) {
       console.warn('[Pusher] Error during unsubscribe:', error);

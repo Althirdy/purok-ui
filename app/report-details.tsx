@@ -14,12 +14,12 @@ import {
   getSeverityColor,
 } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Linking } from 'react-native';
+import { Dimensions, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Audio } from 'expo-av';
 
 const { colors, spacing, typography } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -307,8 +307,8 @@ export default function ReportDetailsScreen() {
           setReport(retryReport);
           setLoading(false);
         } else {
-        setLoading(false);
-      }
+          setLoading(false);
+        }
       }, 1000);
       return () => clearTimeout(timer);
     }

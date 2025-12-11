@@ -2,7 +2,7 @@ import { MAX_REPORTS_LIMIT } from '@/constants/sensor-config';
 import { useAuth } from '@/context/auth-context';
 import { useNotifications } from '@/context/notification-context';
 import { anomalyToReport, deviceStatusToReport, fetchLatestAnomaliesSince, fetchLatestDeviceStatusSince, listenToAnomalies } from '@/services/firebase-service';
-import { updateAssignedConcernStatus } from '@/services/purok-leader-service';
+import { fetchAssignedConcerns, updateAssignedConcernStatus } from '@/services/purok-leader-service';
 import { subscribeToPurokAssignments } from '@/services/realtime-service';
 import type { EmergencyReport, FeedSource } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,8 +28,10 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
 
   // Performance optimization: Track processed IDs and batch updates
   const processedReportIds = useRef<Set<string>>(new Set());
+  const notifiedReportIds = useRef<Set<string>>(new Set()); // Track which reports have triggered notifications
   const pendingReports = useRef<EmergencyReport[]>([]);
   const updateTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const syncTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const immediateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isUpdating = useRef(false);
   const MAX_REPORTS = MAX_REPORTS_LIMIT;
@@ -172,8 +174,24 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
   // Set up Firebase real-time listener for sensor data with throttling
   // Use ref to prevent duplicate subscriptions
   const pusherSubscriptionRef = useRef<(() => void) | null>(null);
+  const syncInProgressRef = useRef(false);
+  const onNewReportRef = useRef(onNewReport);
+  const addNotificationFromReportRef = useRef(addNotificationFromReport);
+  
+  // Update refs when callbacks change
+  useEffect(() => {
+    onNewReportRef.current = onNewReport;
+    addNotificationFromReportRef.current = addNotificationFromReport;
+  }, [onNewReport, addNotificationFromReport]);
   
   useEffect(() => {
+    // Clean up existing subscription first
+    if (pusherSubscriptionRef.current) {
+      console.log('[ReportsFeed] Cleaning up existing Pusher subscription');
+      pusherSubscriptionRef.current();
+      pusherSubscriptionRef.current = null;
+    }
+    
     let unsubscribe: (() => void) | null = null;
     let unsubscribeCitizen: (() => void) | null = null;
 
@@ -203,32 +221,146 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
           token: accessToken,
           userId: user.id,
           onReport: report => {
+            console.log('[ReportsFeed] Received Pusher report:', {
+              id: report.id,
+              title: report.title,
+              concernId: report.id.replace('PUROK-', ''),
+            });
+            
             if (processedReportIds.current.has(report.id)) {
+              console.log('[ReportsFeed] Report already processed, skipping:', report.id);
               return;
             }
+            
             processedReportIds.current.add(report.id);
+            
             setReports(prev => {
               if (prev.some(r => r.id === report.id)) {
+                console.log('[ReportsFeed] Report already in list, skipping:', report.id);
                 return prev;
               }
+              console.log('[ReportsFeed] Adding new report to feed:', report.id);
               return [report, ...prev].slice(0, MAX_REPORTS);
             });
             setNewReportCount(p => p + 1);
             
-            // Add notification for new concern (updates notification bell badge)
-            addNotificationFromReport(report);
+            // Add notification for new concern (updates notification bell badge) - only once per report
+            if (!notifiedReportIds.current.has(report.id)) {
+              notifiedReportIds.current.add(report.id);
+              if (addNotificationFromReportRef.current) {
+                try {
+                  addNotificationFromReportRef.current(report);
+                  console.log('[ReportsFeed] ✅ Added notification for report:', report.id);
+                } catch (error) {
+                  console.error('[ReportsFeed] Error adding notification:', error);
+                }
+              } else {
+                console.warn('[ReportsFeed] ⚠️ addNotificationFromReport callback is not defined');
+              }
+            } else {
+              console.log('[ReportsFeed] Notification already added for report:', report.id);
+            }
             
             // Trigger toast notification callback for ALL reports from Pusher
-            onNewReport?.(report);
+            console.log('[ReportsFeed] Calling onNewReport callback for toast notification');
+            if (onNewReportRef.current) {
+              try {
+                onNewReportRef.current(report);
+                console.log('[ReportsFeed] ✅ Successfully called onNewReport callback');
+              } catch (error) {
+                console.error('[ReportsFeed] Error calling onNewReport callback:', error);
+              }
+            } else {
+              console.warn('[ReportsFeed] ⚠️ onNewReport callback is not defined');
+            }
           },
         });
         pusherSubscriptionRef.current = unsubscribeCitizen;
+        
+        // Fetch any missed reports from API when subscription is established
+        // This ensures we get reports that were published while app was offline or subscription wasn't active
+        const syncMissedReports = async () => {
+          // Prevent multiple simultaneous syncs
+          if (syncInProgressRef.current) {
+            console.log('[ReportsFeed] Sync already in progress, skipping...');
+            return;
+          }
+          
+          try {
+            syncInProgressRef.current = true;
+            console.log('[ReportsFeed] Syncing missed reports from API...');
+            const authToken = await AsyncStorage.getItem('@urbanwatch:auth_token');
+            if (authToken) {
+              const apiReports = await fetchAssignedConcerns(authToken);
+              
+              console.log('[ReportsFeed] Fetched', apiReports.length, 'reports from API');
+              
+              // Add any reports from API that we don't have yet
+              setReports(prev => {
+                const existingIds = new Set(prev.map(r => r.id));
+                const newReports = apiReports.filter(r => !existingIds.has(r.id));
+                
+                if (newReports.length > 0) {
+                  console.log('[ReportsFeed] Found', newReports.length, 'missed reports:', newReports.map(r => r.id));
+                  newReports.forEach(r => processedReportIds.current.add(r.id));
+                  return [...newReports, ...prev].slice(0, MAX_REPORTS);
+                } else {
+                  console.log('[ReportsFeed] No missed reports found - all reports are already in feed');
+                }
+                
+                return prev;
+              });
+            }
+          } catch (error) {
+            console.error('[ReportsFeed] Error syncing missed reports:', error);
+          } finally {
+            syncInProgressRef.current = false;
+          }
+        };
+        
+        // Sync after a short delay to allow subscription to establish (only once)
+        const syncTimer = setTimeout(syncMissedReports, 2000);
+        
+        // Store timer for cleanup
+        (unsubscribeCitizen as any).syncTimer = syncTimer;
       }
 
       // Set up interval to process pending reports
       updateTimer.current = setInterval(() => {
         processPendingReports();
       }, DATA_PROCESSING_INTERVAL);
+      
+      // Periodic sync to catch any missed reports (every 30 seconds)
+      syncTimer.current = setInterval(async () => {
+        // Skip if sync is already in progress
+        if (syncInProgressRef.current) {
+          return;
+        }
+        
+        try {
+          syncInProgressRef.current = true;
+          const authToken = await AsyncStorage.getItem('@urbanwatch:auth_token');
+          if (authToken) {
+            const apiReports = await fetchAssignedConcerns(authToken);
+            setReports(prev => {
+              const existingIds = new Set(prev.map(r => r.id));
+              const newReports = apiReports.filter(r => !existingIds.has(r.id));
+              
+              if (newReports.length > 0) {
+                console.log('[ReportsFeed] Periodic sync found', newReports.length, 'new reports:', newReports.map(r => r.id));
+                newReports.forEach(r => processedReportIds.current.add(r.id));
+                return [...newReports, ...prev].slice(0, MAX_REPORTS);
+              }
+              
+              return prev;
+            });
+          }
+        } catch (error) {
+          console.error('[ReportsFeed] Error in periodic sync:', error);
+        } finally {
+          syncInProgressRef.current = false;
+        }
+      }, 30000); // Every 30 seconds
     } catch (error) {
       console.error('Error setting up Firebase listener:', error);
     }
@@ -238,6 +370,9 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
       if (updateTimer.current) {
         clearInterval(updateTimer.current);
       }
+      if (syncTimer.current) {
+        clearInterval(syncTimer.current);
+      }
       if (immediateTimer.current) {
         clearTimeout(immediateTimer.current);
         immediateTimer.current = null;
@@ -246,13 +381,18 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
         unsubscribe();
       }
       if (unsubscribeCitizen) {
+        // Clear sync timer if it exists
+        if ((unsubscribeCitizen as any).syncTimer) {
+          clearTimeout((unsubscribeCitizen as any).syncTimer);
+        }
         unsubscribeCitizen();
         pusherSubscriptionRef.current = null; // Clear ref on cleanup
       }
       processedReportIds.current.clear();
+      notifiedReportIds.current.clear();
       pendingReports.current = [];
     };
-  }, [processPendingReports, user?.id, accessToken, addNotificationFromReport, onNewReport]);
+  }, [processPendingReports, user?.id, accessToken]);
 
   // Load cached reports on mount
   useEffect(() => {
@@ -328,6 +468,8 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
   }, [fetchSensorReports, mergeReports, processPendingReports]);
 
   // Update report status (with API call for citizen reports)
+  // Note: Backend should broadcast status updates to citizen's private channel
+  // so the citizen app receives real-time updates when purok leader acknowledges/resolves
   const updateReportStatus = useCallback(async (reportId: string, status: EmergencyReport['status']) => {
     // Optimistic UI update
     setReports(prevReports =>
@@ -349,7 +491,20 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}) {
             status === 'resolved' ? 'resolved' : 
             'pending';
           
-          await updateAssignedConcernStatus(authToken, numericId, apiStatus);
+          console.log('[ReportsFeed] Updating concern status:', {
+            reportId,
+            numericId,
+            frontendStatus: status,
+            apiStatus,
+          });
+          
+          const response = await updateAssignedConcernStatus(authToken, numericId, apiStatus);
+          
+          console.log('[ReportsFeed] Status update successful:', response);
+          // Backend should broadcast this update to citizen's private channel
+          // Expected event: concern.updated or concern.status.updated on citizen's channel
+        } else {
+          console.warn('[ReportsFeed] No auth token available for status update');
         }
       } catch (error) {
         console.error('[ReportsFeed] Error updating concern status:', error);

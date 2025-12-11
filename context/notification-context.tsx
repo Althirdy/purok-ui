@@ -86,19 +86,48 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const addNotificationFromReport = useCallback((report: EmergencyReport) => {
-    const notification: Notification = {
-      id: `notif-${report.id}-${Date.now()}`,
-      type: 'sensor_alert',
-      title: report.title,
-      message: report.description,
+    // Use report ID as notification ID to prevent duplicates for the same report
+    const notificationId = `notif-${report.id}`;
+    
+    console.log('[Notifications] ✅ Adding notification from report:', {
       reportId: report.id,
-      timestamp: new Date(),
-      read: false,
+      notificationId,
+      title: report.title,
       severity: report.severity,
-      reportType: report.type,
-    };
-    addNotification(notification);
-  }, [addNotification]);
+    });
+    
+    // Check if notification already exists for this report
+    setNotifications(prev => {
+      const existing = prev.find(n => n.id === notificationId || n.reportId === report.id);
+      if (existing) {
+        console.log('[Notifications] ⚠️ Notification already exists for report:', report.id);
+        return prev;
+      }
+      
+      const notification: Notification = {
+        id: notificationId,
+        type: 'sensor_alert',
+        title: report.title,
+        message: report.description,
+        reportId: report.id,
+        timestamp: new Date(),
+        read: false,
+        severity: report.severity,
+        reportType: report.type,
+      };
+      
+      const newNotifications = [notification, ...prev];
+      const unreadCount = newNotifications.filter(n => !n.read).length;
+      console.log('[Notifications] ✅ Created new notification:', {
+        id: notification.id,
+        totalNotifications: newNotifications.length,
+        unreadCount,
+      });
+      
+      // Add new notification at the beginning (newest first)
+      return newNotifications;
+    });
+  }, []);
 
   const markAsRead = useCallback((notificationId: string) => {
     setNotifications(prev =>

@@ -81,6 +81,42 @@ export default function NewsFeedScreen() {
     router.push({ pathname: 'report-details', params: { reportId } } as any);
   }, []);
 
+  // Memoize the onNewReport callback to prevent unnecessary re-subscriptions
+  const handleNewReport = useCallback((report: EmergencyReport) => {
+    console.log('[NewsFeed] ✅ New report received, showing toast:', {
+      id: report.id,
+      title: report.title,
+      severity: report.severity,
+    });
+    
+    // Always show toast for new reports (replace existing toast if any)
+    // First clear existing toast to ensure new one animates in
+    setToast(null);
+    
+    // Use setTimeout to ensure the previous toast is cleared before showing new one
+    setTimeout(() => {
+      const title = report.severity === 'critical' 
+        ? '🚨 New Critical Concern' 
+        : report.severity === 'high'
+        ? '⚠️ New High Priority Concern'
+        : report.severity === 'medium'
+        ? '📋 New Medium Priority Concern'
+        : '📝 New Concern';
+      
+      const toastData = {
+        id: `toast-${report.id}-${Date.now()}`,
+        title,
+        message: report.title,
+        severity: report.severity,
+        reportType: report.type,
+        onPress: () => handleReportPress(report.id),
+      };
+      
+      console.log('[NewsFeed] ✅ Setting toast:', toastData.id);
+      setToast(toastData);
+    }, 100);
+  }, [handleReportPress]);
+
   const {
     reports,
     loading,
@@ -89,27 +125,7 @@ export default function NewsFeedScreen() {
     handleRefresh,
     updateReportStatus,
   } = useReportsFeed({
-    onNewReport: (report) => {
-      // Show toast notification for ALL reports from Pusher
-      if (!toast) {
-        const title = report.severity === 'critical' 
-          ? '🚨 New Critical Concern' 
-          : report.severity === 'high'
-          ? '⚠️ New High Priority Concern'
-          : report.severity === 'medium'
-          ? '📋 New Medium Priority Concern'
-          : '📝 New Concern';
-        
-        setToast({
-          id: `toast-${report.id}-${Date.now()}`,
-          title,
-          message: report.title,
-          severity: report.severity,
-          reportType: report.type,
-          onPress: () => handleReportPress(report.id),
-        });
-      }
-    },
+    onNewReport: handleNewReport,
   });
   
   // Debounce live search so it filters shortly after typing
@@ -400,7 +416,17 @@ export default function NewsFeedScreen() {
       />
 
       {/* Modern Toast Notification */}
-      <Toast toast={toast} onDismiss={() => setToast(null)} duration={5000} />
+      {toast && (
+        <Toast 
+          key={toast.id} 
+          toast={toast} 
+          onDismiss={() => {
+            console.log('[NewsFeed] Toast dismissed:', toast.id);
+            setToast(null);
+          }} 
+          duration={5000} 
+        />
+      )}
     </SafeAreaView>
   );
 }
