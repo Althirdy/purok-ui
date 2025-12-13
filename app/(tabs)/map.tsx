@@ -13,21 +13,18 @@
  * doesn't support. CartoDB uses OSM data but is more permissive.
  * 
  * Attribution: © OpenStreetMap contributors (data source)
+ * 
+ * OPTIMIZED: Lazy loads react-native-maps and large data files only when screen is accessed
  */
 
 import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION, isPointInBoundary } from '@/constants/barangay-boundary';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { MarkerData, markers } from '@/constants/heatmap.data';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - Metro bundler supports JSON imports
-import GEOJSON from '@/constants/geojson.json';
 import { Fonts } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import MapView, { Callout, Marker, Polygon, UrlTile } from 'react-native-maps';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing, borderRadius, shadows } = DesignSystem;
@@ -40,30 +37,97 @@ const BRGY_176A_REGION = {
   longitudeDelta: 0.008,
 };
 
+// Types for lazy-loaded components
+type MapViewType = any;
+type MarkerType = any;
+type CalloutType = any;
+type PolygonType = any;
+type UrlTileType = any;
+type MarkerData = any;
+
 export default function MapScreen() {
-  const mapRef = React.useRef<MapView | null>(null);
-  type HeatMarker = (typeof markers)[number];
+  const [MapComponents, setMapComponents] = useState<{
+    MapView: MapViewType;
+    Marker: MarkerType;
+    Callout: CalloutType;
+    Polygon: PolygonType;
+    UrlTile: UrlTileType;
+  } | null>(null);
+  const [mapData, setMapData] = useState<{
+    markers: MarkerData[];
+    GEOJSON: any;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const mapRef = useRef<any>(null);
+
+  // Lazy load map library and data on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadMap = async () => {
+      try {
+        // Load map library and data in parallel
+        const [mapModule, markersModule, geojsonModule] = await Promise.all([
+          import('react-native-maps'),
+          import('@/constants/heatmap.data'),
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore - Metro bundler supports JSON imports
+          import('@/constants/geojson.json')
+        ]);
+
+        if (!isMounted) return;
+
+        setMapComponents({
+          MapView: mapModule.default,
+          Marker: mapModule.Marker,
+          Callout: mapModule.Callout,
+          Polygon: mapModule.Polygon,
+          UrlTile: mapModule.UrlTile,
+        });
+
+        setMapData({
+          markers: markersModule.markers,
+          GEOJSON: geojsonModule.default,
+        });
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error loading map:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadMap();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Convert GeoJSON polygon (lng, lat) to { latitude, longitude } if needed
   const geojsonCoordinates = useMemo(() => {
+    if (!mapData?.GEOJSON) return [];
     try {
-      const rings: number[][][] = GEOJSON.features?.[0]?.geometry?.coordinates ?? [];
+      const rings: number[][][] = mapData.GEOJSON.features?.[0]?.geometry?.coordinates ?? [];
       const firstRing = rings[0] || [];
       return firstRing.map(([lng, lat]) => ({ latitude: lat, longitude: lng }));
     } catch {
       return [] as { latitude: number; longitude: number }[];
     }
-  }, []);
+  }, [mapData]);
 
   // Filter markers to only show those inside Barangay 176E boundary
   const filteredMarkers = useMemo(() => {
-    return markers.filter((marker) =>
+    if (!mapData?.markers) return [];
+    return mapData.markers.filter((marker: MarkerData) =>
       isPointInBoundary({ latitude: marker.latitude, longitude: marker.longitude })
     );
-  }, []);
+  }, [mapData]);
 
   // Jitter markers that overlap (same/near coordinates) so bubbles don't stack
   const displayedMarkers = useMemo(() => {
+    if (!filteredMarkers.length) return [];
+    
     // Group by rounded coordinate (~7 decimals ≈ ~1cm; we'll use 5 ≈ ~1m)
     const keyFor = (lat: number, lng: number) => `${lat.toFixed(5)}:${lng.toFixed(5)}`;
     const groups = new Map<string, MarkerData[]>();
@@ -77,7 +141,7 @@ export default function MapScreen() {
     const result: (MarkerData & { _lat: number; _lng: number })[] = [];
     const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~2.399
 
-    groups.forEach((group, _key) => {
+    groups.forEach((group) => {
       // Base coordinate
       const baseLat = group[0].latitude;
       const baseLng = group[0].longitude;
@@ -102,7 +166,7 @@ export default function MapScreen() {
     return result;
   }, [filteredMarkers]);
 
-  const getMarkerColor = (marker: HeatMarker): string => {
+  const getMarkerColor = (marker: MarkerData): string => {
     switch ((marker as any).type) {
       case 'waste':
         return marker.severity === 'high' ? '#DC2626' : marker.severity === 'medium' ? '#F59E0B' : '#10B981';
@@ -119,7 +183,7 @@ export default function MapScreen() {
     }
   };
 
-  const getMarkerIcon = (marker: HeatMarker): keyof typeof Ionicons.glyphMap => {
+  const getMarkerIcon = (marker: MarkerData): keyof typeof Ionicons.glyphMap => {
     switch ((marker as any).type) {
       case 'waste':
         return 'trash-bin';
@@ -136,12 +200,33 @@ export default function MapScreen() {
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
+    if (!MapComponents || !mapRef.current) return;
     const timer = setTimeout(() => {
       mapRef.current?.animateToRegion(BARANGAY_176E_REGION, 1000);
     }, 500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [MapComponents]);
+
+  // Show loading state while map library and data are loading
+  if (isLoading || !MapComponents || !mapData) {
+    return (
+      <SafeAreaView style={globalStyles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerTopRow}>
+            <Text style={styles.headerTitle}>Incident Map</Text>
+          </View>
+          <Text style={styles.headerSubtitle}>View incidents near you</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary.blue} />
+          <Text style={styles.loadingText}>Loading map...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const { MapView, Marker, Callout, Polygon, UrlTile } = MapComponents;
 
   return (
     <SafeAreaView style={globalStyles.container}>
@@ -186,26 +271,6 @@ export default function MapScreen() {
             tileSize={256}
             shouldReplaceMapContent={true}
           />
-          
-          {/* Alternative OSM-based providers (uncomment if CartoDB doesn't work): */}
-          
-          {/* Option 1: Stamen Toner (OSM data, black & white style) */}
-          {/* <UrlTile
-            urlTemplate="https://stamen-tiles-{s}.a.ssl.fastly.net/toner/{z}/{x}/{y}{r}.png"
-            maximumZ={18}
-            minimumZ={0}
-            tileSize={256}
-            shouldReplaceMapContent={true}
-          /> */}
-          
-          {/* Option 2: Stamen Terrain (OSM data, terrain style) */}
-          {/* <UrlTile
-            urlTemplate="https://stamen-tiles-{s}.a.ssl.fastly.net/terrain/{z}/{x}/{y}{r}.png"
-            maximumZ={18}
-            minimumZ={0}
-            tileSize={256}
-            shouldReplaceMapContent={true}
-          /> */}
 
           {/* Barangay 176E Boundary - from constants (fills + stroke) */}
           <Polygon
@@ -322,6 +387,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.secondary,
     borderWidth: 1,
     borderColor: colors.border.light,
+  },
+  
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: spacing.md,
+    fontSize: typography.fontSize.base,
+    color: colors.text.secondary,
   },
   
   // Custom Marker Styles

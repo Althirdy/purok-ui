@@ -3,12 +3,9 @@
  */
 
 import { Toast, type ToastData } from '@/components/common/toast';
-import { AcknowledgeSheet } from '@/components/news/acknowledge-sheet';
 import { EmptyState } from '@/components/news/empty-state';
-import { FilterModal } from '@/components/news/filter-modal';
 import { IncidentHeader } from '@/components/news/incident-header';
 import { ReportCard } from '@/components/news/report-card';
-import { ResolveSheet } from '@/components/news/resolve-sheet';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
@@ -17,9 +14,14 @@ import { useReportsFeed } from '@/hooks/use-reports-feed';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Dimensions, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Lazy load heavy modals/sheets - only load when needed
+const AcknowledgeSheet = lazy(() => import('@/components/news/acknowledge-sheet').then(m => ({ default: m.AcknowledgeSheet })));
+const ResolveSheet = lazy(() => import('@/components/news/resolve-sheet').then(m => ({ default: m.ResolveSheet })));
+const FilterModal = lazy(() => import('@/components/news/filter-modal').then(m => ({ default: m.FilterModal })));
 
 const { colors, spacing } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -294,52 +296,64 @@ export default function NewsFeedScreen() {
         )}
       </TouchableOpacity>
 
-      {/* Filter Modal */}
-      <FilterModal
-        visible={isFilterModalVisible}
-        statusFilter={statusFilter}
-        reportTypeFilter={reportTypeFilter}
-        totalCount={totalCount}
-        pendingCount={pendingCount}
-        ongoingCount={ongoingCount}
-        resolvedCount={resolvedCount}
-        manualCount={manualCount}
-        voiceCount={voiceCount}
-        onStatusFilterChange={setStatusFilter}
-        onReportTypeFilterChange={setReportTypeFilter}
-        onClose={() => setIsFilterModalVisible(false)}
-        onClearAll={() => {
-          setStatusFilter('all');
-          setReportTypeFilter('all');
-          setIsFilterModalVisible(false);
-        }}
-      />
+      {/* Filter Modal - Lazy loaded */}
+      {isFilterModalVisible && (
+        <Suspense fallback={null}>
+          <FilterModal
+            visible={isFilterModalVisible}
+            statusFilter={statusFilter}
+            reportTypeFilter={reportTypeFilter}
+            totalCount={totalCount}
+            pendingCount={pendingCount}
+            ongoingCount={ongoingCount}
+            resolvedCount={resolvedCount}
+            manualCount={manualCount}
+            voiceCount={voiceCount}
+            onStatusFilterChange={setStatusFilter}
+            onReportTypeFilterChange={setReportTypeFilter}
+            onClose={() => setIsFilterModalVisible(false)}
+            onClearAll={() => {
+              setStatusFilter('all');
+              setReportTypeFilter('all');
+              setIsFilterModalVisible(false);
+            }}
+          />
+        </Suspense>
+      )}
 
-      {/* Acknowledge sheet (first step) */}
-      <AcknowledgeSheet
-        visible={!!acknowledgeTarget}
-        report={acknowledgeTarget}
-        onConfirm={() => {
-          if (acknowledgeTarget) {
-            handleAcknowledgePress(acknowledgeTarget.id);
-          }
-          setAcknowledgeTarget(null);
-        }}
-        onCancel={() => setAcknowledgeTarget(null)}
-      />
+      {/* Acknowledge sheet (first step) - Lazy loaded */}
+      {acknowledgeTarget && (
+        <Suspense fallback={null}>
+          <AcknowledgeSheet
+            visible={!!acknowledgeTarget}
+            report={acknowledgeTarget}
+            onConfirm={() => {
+              if (acknowledgeTarget) {
+                handleAcknowledgePress(acknowledgeTarget.id);
+              }
+              setAcknowledgeTarget(null);
+            }}
+            onCancel={() => setAcknowledgeTarget(null)}
+          />
+        </Suspense>
+      )}
 
-      {/* Resolve confirmation sheet (second step) */}
-      <ResolveSheet
-        visible={!!resolveTarget}
-        report={resolveTarget}
-        onConfirm={() => {
-          if (resolveTarget) {
-            handleResolvePress(resolveTarget.id);
-          }
-          setResolveTarget(null);
-        }}
-        onCancel={() => setResolveTarget(null)}
-      />
+      {/* Resolve confirmation sheet (second step) - Lazy loaded */}
+      {resolveTarget && (
+        <Suspense fallback={null}>
+          <ResolveSheet
+            visible={!!resolveTarget}
+            report={resolveTarget}
+            onConfirm={() => {
+              if (resolveTarget) {
+                handleResolvePress(resolveTarget.id);
+              }
+              setResolveTarget(null);
+            }}
+            onCancel={() => setResolveTarget(null)}
+          />
+        </Suspense>
+      )}
 
       {/* Modern Toast Notification */}
       <Toast toast={toast} onDismiss={() => setToast(null)} duration={5000} />

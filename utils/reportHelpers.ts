@@ -78,22 +78,38 @@ export function formatTime12Hour(date?: Date): string {
 }
 
 /**
- * Get category display name from report type
+ * Get category display name from report type and original category
+ * Uses original category if available (from citizen side), otherwise maps from type
  */
-export function getCategory(type: EmergencyReport['type']): string {
+export function getCategory(type: EmergencyReport['type'], originalCategory?: string): string {
+  // If we have the original category from citizen side, use it for display
+  if (originalCategory) {
+    const categoryLabels: Record<string, string> = {
+      'safety': 'Safety',
+      'security': 'Security',
+      'infrastructure': 'Infrastructure',
+      'environment': 'Environment',
+      'noise': 'Noise',
+      'other': 'Other',
+      'voice_concern': 'Voice Concern',
+    };
+    return categoryLabels[originalCategory.toLowerCase()] || 'Other';
+  }
+  
+  // Fallback to type-based mapping
   switch (type) {
     case 'accident':
       return 'Road Accident';
     case 'crime':
-      return 'Crime';
+      return 'Security';
     case 'fire':
       return 'Fire';
     case 'medical':
       return 'Medical Emergency';
     case 'suspicious':
-      return 'Suspicious Activity';
+      return 'Safety';
     case 'other':
-      return 'Flood';
+      return 'Other';
     default:
       return 'Other';
   }

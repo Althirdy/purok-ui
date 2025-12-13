@@ -2,7 +2,7 @@
  * Firebase Service - Handles IoT Sensor Data Fetching
  */
 
-import { database } from '@/config/firebase';
+import { getDatabaseInstance } from '@/config/firebase';
 import { SENSOR_RULES, SENSOR_THRESHOLDS } from '@/constants/sensor-config';
 import type { EmergencyReport } from '@/types';
 import { DataSnapshot, get, limitToLast, off, onChildAdded, orderByChild, query, ref, startAt } from 'firebase/database';
@@ -218,7 +218,8 @@ export { SENSOR_THRESHOLDS } from '@/constants/sensor-config';
 export function listenToAnomalies(
   callback: (sensorData: SensorData, report: EmergencyReport) => void
 ): () => void {
-  const sensorsRef = ref(database, 'urbanwatch/anomaly_data');
+  const db = getDatabaseInstance();
+  const sensorsRef = ref(db, 'urbanwatch/anomaly_data');
 
   // Query only recent items; also rely on onChildAdded for realtime new children
   const cutoff = Date.now() - RECENT_WINDOW_MS;
@@ -401,7 +402,8 @@ export function listenToAnomalies(
  */
 export async function fetchLatestAnomaliesSince(sinceMs?: number, limit: number = 20): Promise<SensorData[]> {
   try {
-    const sensorsRef = ref(database, 'urbanwatch/anomaly_data');
+    const db = getDatabaseInstance();
+    const sensorsRef = ref(db, 'urbanwatch/anomaly_data');
     const cutoff = sinceMs ?? (Date.now() - RECENT_WINDOW_MS);
     const recentQuery = query(
       sensorsRef,
@@ -481,7 +483,8 @@ export async function fetchLatestDeviceStatusSince(sinceMs?: number, limit: numb
   health_status?: string;
 }[]> {
   try {
-    const devRef = ref(database, 'urbanwatch/device_status');
+    const db = getDatabaseInstance();
+    const devRef = ref(db, 'urbanwatch/device_status');
     const cutoff = sinceMs ?? (Date.now() - RECENT_WINDOW_MS);
     const q = query(devRef, orderByChild('timestamp'), startAt(new Date(cutoff).toISOString()), limitToLast(limit * 4));
     const snapshot = await get(q);

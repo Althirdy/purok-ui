@@ -1,9 +1,12 @@
 /**
- * Firebase Configuration
+ * Firebase Configuration - Lazy Initialization
+ * 
+ * Firebase is only initialized when first accessed, not on app startup.
+ * This reduces initial bundle size and improves app load time.
  */
 
-import { initializeApp } from 'firebase/app';
-import { getDatabase } from 'firebase/database';
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { getDatabase, type Database } from 'firebase/database';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBv3B7xnuS_Aw5yXU0N0sOXMScFvyCi0LE",
@@ -16,11 +19,41 @@ const firebaseConfig = {
   measurementId: "G-55N6R7NQER"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Lazy initialization - only create app when first accessed
+let app: FirebaseApp | null = null;
+let databaseInstance: Database | null = null;
 
-// Initialize Realtime Database
-export const database = getDatabase(app);
+function getApp(): FirebaseApp {
+  if (!app) {
+    const existingApps = getApps();
+    if (existingApps.length > 0) {
+      app = existingApps[0];
+    } else {
+      app = initializeApp(firebaseConfig);
+    }
+  }
+  return app;
+}
 
-export default app;
+// Lazy get database - only initialize when first accessed
+export function getDatabaseInstance(): Database {
+  if (!databaseInstance) {
+    databaseInstance = getDatabase(getApp());
+  }
+  return databaseInstance;
+}
+
+// Export database getter for backward compatibility
+export const database = new Proxy({} as Database, {
+  get(_target, prop) {
+    return (getDatabaseInstance() as any)[prop];
+  }
+});
+
+// Export app getter
+export default new Proxy({} as FirebaseApp, {
+  get(_target, prop) {
+    return (getApp() as any)[prop];
+  }
+});
 

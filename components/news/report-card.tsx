@@ -42,6 +42,54 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
     }
   };
 
+  const getCategoryIcon = (originalCategory?: string, type?: EmergencyReport['type']) => {
+    // Use original category from citizen side if available (matches citizen side icons)
+    if (originalCategory) {
+      const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
+        'safety': 'shield-outline',        // Matches citizen side
+        'security': 'eye-outline',         // Matches citizen side
+        'infrastructure': 'construct-outline', // Matches citizen side
+        'environment': 'leaf-outline',       // Matches citizen side
+        'noise': 'volume-high-outline',      // Matches citizen side
+        'other': 'alert-circle-outline',     // Matches citizen side (was ellipsis)
+        'voice_concern': 'mic-outline',
+      };
+      return categoryIcons[originalCategory.toLowerCase()] || 'alert-circle-outline';
+    }
+    
+    // Fallback to type-based icons
+    switch (type) {
+      case 'accident':
+        return 'car-outline';
+      case 'crime':
+        return 'eye-outline'; // Security icon
+      case 'fire':
+        return 'flame-outline';
+      case 'medical':
+        return 'medical-outline';
+      case 'suspicious':
+        return 'shield-outline'; // Safety icon
+      default:
+        return 'alert-circle-outline';
+    }
+  };
+
+  const getCategoryIconColor = (originalCategory?: string) => {
+    if (originalCategory) {
+      const categoryColors: Record<string, string> = {
+        'safety': '#f59e0b',      // Orange
+        'security': '#ef4444',     // Red
+        'infrastructure': '#3b82f6', // Blue
+        'environment': '#10b981',   // Green
+        'noise': '#8b5cf6',        // Purple
+        'other': '#64748b',        // Gray
+        'voice_concern': '#64748b', // Gray
+      };
+      return categoryColors[originalCategory.toLowerCase()] || colors.accent.orange;
+    }
+    return colors.accent.orange;
+  };
+
   const getSeverityBadge = (severity: string) => {
     const badgeColor = getSeverityColor(severity as EmergencyReport['severity']);
     return (
@@ -71,13 +119,17 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
       <View style={styles.header}>
         {/* Icon on Left */}
         <View style={styles.iconContainer}>
-          <Ionicons name="shield-outline" size={24} color={colors.accent.orange} />
+          <Ionicons 
+            name={getCategoryIcon(report.originalCategory, report.type)} 
+            size={24} 
+            color={getCategoryIconColor(report.originalCategory)} 
+          />
         </View>
 
         {/* Content */}
         <View style={styles.info}>
           <Text style={styles.title} numberOfLines={2}>{report.title}</Text>
-          <Text style={styles.category}>{getCategory(report.type)}</Text>
+          <Text style={styles.category}>{getCategory(report.type, report.originalCategory)}</Text>
         </View>
 
         {/* Severity Badge on Right */}

@@ -34,6 +34,36 @@ type ConcernAssignedPayload = {
   };
 };
 
+// Payload structure for status updates
+type ConcernStatusUpdatedPayload = {
+  concern: {
+    id: number;
+    title: string;
+    description: string;
+    category: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    status: 'pending' | 'ongoing' | 'escalated' | 'resolved';
+    created_at: string;
+    updated_at?: string;
+    images?: string[];
+    audio?: string | null;
+    summary?: string | null;
+    transcript?: string | null;
+    latitude?: string | number | null;
+    longitude?: string | number | null;
+  };
+  distribution?: {
+    id: number;
+    status: string;
+    assigned_at: string;
+    updated_at?: string;
+  };
+  purok_leader?: {
+    id: number;
+    name: string;
+  };
+};
+
 let pusherClient: Pusher | null = null;
 let connectionHandlersBound = false;
 
@@ -143,11 +173,13 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
   }
   const location = locationParts.length > 0 ? locationParts.join(' • ') : 'Citizen submitted location';
 
+  const category = concern.category?.toLowerCase() || 'other';
+  
   return {
     id: `PUROK-${concern.id}`, // Format: PUROK-{id} to match API format and enable status updates
     title: concern.title,
     description: concern.description || concern.summary || 'No description available',
-    type: categoryMap[concern.category?.toLowerCase()] ?? 'other',
+    type: categoryMap[category] ?? 'other',
     location,
     severity: concern.severity ?? 'medium',
     status: statusMap[concern.status] ?? 'pending',
@@ -156,6 +188,7 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
     reportedBy: citizen.name ?? 'citizen',
     images: concern.images ?? [],
     coordinates,
+    originalCategory: category, // Preserve original category for display
   };
 }
 
@@ -263,6 +296,80 @@ export async function subscribeToCitizenReports(
   } catch (error) {
     console.error('[Pusher] Error setting up subscription:', error);
     // Return a no-op cleanup function
+    return () => {};
+  }
+}
+
+/**
+ * Subscribe to status update events for concerns
+ * 
+ * Channel: private-purok-leader.{userId}
+ * Event: concern.status.updated or concern.updated
+ * 
+ * This listens for status updates that happen when:
+ * - Purok leader acknowledges/resolves a concern (via app or Postman)
+ * - Backend broadcasts the update back to the purok leader's channel
+ * 
+ * @param userId - The purok leader's user ID
+ * @param authToken - The authentication token
+ * @param onStatusUpdate - Callback when a concern status is updated
+ */
+export async function subscribeToStatusUpdates(
+  userId: number | string,
+  authToken: string,
+  onStatusUpdate: (reportId: string, status: 'pending' | 'acknowledged' | 'resolved') => void
+): Promise<() => void> {
+  try {
+    const client = await getPusherClient(authToken);
+    
+    const channelName = `private-purok-leader.${userId}`;
+    console.log('[Pusher] Subscribing to status updates on channel:', channelName);
+    
+    const channel = client.subscribe(channelName);
+
+    // Map backend status to frontend status
+    const statusMap: Record<string, 'pending' | 'acknowledged' | 'resolved'> = {
+      'pending': 'pending',
+      'ongoing': 'acknowledged',
+      'escalated': 'acknowledged',
+      'resolved': 'resolved',
+    };
+
+    // Listen for concern.status.updated event
+    const statusUpdateHandler = (data: ConcernStatusUpdatedPayload) => {
+      try {
+        const concernId = data.concern.id;
+        const backendStatus = data.concern.status || data.distribution?.status || 'pending';
+        const frontendStatus = statusMap[backendStatus.toLowerCase()] || 'pending';
+        
+        console.log('[Pusher] 🔄 Status Update Received:', {
+          concernId,
+          backendStatus,
+          frontendStatus,
+          title: data.concern.title,
+        });
+        
+        // Call callback with report ID (format: PUROK-{id}) and frontend status
+        onStatusUpdate(`PUROK-${concernId}`, frontendStatus);
+      } catch (error) {
+        console.error('[Pusher] ❌ Failed to process status update:', error, data);
+      }
+    };
+
+    // Bind to both possible event names
+    channel.bind('concern.status.updated', statusUpdateHandler);
+    channel.bind('concern.updated', statusUpdateHandler);
+
+    console.log('[Pusher] ✅ Listening for status updates on', channelName);
+
+    return () => {
+      console.log('[Pusher] Unsubscribing from status updates on', channelName);
+      channel.unbind('concern.status.updated', statusUpdateHandler);
+      channel.unbind('concern.updated', statusUpdateHandler);
+      // Note: Don't unsubscribe from channel here - it might be used by other subscriptions
+    };
+  } catch (error) {
+    console.error('[Pusher] Error setting up status update subscription:', error);
     return () => {};
   }
 }

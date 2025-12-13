@@ -130,10 +130,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const loginData = await resp.json();
       const token: string | undefined = loginData?.token || loginData?.accessToken || loginData?.data?.token;
       if (!token) {
+        console.error('[Auth] Login response missing token:', {
+          hasToken: !!loginData?.token,
+          hasAccessToken: !!loginData?.accessToken,
+          hasDataToken: !!loginData?.data?.token,
+          loginDataKeys: Object.keys(loginData || {}),
+        });
         throw new Error('Login response missing token');
       }
+      console.log('[Auth] ✅ Token extracted from login response:', {
+        tokenLength: token.length,
+        tokenPrefix: token.substring(0, 20) + '...',
+        tokenFormat: token.includes('|') ? 'valid (has pipe)' : 'invalid (no pipe)',
+        source: loginData?.token ? 'loginData.token' : 
+                loginData?.accessToken ? 'loginData.accessToken' : 
+                'loginData.data.token',
+      });
       await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
       setAccessToken(token);
+      console.log('[Auth] ✅ Token stored in AsyncStorage and context');
       // Optimistically set user from login response if available
       if (loginData?.data?.user) {
         setUser(normalizeUser(loginData.data.user));
