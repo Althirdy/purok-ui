@@ -3,6 +3,7 @@
  */
 
 import { Card } from '@/components/common/card';
+import { NotificationSkeleton } from '@/components/news/notification-skeleton';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { useNotifications, type Notification } from '@/context/notification-context';
@@ -10,7 +11,7 @@ import { getNotificationIcon } from '@/utils/notificationHelpers';
 import { formatTimestamp } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -110,10 +111,22 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginTop: spacing.md,
   },
+  skeletonContainer: {
+    paddingHorizontal: spacing.lg,
+  },
 });
 
 export default function NotificationsScreen() {
   const { notifications, markAsRead, markAllAsRead, unreadCount } = useNotifications();
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Simulate loading state on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleNotificationPress = useCallback((notification: Notification) => {
     // Mark as read when pressed
@@ -194,15 +207,23 @@ export default function NotificationsScreen() {
 
       {/* Notifications List */}
       <FlatList
-        data={notifications}
+        data={isLoading ? [] : notifications}
         keyExtractor={keyExtractor}
         renderItem={renderNotification}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="notifications-off-outline" size={64} color={colors.neutral.gray600} />
-            <Text style={styles.emptyStateText}>No notifications</Text>
-          </View>
+          isLoading ? (
+            <View style={styles.skeletonContainer}>
+              {Array.from({ length: 5 }).map((_, index) => (
+                <NotificationSkeleton key={`skeleton-${index}`} />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="notifications-off-outline" size={64} color={colors.neutral.gray600} />
+              <Text style={styles.emptyStateText}>No notifications</Text>
+            </View>
+          )
         }
       />
     </SafeAreaView>
