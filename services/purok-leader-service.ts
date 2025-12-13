@@ -144,16 +144,25 @@ export async function updateAssignedConcernStatus(
     const endpoint = `/api/v1/purok-leader/concerns/${id}/status`;
     const fullUrl = `https://www.urbanwatch.me${endpoint}`;
     
+    // Ensure token doesn't already have "Bearer " prefix
+    const cleanToken = token.startsWith('Bearer ') ? token.substring(7).trim() : token.trim();
+    
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📤 [PurokLeaderService] SENDING STATUS UPDATE REQUEST');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📍 Endpoint:', fullUrl);
     console.log('🔑 Method: PUT');
     console.log('📦 Request Body:', JSON.stringify(requestBody, null, 2));
+    console.log('🔐 Token Info:', {
+      tokenLength: cleanToken.length,
+      tokenFormat: cleanToken.includes('|') ? 'valid (has pipe)' : 'invalid (no pipe)',
+      tokenPrefix: cleanToken.substring(0, 20) + '...',
+    });
     console.log('🔐 Headers:', {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'Authorization': `Bearer ${token.substring(0, 20)}...` // Show only first 20 chars for security
+      'X-Requested-With': 'XMLHttpRequest',
+      'Authorization': `Bearer ${cleanToken.substring(0, 20)}...` // Show only first 20 chars for security
     });
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
@@ -162,7 +171,7 @@ export async function updateAssignedConcernStatus(
       requestBody,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${cleanToken}`,
         },
       },
     );
