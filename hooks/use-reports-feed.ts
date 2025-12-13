@@ -106,17 +106,20 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
   useEffect(() => {
     if (!user?.id) return;
 
-    // Firebase listener for sensor data
-    const firebaseUnsubscribe = listenToAnomalies((sensorData, report) => {
-      if (processedReportIds.current.has(report.id)) {
-        return; // Skip if already processed
-      }
-      processedReportIds.current.add(report.id);
-      console.log('[ReportsFeed] New sensor report:', report.id);
-      setReports(prev => [report, ...prev]);
-      addNotificationFromReportRef.current(report);
-      onNewReportRef.current?.(report);
-    });
+      // Firebase listener for sensor data
+      const firebaseUnsubscribe = listenToAnomalies((sensorData, report) => {
+        if (processedReportIds.current.has(report.id)) {
+          return; // Skip if already processed
+        }
+        processedReportIds.current.add(report.id);
+        console.log('[ReportsFeed] New sensor report:', report.id);
+        setReports(prev => {
+          // Sort by timestamp (newest first) after adding
+          return [report, ...prev].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        });
+        addNotificationFromReportRef.current(report);
+        onNewReportRef.current?.(report);
+      });
     firebaseUnsubscribeRef.current = firebaseUnsubscribe;
 
     // Pusher subscription for citizen reports
@@ -149,14 +152,22 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
           setReports(prev => {
             // Check if report already exists
             if (prev.some(r => r.id === report.id)) {
+              console.log('[ReportsFeed] Report already in list, skipping:', report.id);
               return prev;
             }
-            return [report, ...prev];
+            console.log('[ReportsFeed] ✅ Adding new report to list:', report.id, report.title);
+            // Sort by timestamp (newest first) after adding
+            const updated = [report, ...prev].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+            console.log('[ReportsFeed] Total reports after adding:', updated.length);
+            return updated;
           });
 
           // Trigger toast notification callback
           if (onNewReportRef.current) {
+            console.log('[ReportsFeed] 🎯 Triggering onNewReport callback for:', report.id);
             onNewReportRef.current(report);
+          } else {
+            console.warn('[ReportsFeed] ⚠️ onNewReport callback is not set');
           }
         }
       ).then((unsubscribe) => {
@@ -267,7 +278,9 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
         clearInterval(syncTimer);
       }
     };
-  }, [user?.id, accessToken, reports]);
+    // IMPORTANT: Do NOT include 'reports' in dependencies - it causes re-subscriptions
+    // Only re-subscribe when user or token changes
+  }, [user?.id, accessToken]);
 
   // Update report status (with API call for citizen reports)
   const updateReportStatus = useCallback(async (

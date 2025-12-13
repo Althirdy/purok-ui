@@ -92,7 +92,9 @@ export default function NewsFeedScreen() {
     updateReportStatus,
   } = useReportsFeed({
     onNewReport: (report) => {
-      if ((report.severity === 'critical' || report.severity === 'high') && !toast) {
+      // Always show toast for high/critical reports (remove !toast condition)
+      if (report.severity === 'critical' || report.severity === 'high') {
+        console.log('[NewsFeed] 🎯 Showing toast for new report:', report.id, report.severity);
         setToast({
           id: `toast-${report.id}-${Date.now()}`,
           title: report.severity === 'critical' ? '🚨 Critical Alert' : '⚠️ Alert',
@@ -355,8 +357,8 @@ export default function NewsFeedScreen() {
         </Suspense>
       )}
 
-      {/* Modern Toast Notification */}
-      <Toast toast={toast} onDismiss={() => setToast(null)} duration={5000} />
+      {/* Modern Toast Notification - Key prop ensures re-render on new toast */}
+      <Toast key={toast?.id || 'no-toast'} toast={toast} onDismiss={() => setToast(null)} duration={5000} />
     </SafeAreaView>
   );
 }
