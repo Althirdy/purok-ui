@@ -1,7 +1,7 @@
+import { Skeleton } from '@/components/common/skeleton';
+import { DesignSystem } from '@/constants/design-system';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { DesignSystem } from '@/constants/design-system';
-import { Skeleton } from '@/components/common/skeleton';
 
 const { spacing, borderRadius } = DesignSystem;
 
