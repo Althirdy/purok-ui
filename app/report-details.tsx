@@ -413,8 +413,11 @@ export default function ReportDetailsScreen() {
       });
       setReport(foundReport);
       setLoading(false);
-    } else if (reports.length > 0) {
-      // Retry after a short delay in case report is still loading
+      return;
+    }
+
+    // If we have some reports but didn't find this one, retry once after a short delay.
+    if (reports.length > 0) {
       const timer = setTimeout(() => {
         const retryReport = reports.find(r => r.id === reportId);
         if (retryReport) {
@@ -426,14 +429,25 @@ export default function ReportDetailsScreen() {
             hasAudio: !!retryReport.audio,
           });
           setReport(retryReport);
-          setLoading(false);
         } else {
+          // After retry, give up and show "Report not found"
+          setReport(null);
+        }
         setLoading(false);
-      }
       }, 1000);
+
       return () => clearTimeout(timer);
     }
-  }, [reports, reportId]);
+
+    // Fallback: if reports array stays empty for a while, avoid infinite loading spinner
+    const emptyTimer = setTimeout(() => {
+      if (!report) {
+        setLoading(false);
+      }
+    }, 4000);
+
+    return () => clearTimeout(emptyTimer);
+  }, [reports, reportId, report]);
 
   // Parse coordinates from location string if available
   const parseCoordinates = (location: string) => {
@@ -782,57 +796,9 @@ export default function ReportDetailsScreen() {
           </Animated.View>
         )}
 
-        {/* Location with Map */}
-        <Animated.View
-          entering={FadeInDown.delay(400).duration(500)}
-          style={styles.section}
-        >
-          <Text style={styles.sectionLabel}>Location</Text>
-          <View style={styles.locationCard}>
-            <View style={styles.locationRow}>
-              <Ionicons name="location" size={20} color={colors.primary.blue} />
-              <Text style={styles.locationText}>{report.location}</Text>
-            </View>
-            {mapRegion && coords && (
-              <TouchableOpacity 
-                activeOpacity={0.9}
-                onPress={handleMapPress}
-                style={styles.mapContainer}
-              >
-                <MapView
-                  style={styles.map}
-                  initialRegion={mapRegion}
-                  scrollEnabled={false}
-                  zoomEnabled={false}
-                  pitchEnabled={false}
-                  rotateEnabled={false}
-                  mapType="standard"
-                >
-                  <Marker
-                    coordinate={{
-                      latitude: coords.latitude,
-                      longitude: coords.longitude,
-                    }}
-                    title={report.title}
-                  >
-                    <View style={styles.markerContainer}>
-                      <Ionicons name="location" size={24} color={colors.semantic.error} />
-                    </View>
-                  </Marker>
-                </MapView>
-                <View style={styles.mapOverlay}>
-                  <Text style={styles.mapCoordinates}>
-                    {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-          </View>
-        </Animated.View>
-
         {/* Info Grid */}
         <Animated.View
-          entering={FadeInDown.delay(450).duration(500)}
+          entering={FadeInDown.delay(420).duration(500)}
           style={styles.section}
         >
           <View style={styles.infoGrid}>
@@ -845,34 +811,11 @@ export default function ReportDetailsScreen() {
               <Text style={styles.infoLabel}>Priority</Text>
             </View>
           </View>
-
-          {/* Action Buttons */}
-          {report.status === 'pending' && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              activeOpacity={0.8}
-              onPress={handleAcknowledge}
-            >
-              <Text style={styles.actionButtonText}>Acknowledge</Text>
-            </TouchableOpacity>
-          )}
-          {report.status === 'acknowledged' && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.actionButtonResolve]}
-              activeOpacity={0.8}
-              onPress={handleResolve}
-            >
-              <Text style={styles.actionButtonText}>Mark as Resolved</Text>
-            </TouchableOpacity>
-          )}
-          {report.status === 'resolved' && (
-            <Text style={styles.resolvedText}>Report resolved</Text>
-          )}
         </Animated.View>
 
         {/* Status Timeline */}
         <Animated.View
-          entering={FadeInDown.delay(500).duration(500)}
+          entering={FadeInDown.delay(460).duration(500)}
           style={styles.timelineSection}
         >
           <View style={styles.timelineHeader}>
@@ -930,7 +873,7 @@ export default function ReportDetailsScreen() {
 
         {/* Reported Date Card */}
         <Animated.View
-          entering={FadeInUp.delay(550).duration(500)}
+          entering={FadeInUp.delay(500).duration(500)}
           style={styles.dateSection}
         >
           <View style={styles.dateInfo}>
@@ -947,6 +890,82 @@ export default function ReportDetailsScreen() {
             </View>
           </View>
           <Text style={styles.relativeTime}>Most recent update</Text>
+        </Animated.View>
+
+        {/* Location with Map (below status + reported card) */}
+        <Animated.View
+          entering={FadeInDown.delay(540).duration(500)}
+          style={styles.section}
+        >
+          <Text style={styles.sectionLabel}>Location</Text>
+          <View style={styles.locationCard}>
+            <View style={styles.locationRow}>
+              <Ionicons name="location" size={20} color={colors.primary.blue} />
+              <Text style={styles.locationText}>{report.location}</Text>
+            </View>
+            {mapRegion && coords && (
+              <TouchableOpacity 
+                activeOpacity={0.9}
+                onPress={handleMapPress}
+                style={styles.mapContainer}
+              >
+                <MapView
+                  style={styles.map}
+                  initialRegion={mapRegion}
+                  scrollEnabled={false}
+                  zoomEnabled={false}
+                  pitchEnabled={false}
+                  rotateEnabled={false}
+                  mapType="standard"
+                >
+                  <Marker
+                    coordinate={{
+                      latitude: coords.latitude,
+                      longitude: coords.longitude,
+                    }}
+                    title={report.title}
+                  >
+                    <View style={styles.markerContainer}>
+                      <Ionicons name="location" size={24} color={colors.semantic.error} />
+                    </View>
+                  </Marker>
+                </MapView>
+                <View style={styles.mapOverlay}>
+                  <Text style={styles.mapCoordinates}>
+                    {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* Action Buttons at very bottom */}
+        <Animated.View
+          entering={FadeInUp.delay(580).duration(500)}
+          style={[styles.section, { marginBottom: spacing.lg }]}
+        >
+          {report.status === 'pending' && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              activeOpacity={0.8}
+              onPress={handleAcknowledge}
+            >
+              <Text style={styles.actionButtonText}>Acknowledge</Text>
+            </TouchableOpacity>
+          )}
+          {report.status === 'acknowledged' && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.actionButtonResolve]}
+              activeOpacity={0.8}
+              onPress={handleResolve}
+            >
+              <Text style={styles.actionButtonText}>Mark as Resolved</Text>
+            </TouchableOpacity>
+          )}
+          {report.status === 'resolved' && (
+            <Text style={styles.resolvedText}>Report resolved</Text>
+          )}
         </Animated.View>
       </ScrollView>
     </SafeAreaView>

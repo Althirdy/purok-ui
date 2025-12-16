@@ -181,43 +181,51 @@ export default function NewsFeedScreen() {
   }, [fetchReports]);
 
   // Handle acknowledge - mark report as acknowledged (first step)
-  const handleAcknowledgePress = useCallback((reportId: string) => {
+  const handleAcknowledgePress = useCallback(async (reportId: string) => {
     const r = reports.find(x => x.id === reportId);
     if (!r || r.status !== 'pending') return;
 
-    // Mark as acknowledged
-    updateReportStatus(reportId, 'acknowledged');
-      
-    // Add notification
-    addNotification({
-      id: `acknowledge-${r.id}-${Date.now()}`,
-      type: 'report_update',
-      title: 'Report Acknowledged',
-      message: r.title,
-      reportId: r.id,
-      timestamp: new Date(),
-      read: false,
-    });
+    try {
+      // Mark as acknowledged
+      await updateReportStatus(reportId, 'acknowledged');
+
+      // Add notification after successful update
+      addNotification({
+        id: `acknowledge-${r.id}-${Date.now()}`,
+        type: 'report_update',
+        title: 'Report Acknowledged',
+        message: r.title,
+        reportId: r.id,
+        timestamp: new Date(),
+        read: false,
+      });
+    } catch (error) {
+      console.error('[NewsFeed] Failed to acknowledge report:', error);
+    }
   }, [reports, addNotification, updateReportStatus]);
 
   // Handle resolve - mark report as resolved (second step)
-  const handleResolvePress = useCallback((reportId: string) => {
+  const handleResolvePress = useCallback(async (reportId: string) => {
     const r = reports.find(x => x.id === reportId);
     if (!r || r.status === 'resolved') return;
 
-    // Mark as resolved
-    updateReportStatus(reportId, 'resolved');
-      
-    // Add notification
-    addNotification({
-      id: `resolve-${r.id}-${Date.now()}`,
-      type: 'report_update',
-      title: 'Report Resolved',
-      message: r.title,
-      reportId: r.id,
-      timestamp: new Date(),
-      read: false,
-    });
+    try {
+      // Mark as resolved
+      await updateReportStatus(reportId, 'resolved');
+
+      // Add notification after successful update
+      addNotification({
+        id: `resolve-${r.id}-${Date.now()}`,
+        type: 'report_update',
+        title: 'Report Resolved',
+        message: r.title,
+        reportId: r.id,
+        timestamp: new Date(),
+        read: false,
+      });
+    } catch (error) {
+      console.error('[NewsFeed] Failed to resolve report:', error);
+    }
   }, [reports, addNotification, updateReportStatus]);
 
   // Handle acknowledge button - opens acknowledge modal (first step)

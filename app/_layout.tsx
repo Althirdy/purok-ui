@@ -26,7 +26,6 @@ function AuthAwareStack() {
   const { isAuthenticated } = useAuth();
   return (
     <Stack
-      key={isAuthenticated ? 'authed' : 'guest'}
       screenOptions={{
         headerShown: false,
         // When individual screens enable headers, use uw-citizen primary blue

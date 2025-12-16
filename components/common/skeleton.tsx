@@ -1,11 +1,11 @@
 import React from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
 import { DesignSystem } from '@/constants/design-system';
 
 const { colors, borderRadius } = DesignSystem;
 
 interface SkeletonProps {
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function Skeleton({ style }: SkeletonProps) {
