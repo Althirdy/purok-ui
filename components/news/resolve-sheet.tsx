@@ -225,7 +225,7 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
               onPress={onConfirm}
             >
               <Ionicons name="checkmark-done-circle" size={20} color={colors.text.inverse} style={{ marginRight: 8 }} />
-              <Text style={styles.modalButtonText}>Mark as Resolved</Text>
+              <Text style={styles.modalButtonText}>Resolve</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -246,7 +246,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
     paddingTop: spacing.xl,
-    paddingBottom: Platform.OS === 'ios' ? 40 : spacing.xl,
+    // Extra bottom padding so primary button text isn't clipped by gesture bar
+    paddingBottom: Platform.OS === 'ios' ? 48 : spacing.xl + spacing.sm,
     borderWidth: 2,
     borderColor: '#e2e8f0',
     borderBottomWidth: 0,

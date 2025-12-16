@@ -17,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 
 const { colors, typography, spacing } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -48,6 +49,12 @@ export function AcknowledgeSheet({ visible, report, onConfirm, onCancel }: Ackno
   };
 
   const coords = report.coordinates || parseCoordinates(report.location);
+  const mapRegion = coords ? {
+    latitude: coords.latitude,
+    longitude: coords.longitude,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  } : null;
 
   return (
     <Modal
@@ -128,22 +135,41 @@ export function AcknowledgeSheet({ visible, report, onConfirm, onCancel }: Ackno
               </View>
             )}
 
-            {/* Location with Map Preview */}
+            {/* Location with Map (match resolve modal) */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Where did this happen?</Text>
+              <Text style={styles.sectionLabel}>Location</Text>
               <View style={styles.locationCard}>
                 <View style={styles.locationRow}>
                   <Ionicons name="location" size={20} color={colors.primary.blue} />
                   <Text style={styles.locationText}>{report.location}</Text>
                 </View>
-                {coords && (
-                  <View style={styles.mapPreview}>
-                    <View style={styles.mapPlaceholder}>
-                      <Ionicons name="map" size={32} color={colors.text.secondary} />
-                      <Text style={styles.mapText}>
+                {mapRegion && coords && (
+                  <View style={styles.mapContainer}>
+                    <MapView
+                      style={styles.map}
+                      initialRegion={mapRegion}
+                      scrollEnabled={false}
+                      zoomEnabled={false}
+                      pitchEnabled={false}
+                      rotateEnabled={false}
+                      mapType="standard"
+                    >
+                      <Marker
+                        coordinate={{
+                          latitude: coords.latitude,
+                          longitude: coords.longitude,
+                        }}
+                        title={report.title}
+                      >
+                        <View style={styles.markerContainer}>
+                          <Ionicons name="location" size={24} color={colors.semantic.error} />
+                        </View>
+                      </Marker>
+                    </MapView>
+                    <View style={styles.mapOverlay}>
+                      <Text style={styles.mapCoordinates}>
                         {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
                       </Text>
-                      <Text style={styles.mapHint}>Tap to view on map</Text>
                     </View>
                   </View>
                 )}
@@ -338,31 +364,37 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     flex: 1,
   },
-  mapPreview: {
+  mapContainer: {
     marginTop: spacing.sm,
-    borderRadius: 8,
+    height: 180,
+    borderRadius: 12,
     overflow: 'hidden',
-  },
-  mapPlaceholder: {
-    height: 120,
-    backgroundColor: colors.background.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.border.light,
-    borderRadius: 8,
   },
-  mapText: {
+  map: {
+    width: '100%',
+    height: '100%',
+  },
+  mapOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    padding: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  mapCoordinates: {
     fontSize: typography.fontSize.xs,
     color: colors.text.secondary,
-    marginTop: spacing.xs,
     fontFamily: 'monospace',
+    textAlign: 'center',
   },
-  mapHint: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-    marginTop: 2,
-    fontStyle: 'italic',
+  markerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   infoGrid: {
     flexDirection: 'row',

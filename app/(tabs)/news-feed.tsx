@@ -11,11 +11,12 @@ import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
 import { useNotifications } from '@/context/notification-context';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
-import type { EmergencyReport, FeedSource } from '@/types';
+import type { EmergencyReport } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Dimensions, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Lazy load heavy modals/sheets - only load when needed
@@ -235,18 +236,22 @@ export default function NewsFeedScreen() {
   // Optimized renderItem with memoized callbacks
   // All cards are clickable regardless of status
   // Use useMemo to create stable props object per item
-  const renderReportItem = useCallback(({ item }: { item: EmergencyReport }) => {
+  const renderReportItem = useCallback(({ item, index }: { item: EmergencyReport; index: number }) => {
     // Create stable callback references based on item status
     const acknowledgeCallback = item.status === 'pending' ? handleAcknowledgeAction : undefined;
     const resolveCallback = item.status === 'acknowledged' ? handleResolveAction : undefined;
     
     return (
-      <ReportCard
-        report={item}
-        onPress={handleReportPress}
-        onAcknowledge={acknowledgeCallback}
-        onResolve={resolveCallback}
-      />
+      <Animated.View
+        entering={FadeInDown.delay(120 + index * 40).duration(450)}
+      >
+        <ReportCard
+          report={item}
+          onPress={handleReportPress}
+          onAcknowledge={acknowledgeCallback}
+          onResolve={resolveCallback}
+        />
+      </Animated.View>
     );
   }, [handleReportPress, handleAcknowledgeAction, handleResolveAction]);
 

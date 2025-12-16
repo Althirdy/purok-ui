@@ -119,10 +119,10 @@ const styles = StyleSheet.create({
   activeUnderline: {
     position: 'absolute',
     bottom: 0,
-    left: '20%',
-    right: '20%',
-    height: 2.5,
-    backgroundColor: colors.accent.orange,
+    left: '22%',
+    right: '22%',
+    height: 3,
+    backgroundColor: '#3b82f6',
     borderRadius: borderRadius.sm,
   },
   iconContainer: {
