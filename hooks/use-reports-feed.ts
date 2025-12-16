@@ -234,7 +234,7 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
         console.error('[ReportsFeed] Error subscribing to status updates:', error);
       });
 
-      // Initial sync for missed reports (2 seconds after subscription)
+      // Initial sync for missed reports and status updates (2 seconds after subscription)
       const syncMissedReports = async () => {
         if (syncInProgressRef.current) {
           return; // Skip silently if already in progress
@@ -244,12 +244,38 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
           const concerns = await fetchAssignedConcerns(accessToken);
           
           setReports(prev => {
-            const existingIds = new Set(prev.map(r => r.id));
-            const newReports = concerns.filter(r => !existingIds.has(r.id));
-            if (newReports.length > 0) {
-              console.log(`[ReportsFeed] Found ${newReports.length} new report(s)`);
-              return [...newReports, ...prev].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+            const existingMap = new Map(prev.map(r => [r.id, r]));
+            let hasUpdates = false;
+            
+            // Update existing reports and add new ones
+            concerns.forEach(concern => {
+              const reportId = concern.id;
+              const existing = existingMap.get(reportId);
+              
+              if (existing) {
+                // Update existing report if status changed
+                if (existing.status !== concern.status) {
+                  console.log(`[ReportsFeed] 🔄 Updating existing report status: ${reportId}`, {
+                    oldStatus: existing.status,
+                    newStatus: concern.status,
+                  });
+                  existingMap.set(reportId, { ...existing, ...concern });
+                  hasUpdates = true;
+                }
+              } else {
+                // Add new report
+                console.log(`[ReportsFeed] ➕ Adding new report: ${reportId}`);
+                existingMap.set(reportId, concern);
+                hasUpdates = true;
+              }
+            });
+            
+            if (hasUpdates) {
+              const updated = Array.from(existingMap.values()).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+              console.log(`[ReportsFeed] ✅ Sync complete: ${updated.length} total reports`);
+              return updated;
             }
+            
             return prev;
           });
         } catch (error) {

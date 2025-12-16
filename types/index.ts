@@ -38,6 +38,9 @@ export interface EmergencyReport {
   reportType?: 'manual' | 'voice'; // 'voice' if has audio or category is 'voice_concern', 'manual' otherwise
   // Original category from citizen side (preserved for display)
   originalCategory?: string; // 'safety', 'security', 'infrastructure', 'environment', 'noise', 'other', 'voice_concern'
+  // Voice transcription fields (for voice concerns)
+  transcript?: string | null; // Full transcript text from backend (transcript_text / transcript)
+  transcriptionStatus?: 'queued' | 'processing' | 'completed' | 'failed'; // Realtime transcription status
 }
 
 // Feed Types

@@ -11,6 +11,7 @@ import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
 import { useNotifications } from '@/context/notification-context';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
+import { scheduleNotification, getBadgeCount, setBadgeCount } from '@/services/notifications';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -68,7 +69,6 @@ const styles = StyleSheet.create({
 
 export default function NewsFeedScreen() {
   const { user } = useAuth();
-  const [activeFilter, setActiveFilter] = useState<FeedSource>('all');
   const [toast, setToast] = useState<ToastData | null>(null);
   const { addNotification, unreadCount } = useNotifications();
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,6 +83,7 @@ export default function NewsFeedScreen() {
     router.push({ pathname: 'report-details', params: { reportId } } as any);
   }, []);
 
+
   const {
     reports,
     loading,
@@ -91,22 +92,109 @@ export default function NewsFeedScreen() {
     handleRefresh,
     updateReportStatus,
   } = useReportsFeed({
-    onNewReport: (report) => {
-      // Always show toast for high/critical reports (remove !toast condition)
-      if (report.severity === 'critical' || report.severity === 'high') {
-        console.log('[NewsFeed] 🎯 Showing toast for new report:', report.id, report.severity);
-        setToast({
-          id: `toast-${report.id}-${Date.now()}`,
-          title: report.severity === 'critical' ? '🚨 Critical Alert' : '⚠️ Alert',
-          message: report.title,
-          severity: report.severity,
-          reportType: report.type,
-          onPress: () => handleReportPress(report.id),
-        });
+    onNewReport: async (report) => {
+      // Show toast for ALL new reports (not just high/critical)
+      console.log('[NewsFeed] 🎯 New report received - showing toast:', {
+        id: report.id,
+        title: report.title,
+        severity: report.severity,
+        source: report.source,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Determine toast title based on severity
+      let toastTitle = '📢 New Report';
+      let emoji = '📢';
+      if (report.severity === 'critical') {
+        toastTitle = '🚨 Critical Alert';
+        emoji = '🚨';
+      } else if (report.severity === 'high') {
+        toastTitle = '⚠️ High Priority';
+        emoji = '⚠️';
+      } else if (report.severity === 'medium') {
+        toastTitle = '📋 Medium Priority';
+        emoji = '📋';
+      } else {
+        toastTitle = '📝 New Report';
+        emoji = '📝';
       }
+
+      // Show push notification with sound (like uw-citizen)
+      // NOTE: Only works in development builds, not Expo Go
+      try {
+        const notificationTitle = `${emoji} ${toastTitle}`;
+        const notificationBody = report.title;
+        
+        await scheduleNotification(notificationTitle, notificationBody, {
+          type: 'new_report',
+          reportId: report.id,
+          severity: report.severity,
+        });
+
+        // Increment badge count (only in development builds)
+        const currentBadge = await getBadgeCount();
+        await setBadgeCount(currentBadge + 1);
+        
+        console.log('[NewsFeed] ✅ Push notification sent with sound');
+      } catch (error) {
+        console.error('[NewsFeed] ❌ Error sending push notification:', error);
+      }
+
+      // Haptic feedback as fallback (works in Expo Go too)
+      try {
+        const { impactAsync, ImpactFeedbackStyle } = await import('expo-haptics');
+        const feedbackStyle = report.severity === 'critical' 
+          ? ImpactFeedbackStyle.Heavy 
+          : report.severity === 'high' 
+          ? ImpactFeedbackStyle.Medium 
+          : ImpactFeedbackStyle.Light;
+        impactAsync(feedbackStyle);
+        console.log('[NewsFeed] ✅ Haptic feedback triggered');
+      } catch (error) {
+        console.error('[NewsFeed] ❌ Error with haptic feedback:', error);
+      }
+
+      // Always show toast for new reports - use unique ID to force re-render
+      const toastId = `toast-${report.id}-${Date.now()}`;
+      console.log('[NewsFeed] 📱 Setting toast with ID:', toastId);
+      
+      setToast({
+        id: toastId,
+        title: toastTitle,
+        message: report.title,
+        severity: report.severity,
+        reportType: report.type,
+        onPress: () => handleReportPress(report.id),
+      });
+      
+      console.log('[NewsFeed] ✅ Toast state updated');
     },
   });
   
+  // Initialize notifications on mount (like uw-citizen)
+  useEffect(() => {
+    const initNotifications = async () => {
+      const { configureNotifications, requestNotificationPermissions } = await import('@/services/notifications');
+      configureNotifications();
+      await requestNotificationPermissions();
+    };
+    initNotifications();
+  }, []);
+
+  // Debug: Log toast state changes
+  useEffect(() => {
+    if (toast) {
+      console.log('[NewsFeed] 📱 Toast state updated:', {
+        id: toast.id,
+        title: toast.title,
+        message: toast.message,
+        severity: toast.severity,
+      });
+    } else {
+      console.log('[NewsFeed] 📱 Toast dismissed');
+    }
+  }, [toast]);
+
   // Debounce live search so it filters shortly after typing
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -114,6 +202,7 @@ export default function NewsFeedScreen() {
     }, 200);
     return () => clearTimeout(handle);
   }, [searchQuery]);
+
 
   // Fetch reports only on initial mount (not on filter change)
   // Filtering is done client-side in displayedReports for better performance
@@ -207,16 +296,8 @@ export default function NewsFeedScreen() {
   // Derived: reports filtered by search query and source (category)
   const displayedReports = useMemo(() => {
     const q = committedQuery.trim().toLowerCase();
-    // Apply source filter (category: all, cctv, sensor_box, citizen_reports)
+    // Source filter (all/cctv/sensor) removed – always show all reports
     let base = reports;
-    if (activeFilter !== 'all') {
-      base = base.filter(r => {
-        if (activeFilter === 'sensor_box') return r.source === 'sensor';
-        if (activeFilter === 'cctv') return r.source === 'cctv';
-        if (activeFilter === 'citizen_reports') return r.source === 'citizen';
-        return true;
-      });
-    }
     // Apply status filter
     if (statusFilter !== 'all') {
       const targetStatus = statusFilter === 'ongoing' ? 'acknowledged' : statusFilter;
@@ -229,17 +310,12 @@ export default function NewsFeedScreen() {
       const location = r.location?.toLowerCase() ?? '';
       return title.includes(q) || location.includes(q);
     });
-  }, [reports, committedQuery, statusFilter, activeFilter]);
-  
-  const handleFilterChange = useCallback((filter: FeedSource) => {
-    setActiveFilter(filter);
-  }, []);
+  }, [reports, committedQuery, statusFilter]);
   
   // Memoize header component - only recompute when dependencies change
   const memoizedHeader = useMemo(() => {
     return (
       <IncidentHeader
-        activeFilter={activeFilter}
         statusFilter={statusFilter}
         reportTypeFilter={reportTypeFilter}
         pendingCount={pendingCount}
@@ -249,12 +325,11 @@ export default function NewsFeedScreen() {
         committedQuery={committedQuery}
         setCommittedQuery={setCommittedQuery}
         onFilterPress={() => setIsFilterModalVisible(true)}
-        onFeedFilterChange={handleFilterChange}
         setStatusFilter={setStatusFilter}
         setReportTypeFilter={setReportTypeFilter}
       />
     );
-  }, [activeFilter, pendingCount, resolvedCount, statusFilter, reportTypeFilter, searchQuery, committedQuery, handleFilterChange]);
+  }, [pendingCount, resolvedCount, statusFilter, reportTypeFilter, searchQuery, committedQuery]);
 
   return (
     <SafeAreaView style={globalStyles.container}>

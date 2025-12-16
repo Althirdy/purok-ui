@@ -18,7 +18,8 @@ type ConcernAssignedPayload = {
     images?: string[];
     audio?: string | null;
     summary?: string | null;
-    transcript?: string | null;
+    transcript?: string | null; // Full transcript text (if already processed)
+    transcription_status?: 'queued' | 'processing' | 'completed' | 'failed' | null;
     latitude?: string | number | null;
     longitude?: string | number | null;
   };
@@ -49,6 +50,7 @@ type ConcernStatusUpdatedPayload = {
     audio?: string | null;
     summary?: string | null;
     transcript?: string | null;
+    transcription_status?: 'queued' | 'processing' | 'completed' | 'failed' | null;
     latitude?: string | number | null;
     longitude?: string | number | null;
   };
@@ -189,6 +191,9 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
     images: concern.images ?? [],
     coordinates,
     originalCategory: category, // Preserve original category for display
+    // Voice transcription details (for voice concerns)
+    transcript: concern.transcript ?? concern.summary ?? null,
+    transcriptionStatus: concern.transcription_status ?? undefined,
   };
 }
 
@@ -327,6 +332,26 @@ export async function subscribeToStatusUpdates(
     
     const channel = client.subscribe(channelName);
 
+    // Debug: Listen to ALL events on this channel to see what backend is broadcasting
+    if (__DEV__) {
+      const debugHandler = (eventName: string, data: any) => {
+        console.log('[Pusher] 🔍 DEBUG - Event received on channel:', {
+          channel: channelName,
+          event: eventName,
+          data: data ? JSON.stringify(data, null, 2) : 'null',
+        });
+      };
+      
+      // Bind to all events (Pusher doesn't have a wildcard, so we'll log subscription events)
+      channel.bind('pusher:subscription_succeeded', () => {
+        console.log('[Pusher] ✅ Status update subscription succeeded on', channelName);
+      });
+      
+      channel.bind('pusher:subscription_error', (err: any) => {
+        console.error('[Pusher] ❌ Status update subscription error:', err);
+      });
+    }
+
     // Map backend status to frontend status
     const statusMap: Record<string, 'pending' | 'acknowledged' | 'resolved'> = {
       'pending': 'pending',
@@ -338,33 +363,49 @@ export async function subscribeToStatusUpdates(
     // Listen for concern.status.updated event
     const statusUpdateHandler = (data: ConcernStatusUpdatedPayload) => {
       try {
+        console.log('[Pusher] 📨 Raw status update event received:', {
+          event: 'concern.status.updated or concern.updated',
+          data: JSON.stringify(data, null, 2),
+        });
+
         const concernId = data.concern.id;
-        const backendStatus = data.concern.status || data.distribution?.status || 'pending';
+        // Priority: distribution.status > concern.status (backend updates distribution_status)
+        const backendStatus = data.distribution?.status || data.concern.status || 'pending';
         const frontendStatus = statusMap[backendStatus.toLowerCase()] || 'pending';
         
-        console.log('[Pusher] 🔄 Status Update Received:', {
+        console.log('[Pusher] 🔄 Status Update Processed:', {
           concernId,
           backendStatus,
           frontendStatus,
           title: data.concern.title,
+          distributionStatus: data.distribution?.status,
+          concernStatus: data.concern.status,
         });
         
         // Call callback with report ID (format: PUROK-{id}) and frontend status
         onStatusUpdate(`PUROK-${concernId}`, frontendStatus);
       } catch (error) {
-        console.error('[Pusher] ❌ Failed to process status update:', error, data);
+        console.error('[Pusher] ❌ Failed to process status update:', error);
+        console.error('[Pusher] ❌ Event data:', JSON.stringify(data, null, 2));
       }
     };
 
-    // Bind to both possible event names
+    // Bind to both possible event names (with and without leading dot)
+    // Client-named events use leading dot (e.g., .concern.status.updated)
+    // Server-named events don't use leading dot (e.g., concern.status.updated)
+    channel.bind('.concern.status.updated', statusUpdateHandler);
     channel.bind('concern.status.updated', statusUpdateHandler);
+    channel.bind('.concern.updated', statusUpdateHandler);
     channel.bind('concern.updated', statusUpdateHandler);
 
     console.log('[Pusher] ✅ Listening for status updates on', channelName);
+    console.log('[Pusher] ✅ Listening for events: .concern.status.updated, concern.status.updated, .concern.updated, concern.updated');
 
     return () => {
       console.log('[Pusher] Unsubscribing from status updates on', channelName);
+      channel.unbind('.concern.status.updated', statusUpdateHandler);
       channel.unbind('concern.status.updated', statusUpdateHandler);
+      channel.unbind('.concern.updated', statusUpdateHandler);
       channel.unbind('concern.updated', statusUpdateHandler);
       // Note: Don't unsubscribe from channel here - it might be used by other subscriptions
     };

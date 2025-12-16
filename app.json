@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "urbanwatch",
     "userInterfaceStyle": "light",
-    "newArchEnabled": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.urbanwatchpurok"

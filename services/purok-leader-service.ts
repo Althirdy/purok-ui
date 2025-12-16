@@ -25,6 +25,7 @@ export interface AssignedConcern {
   audio?: string | null;
   summary?: string | null;
   transcript?: string | null;
+  transcription_status?: 'queued' | 'processing' | 'completed' | 'failed' | null;
   citizen?: {
     id?: number;
     name?: string;
@@ -299,5 +300,8 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
     audio: concern.audio,
     coordinates: latitude != null && longitude != null ? { latitude, longitude } : undefined,
     originalCategory: category, // Preserve original category for display
+    // Voice transcription details (for voice concerns)
+    transcript: concern.transcript ?? concern.summary ?? null,
+    transcriptionStatus: concern.transcription_status ?? undefined,
   };
 }

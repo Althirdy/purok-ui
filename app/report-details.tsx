@@ -14,12 +14,13 @@ import {
   getSeverityColor,
 } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Linking } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Audio } from 'expo-av';
 
 const { colors, spacing, typography } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -261,6 +262,126 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     fontFamily: 'monospace',
   },
+  transcriptText: {
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+    lineHeight: 22,
+  },
+  transcriptStatusText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    fontStyle: 'italic',
+    marginTop: spacing.xs,
+  },
+  // Timeline styles (inspired by uw-citizen)
+  timelineSection: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: colors.background.card,
+    borderRadius: 20,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  timelineHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  timelineTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginLeft: spacing.xs,
+  },
+  timelineList: {
+    marginTop: spacing.sm,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    marginBottom: spacing.sm,
+  },
+  timelineMarker: {
+    alignItems: 'center',
+    marginRight: spacing.sm,
+    paddingTop: 2,
+  },
+  timelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: colors.background.card,
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: colors.border.light,
+    marginTop: 2,
+  },
+  timelineContent: {
+    flex: 1,
+    paddingBottom: spacing.sm,
+  },
+  timelineStatus: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+  },
+  timelineDescription: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  timelineMeta: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  dateSection: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: colors.background.card,
+    borderRadius: 20,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dateInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dateIcon: {
+    marginRight: spacing.sm,
+  },
+  dateLabel: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  dateValue: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.primary,
+    fontWeight: typography.fontWeight.semibold,
+    marginTop: 2,
+  },
+  dateTime: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  relativeTime: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium,
+  },
 });
 
 export default function ReportDetailsScreen() {
@@ -336,6 +457,29 @@ export default function ReportDetailsScreen() {
   } : null;
 
   const severityColor = report ? getSeverityColor(report.severity) : colors.accent.orange;
+
+  // Simple status timeline steps (Pending -> Acknowledged -> Resolved)
+  const statusSteps: Array<{
+    key: EmergencyReport['status'];
+    label: string;
+    description: string;
+  }> = [
+    {
+      key: 'pending',
+      label: 'Pending',
+      description: 'Concern submitted and automatically distributed to Purok Leader.',
+    },
+    {
+      key: 'acknowledged',
+      label: 'Ongoing',
+      description: 'The concern is being handled by the Purok Leader.',
+    },
+    {
+      key: 'resolved',
+      label: 'Resolved',
+      description: 'The concern has been resolved.',
+    },
+  ];
 
   const handleAcknowledge = async () => {
     if (report) {
@@ -434,13 +578,16 @@ export default function ReportDetailsScreen() {
   if (loading) {
     return (
       <SafeAreaView style={globalStyles.container}>
-        <View style={styles.headerBar}>
+        <Animated.View
+          entering={FadeInDown.duration(400)}
+          style={styles.headerBar}
+        >
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color={colors.text.inverse} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Citizen Report</Text>
+          <Text style={styles.headerTitle}>Citizen Concern</Text>
           <View style={styles.headerSpacer} />
-        </View>
+        </Animated.View>
         <View style={[styles.section, { marginTop: spacing.lg }]}>
           <Text style={{ color: colors.text.secondary }}>Loading...</Text>
         </View>
@@ -451,13 +598,16 @@ export default function ReportDetailsScreen() {
   if (!report) {
     return (
       <SafeAreaView style={globalStyles.container}>
-        <View style={styles.headerBar}>
+        <Animated.View
+          entering={FadeInDown.duration(400)}
+          style={styles.headerBar}
+        >
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color={colors.text.inverse} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Citizen Report</Text>
+          <Text style={styles.headerTitle}>Citizen Concern</Text>
           <View style={styles.headerSpacer} />
-        </View>
+        </Animated.View>
         <View style={[styles.section, { marginTop: spacing.lg }]}>
           <Text style={{ color: colors.text.secondary, textAlign: 'center', marginBottom: spacing.md }}>
             Report not found
@@ -482,44 +632,64 @@ export default function ReportDetailsScreen() {
 
   return (
     <SafeAreaView style={globalStyles.container}>
-      <View style={styles.headerBar}>
+      <Animated.View
+        entering={FadeInDown.duration(400)}
+        style={styles.headerBar}
+      >
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color={colors.text.inverse} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Citizen Report</Text>
+        <Text style={styles.headerTitle}>Citizen Concern</Text>
         <View style={styles.headerSpacer} />
-      </View>
+      </Animated.View>
 
       <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Report ID Badge */}
-        <View style={styles.idBadgeContainer}>
+        <Animated.View
+          entering={FadeInDown.delay(100).duration(500)}
+          style={styles.idBadgeContainer}
+        >
           <Text style={styles.idLabel}>Report ID</Text>
           <View style={styles.idBadge}>
             <Text style={styles.idText}>{formatReportId(report.id)}</Text>
           </View>
-        </View>
+        </Animated.View>
 
         {/* Title Section */}
-        <View style={styles.section}>
+        <Animated.View
+          entering={FadeInDown.delay(150).duration(500)}
+          style={styles.section}
+        >
           <Text style={styles.sectionLabel}>What happened?</Text>
           <Text style={styles.titleText}>{cleanTitle(report.title)}</Text>
           <Text style={styles.dateText}>
             {formatDateReadable(report.timestamp)} {formatTime12Hour(report.timestamp)}
           </Text>
-      </View>
+        </Animated.View>
 
         {/* Description */}
         {report.description && (
-          <View style={styles.section}>
+          <Animated.View
+            entering={FadeInDown.delay(200).duration(500)}
+            style={styles.section}
+          >
             <Text style={styles.sectionLabel}>Details</Text>
             <Text style={styles.descriptionText}>{report.description}</Text>
-            
-            {/* Audio Player for Voice Concerns */}
-            {/* Show audio player if audio exists OR if it's a voice concern (by title/description) */}
-            {(report.audio || 
-              report.reportType === 'voice' || 
-              report.title?.toLowerCase().includes('voice concern') ||
-              report.description?.toLowerCase().includes('audio recording')) && (
+          </Animated.View>
+        )}
+
+        {/* Voice Recording + Transcript for Voice Concerns */}
+        {(report.audio ||
+          report.reportType === 'voice' ||
+          report.title?.toLowerCase().includes('voice concern') ||
+          report.description?.toLowerCase().includes('audio recording')) && (
+          <>
+            {/* Voice Recording */}
+            <Animated.View
+              entering={FadeInDown.delay(250).duration(500)}
+              style={styles.section}
+            >
+              <Text style={styles.sectionLabel}>Voice Recording</Text>
               <View style={styles.audioSection}>
                 <View style={styles.audioPlayer}>
                   {report.audio ? (
@@ -540,10 +710,10 @@ export default function ReportDetailsScreen() {
                         <Text style={styles.audioUrl} numberOfLines={1}>
                           {report.audio}
                         </Text>
-          </View>
+                      </View>
                     </>
-        ) : (
-        <>
+                  ) : (
+                    <>
                       <View style={[styles.audioButton, { backgroundColor: colors.neutral.gray600 }]}>
                         <Ionicons
                           name="mic"
@@ -561,13 +731,37 @@ export default function ReportDetailsScreen() {
                   )}
                 </View>
               </View>
-            )}
-          </View>
+            </Animated.View>
+
+            {/* Voice Transcript */}
+            <Animated.View
+              entering={FadeInDown.delay(300).duration(500)}
+              style={styles.section}
+            >
+              <Text style={styles.sectionLabel}>Voice Transcript</Text>
+              {report.transcript ? (
+                <Text style={styles.transcriptText}>{report.transcript}</Text>
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={colors.primary.blue} />
+                  <Text style={styles.transcriptStatusText}>
+                    {'  '}
+                    {report.transcriptionStatus === 'failed'
+                      ? 'We were unable to transcribe this audio.'
+                      : 'Transcribing audio message...'}
+                  </Text>
+                </View>
+              )}
+            </Animated.View>
+          </>
         )}
 
         {/* Images Gallery */}
         {report.images && report.images.length > 0 && (
-          <View style={styles.section}>
+          <Animated.View
+            entering={FadeInDown.delay(350).duration(500)}
+            style={styles.section}
+          >
             <Text style={styles.sectionLabel}>Photos from citizen</Text>
             <ScrollView 
               horizontal 
@@ -585,11 +779,14 @@ export default function ReportDetailsScreen() {
                 </View>
               ))}
             </ScrollView>
-          </View>
+          </Animated.View>
         )}
 
         {/* Location with Map */}
-        <View style={styles.section}>
+        <Animated.View
+          entering={FadeInDown.delay(400).duration(500)}
+          style={styles.section}
+        >
           <Text style={styles.sectionLabel}>Location</Text>
           <View style={styles.locationCard}>
             <View style={styles.locationRow}>
@@ -631,10 +828,13 @@ export default function ReportDetailsScreen() {
               </TouchableOpacity>
             )}
           </View>
-        </View>
+        </Animated.View>
 
         {/* Info Grid */}
-        <View style={styles.section}>
+        <Animated.View
+          entering={FadeInDown.delay(450).duration(500)}
+          style={styles.section}
+        >
           <View style={styles.infoGrid}>
             <View style={styles.infoItem}>
               <View style={[styles.severityBadge, { backgroundColor: severityColor + '20' }]}>
@@ -644,7 +844,7 @@ export default function ReportDetailsScreen() {
               </View>
               <Text style={styles.infoLabel}>Priority</Text>
             </View>
-        </View>
+          </View>
 
           {/* Action Buttons */}
           {report.status === 'pending' && (
@@ -668,7 +868,86 @@ export default function ReportDetailsScreen() {
           {report.status === 'resolved' && (
             <Text style={styles.resolvedText}>Report resolved</Text>
           )}
-        </View>
+        </Animated.View>
+
+        {/* Status Timeline */}
+        <Animated.View
+          entering={FadeInDown.delay(500).duration(500)}
+          style={styles.timelineSection}
+        >
+          <View style={styles.timelineHeader}>
+            <Ionicons name="time-outline" size={18} color={colors.primary.blue} />
+            <Text style={styles.timelineTitle}>Status Timeline</Text>
+          </View>
+          <View style={styles.timelineList}>
+            {statusSteps.map((step, index) => {
+              const isActive =
+                report.status === step.key ||
+                (step.key === 'acknowledged' && report.status === 'resolved') ||
+                (step.key === 'pending' && report.status === 'pending');
+              const isCompleted =
+                step.key === 'pending' ||
+                (step.key === 'acknowledged' &&
+                  (report.status === 'acknowledged' || report.status === 'resolved')) ||
+                (step.key === 'resolved' && report.status === 'resolved');
+
+              const dotColor = isActive || isCompleted ? colors.primary.blue : colors.border.light;
+              const textOpacity = isCompleted || isActive ? 1 : 0.5;
+
+              return (
+                <View key={step.key} style={styles.timelineItem}>
+                  <View style={styles.timelineMarker}>
+                    <View
+                      style={[
+                        styles.timelineDot,
+                        {
+                          backgroundColor: dotColor,
+                        },
+                      ]}
+                    />
+                    {index < statusSteps.length - 1 && (
+                      <View style={styles.timelineLine} />
+                    )}
+                  </View>
+                  <View style={styles.timelineContent}>
+                    <Text style={[styles.timelineStatus, { opacity: textOpacity }]}>
+                      {step.label}
+                    </Text>
+                    <Text style={[styles.timelineDescription, { opacity: textOpacity }]}>
+                      {step.description}
+                    </Text>
+                    {index === 0 && (
+                      <Text style={styles.timelineMeta}>
+                        Reported {formatDateReadable(report.timestamp)} {formatTime12Hour(report.timestamp)}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </Animated.View>
+
+        {/* Reported Date Card */}
+        <Animated.View
+          entering={FadeInUp.delay(550).duration(500)}
+          style={styles.dateSection}
+        >
+          <View style={styles.dateInfo}>
+            <Ionicons
+              name="calendar-outline"
+              size={18}
+              color={colors.text.secondary}
+              style={styles.dateIcon}
+            />
+            <View>
+              <Text style={styles.dateLabel}>Reported</Text>
+              <Text style={styles.dateValue}>{formatDateReadable(report.timestamp)}</Text>
+              <Text style={styles.dateTime}>{formatTime12Hour(report.timestamp)}</Text>
+            </View>
+          </View>
+          <Text style={styles.relativeTime}>Most recent update</Text>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );

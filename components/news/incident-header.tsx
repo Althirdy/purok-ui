@@ -20,7 +20,6 @@ const isTablet = SCREEN_WIDTH >= 768;
 const isIOS = Platform.OS === 'ios';
 
 export interface IncidentHeaderProps {
-  activeFilter: FeedSource;
   statusFilter: 'all' | 'pending' | 'ongoing' | 'resolved';
   reportTypeFilter: 'all' | 'manual' | 'voice';
   pendingCount: number;
@@ -30,14 +29,12 @@ export interface IncidentHeaderProps {
   committedQuery: string;
   setCommittedQuery: (value: string) => void;
   onFilterPress: () => void;
-  onFeedFilterChange: (filter: FeedSource) => void;
   setStatusFilter: (value: IncidentHeaderProps['statusFilter']) => void;
   setReportTypeFilter: (value: IncidentHeaderProps['reportTypeFilter']) => void;
 }
 
 export function IncidentHeader(props: IncidentHeaderProps) {
   const {
-    activeFilter,
     statusFilter,
     reportTypeFilter,
     pendingCount,
@@ -47,7 +44,6 @@ export function IncidentHeader(props: IncidentHeaderProps) {
     committedQuery,
     setCommittedQuery,
     onFilterPress,
-    onFeedFilterChange,
     setStatusFilter,
     setReportTypeFilter,
   } = props;
@@ -162,71 +158,6 @@ export function IncidentHeader(props: IncidentHeaderProps) {
         <View style={styles.currentReportHeader}>
           <Text style={styles.currentReportTitle}>Your Concerns ({pendingCount})</Text>
         </View>
-      </View>
-
-      {/* Source filter boxes */}
-      <View style={styles.filterGrid}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => onFeedFilterChange('all')}
-          style={[styles.filterBox, activeFilter === 'all' && styles.filterBoxActive]}
-        >
-          <Text style={styles.filterBoxLabel}>All</Text>
-          <View style={[styles.filterIconWrap, styles.iconAll]}>
-            <Ionicons
-              name="apps-outline"
-              size={18}
-              color={activeFilter === 'all' ? colors.primary.blue : colors.neutral.gray700}
-            />
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => onFeedFilterChange('cctv')}
-          style={[styles.filterBox, activeFilter === 'cctv' && styles.filterBoxActive]}
-        >
-          <Text style={styles.filterBoxLabel}>CCTV</Text>
-          <View style={[styles.filterIconWrap, styles.iconCctv]}>
-            <Ionicons
-              name="videocam-outline"
-              size={18}
-              color={activeFilter === 'cctv' ? colors.primary.blue : colors.neutral.gray700}
-            />
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => onFeedFilterChange('sensor_box')}
-          style={[styles.filterBox, activeFilter === 'sensor_box' && styles.filterBoxActive]}
-        >
-          <Text style={styles.filterBoxLabel}>Sensor Box</Text>
-          <View style={[styles.filterIconWrap, styles.iconSensor]}>
-            <Ionicons
-              name="hardware-chip-outline"
-              size={18}
-              color={activeFilter === 'sensor_box' ? colors.primary.blue : colors.neutral.gray700}
-            />
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => onFeedFilterChange('citizen_reports')}
-          style={[styles.filterBox, activeFilter === 'citizen_reports' && styles.filterBoxActive]}
-        >
-          <Text style={styles.filterBoxLabel}>Citizen</Text>
-          <View style={[styles.filterIconWrap, styles.iconCitizen]}>
-            <Ionicons
-              name="people-outline"
-              size={18}
-              color={
-                activeFilter === 'citizen_reports' ? colors.primary.blue : colors.neutral.gray700
-              }
-            />
-          </View>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -385,45 +316,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
     marginBottom: spacing.sm,
-  },
-  filterGrid: {
-    paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  filterBox: {
-    flexGrow: 1,
-    flexBasis: '45%',
-    backgroundColor: colors.background.card,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    borderRadius: 20,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  filterIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconAll: { backgroundColor: '#E6ECF2' },
-  iconCctv: { backgroundColor: '#E6F0FF' },
-  iconSensor: { backgroundColor: '#EAF7EE' },
-  iconCitizen: { backgroundColor: '#F1EAFE' },
-  filterBoxLabel: {
-    color: colors.text.primary,
-    fontWeight: typography.fontWeight.medium,
-  },
-  filterBoxActive: {
-    borderColor: colors.primary.blue,
-    backgroundColor: '#EFF6FF',
   },
 });
 
