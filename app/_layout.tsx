@@ -1,12 +1,8 @@
 import { AuthProvider, useAuth } from '@/context/auth-context';
 import { NotificationProvider } from '@/context/notification-context';
-import { configureNotifications } from '@/services/notifications';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
-
-// Configure notification behavior (like uw-citizen)
-configureNotifications();
 
 export const unstable_settings = {
   initialRouteName: '(auth)',

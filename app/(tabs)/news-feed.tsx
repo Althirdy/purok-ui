@@ -11,7 +11,6 @@ import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
 import { useNotifications } from '@/context/notification-context';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
-import { scheduleNotification, getBadgeCount, setBadgeCount } from '@/services/notifications';
 import type { EmergencyReport, FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -119,28 +118,7 @@ export default function NewsFeedScreen() {
         emoji = '📝';
       }
 
-      // Show push notification with sound (like uw-citizen)
-      // NOTE: Only works in development builds, not Expo Go
-      try {
-        const notificationTitle = `${emoji} ${toastTitle}`;
-        const notificationBody = report.title;
-        
-        await scheduleNotification(notificationTitle, notificationBody, {
-          type: 'new_report',
-          reportId: report.id,
-          severity: report.severity,
-        });
-
-        // Increment badge count (only in development builds)
-        const currentBadge = await getBadgeCount();
-        await setBadgeCount(currentBadge + 1);
-        
-        console.log('[NewsFeed] ✅ Push notification sent with sound');
-      } catch (error) {
-        console.error('[NewsFeed] ❌ Error sending push notification:', error);
-      }
-
-      // Haptic feedback as fallback (works in Expo Go too)
+      // Haptic feedback + in-app toast ONLY (no OS-level notification)
       try {
         const { impactAsync, ImpactFeedbackStyle } = await import('expo-haptics');
         const feedbackStyle = report.severity === 'critical' 
@@ -170,16 +148,6 @@ export default function NewsFeedScreen() {
       console.log('[NewsFeed] ✅ Toast state updated');
     },
   });
-  
-  // Initialize notifications on mount (like uw-citizen)
-  useEffect(() => {
-    const initNotifications = async () => {
-      const { configureNotifications, requestNotificationPermissions } = await import('@/services/notifications');
-      configureNotifications();
-      await requestNotificationPermissions();
-    };
-    initNotifications();
-  }, []);
 
   // Debug: Log toast state changes
   useEffect(() => {

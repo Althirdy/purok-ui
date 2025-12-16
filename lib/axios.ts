@@ -62,7 +62,7 @@ export async function httpGet<T = any>(path: string, init?: RequestInit): Promis
         throw new Error(errorMessage);
       } catch (parseError) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+  }
     }
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
@@ -139,7 +139,7 @@ export async function httpPost<T = any>(path: string, body?: any, init?: Request
         throw new Error(errorMessage);
       } catch (parseError) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
+  }
     }
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
