@@ -8,16 +8,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -151,7 +151,7 @@ export default function ProfileSettingsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+            <Ionicons name="arrow-back" size={24} color={colors.text.inverse} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Profile Settings</Text>
         </View>
@@ -169,7 +169,7 @@ export default function ProfileSettingsScreen() {
                 <Text style={styles.avatarText}>JB</Text>
               </View>
               <View style={styles.editIconButton}>
-                <Ionicons name="pencil" size={16} color={colors.text.primary} />
+                <Ionicons name="pencil" size={16} color={colors.text.inverse} />
               </View>
             </TouchableOpacity>
           </View>

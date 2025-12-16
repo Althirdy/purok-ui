@@ -6,6 +6,7 @@ import { Toast, type ToastData } from '@/components/common/toast';
 import { EmptyState } from '@/components/news/empty-state';
 import { IncidentHeader } from '@/components/news/incident-header';
 import { ReportCard } from '@/components/news/report-card';
+import { ReportCardSkeleton } from '@/components/news/report-card-skeleton';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
@@ -320,7 +321,11 @@ export default function NewsFeedScreen() {
             tintColor={colors.primary.blue}
           />
         }
-        ListEmptyComponent={<EmptyState loading={loading} />}
+        ListEmptyComponent={
+          loading
+            ? <ReportCardSkeleton count={4} />
+            : <EmptyState loading={false} />
+        }
         // Performance optimizations for rapid data
         removeClippedSubviews={true}
         maxToRenderPerBatch={10}

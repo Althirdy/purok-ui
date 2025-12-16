@@ -3,6 +3,7 @@
  */
 
 import { Card } from '@/components/common/card';
+import { NotificationSkeleton } from '@/components/news/notification-skeleton';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { useNotifications, type Notification } from '@/context/notification-context';
@@ -11,7 +12,7 @@ import { formatTimestamp } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing } = DesignSystem;
@@ -212,10 +213,7 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           isLoading ? (
-            <View style={styles.emptyState}>
-              <ActivityIndicator size="large" color={colors.primary.blue} />
-              <Text style={styles.emptyStateText}>Loading notifications...</Text>
-            </View>
+            <NotificationSkeleton count={6} />
           ) : (
             <View style={styles.emptyState}>
               <Ionicons name="notifications-off-outline" size={64} color={colors.neutral.gray600} />

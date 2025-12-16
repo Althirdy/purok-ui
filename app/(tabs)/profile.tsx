@@ -5,6 +5,7 @@
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
+import { ProfileSkeleton } from '@/components/profile/profile-skeleton';
 import { getInitials } from '@/utils/userHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -55,10 +56,20 @@ export default function ProfileScreen() {
   if (loading && !user) {
     return (
       <SafeAreaView style={globalStyles.container} edges={['top']}>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#1e3a8a" />
-          <Text style={styles.loadingText}>Loading profile...</Text>
+        <View style={styles.appBar}>
+          <View style={styles.appBarContent}>
+            <View>
+              <Text style={styles.appTitle}>UrbanWatch</Text>
+              <Text style={styles.appSubtitle}>Purok Profile</Text>
+            </View>
+            <View style={styles.appBarAvatar}>
+              <Ionicons name="person" size={20} color="#1e3a8a" />
+            </View>
+          </View>
         </View>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <ProfileSkeleton />
+        </ScrollView>
       </SafeAreaView>
     );
   }
