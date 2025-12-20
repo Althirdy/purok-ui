@@ -94,60 +94,53 @@ export default function NewsFeedScreen() {
     updateReportStatus,
   } = useReportsFeed({
     onNewReport: async (report) => {
-      // Show toast for ALL new reports (not just high/critical)
-      console.log('[NewsFeed] 🎯 New report received - showing toast:', {
+      // Show toast for ANY new report from Pusher - no conditions, always show
+      console.log('[NewsFeed] 🎯 New report received from Pusher - showing toast:', {
         id: report.id,
         title: report.title,
         severity: report.severity,
-        source: report.source,
         timestamp: new Date().toISOString(),
       });
 
-      // Determine toast title based on severity
-      let toastTitle = '📢 New Report';
-      let emoji = '📢';
-      if (report.severity === 'critical') {
-        toastTitle = '🚨 Critical Alert';
-        emoji = '🚨';
-      } else if (report.severity === 'high') {
-        toastTitle = '⚠️ High Priority';
-        emoji = '⚠️';
-      } else if (report.severity === 'medium') {
-        toastTitle = '📋 Medium Priority';
-        emoji = '📋';
-      } else {
-        toastTitle = '📝 New Report';
-        emoji = '📝';
-      }
-
-      // Haptic feedback + in-app toast ONLY (no OS-level notification)
+      // Haptic feedback based on report category (not severity)
       try {
         const { impactAsync, ImpactFeedbackStyle } = await import('expo-haptics');
-        const feedbackStyle = report.severity === 'critical' 
-          ? ImpactFeedbackStyle.Heavy 
-          : report.severity === 'high' 
-          ? ImpactFeedbackStyle.Medium 
-          : ImpactFeedbackStyle.Light;
+        const category = report.originalCategory || 'other';
+        
+        // Map categories to haptic feedback intensity
+        let feedbackStyle = ImpactFeedbackStyle.Light; // Default
+        if (category === 'safety' || category === 'security') {
+          feedbackStyle = ImpactFeedbackStyle.Heavy; // Most urgent categories
+        } else if (category === 'infrastructure' || category === 'environment') {
+          feedbackStyle = ImpactFeedbackStyle.Medium; // Medium priority categories
+        } else {
+          // 'noise', 'other', 'voice_concern' or unknown -> Light
+          feedbackStyle = ImpactFeedbackStyle.Light;
+        }
+        
         impactAsync(feedbackStyle);
-        console.log('[NewsFeed] ✅ Haptic feedback triggered');
+        console.log('[NewsFeed] ✅ Haptic feedback triggered for category:', category);
       } catch (error) {
-        console.error('[NewsFeed] ❌ Error with haptic feedback:', error);
+        console.error('[NewsFeed] Error with haptic feedback:', error);
       }
 
-      // Always show toast for new reports - use unique ID to force re-render
+      // Show toast with report title/header - always show for any new report
       const toastId = `toast-${report.id}-${Date.now()}`;
-      console.log('[NewsFeed] 📱 Setting toast with ID:', toastId);
+      const reportId = report.id; // Capture report ID for navigation
       
       setToast({
         id: toastId,
-        title: toastTitle,
-        message: report.title,
-        severity: report.severity,
+        title: '📢 New Report',
+        message: report.title || report.description || 'New concern reported',
+        severity: report.severity || 'low',
         reportType: report.type,
-        onPress: () => handleReportPress(report.id),
+        onPress: () => {
+          console.log('[NewsFeed] 🎯 Toast pressed - navigating to report:', reportId);
+          handleReportPress(reportId);
+        },
       });
       
-      console.log('[NewsFeed] ✅ Toast state updated');
+      console.log('[NewsFeed] ✅ Toast displayed for new report');
     },
   });
 
