@@ -163,6 +163,15 @@ export function anomalyToReport(sensorData: SensorData): EmergencyReport {
     sensorData.sensorType;
   const reportId = `SENSOR-${sensorData.sensorId}-${sensorFieldType}-${timestamp}-${randomSuffix}`;
 
+  // Include coordinates if available and valid (needed for map display)
+  const hasValidCoordinates = 
+    sensorData.location.latitude != null && 
+    sensorData.location.longitude != null &&
+    !isNaN(sensorData.location.latitude) &&
+    !isNaN(sensorData.location.longitude) &&
+    sensorData.location.latitude !== 0 &&
+    sensorData.location.longitude !== 0;
+
   return {
     id: reportId,
     type: reportType,
@@ -173,6 +182,11 @@ export function anomalyToReport(sensorData: SensorData): EmergencyReport {
     status: 'pending',
     severity,
     source: 'sensor',
+    // Include coordinates for map markers
+    coordinates: hasValidCoordinates ? {
+      latitude: sensorData.location.latitude,
+      longitude: sensorData.location.longitude,
+    } : undefined,
   };
 }
 

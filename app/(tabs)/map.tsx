@@ -1,136 +1,125 @@
 /**
- * Map Screen - View incidents on map with custom markers
+ * Map Screen - View incidents on map (REALTIME)
  * 
- * Uses OSM-based tiles (CartoDB) - Uses OpenStreetMap data
- * - No API key required
- * - More permissive than direct OSM tiles (no User-Agent header required)
- * - Still uses OpenStreetMap data, just rendered by CartoDB
- * - Proper attribution included
+ * Uses default Google Maps (same as uw-citizen heatmap.tsx)
  * - Focused on Barangay 176E area only
- * - Uses GeoJSON boundary data from constants/geojson.json
+ * - Uses GeoJSON boundary data from constants/barangay-boundary.ts
+ * - REALTIME: Shows reports from useReportsFeed hook (updates automatically)
+ * - Custom styled markers with icons (matching uw-citizen design)
+ * - tracksViewChanges={false} for Android performance
  * 
- * Note: Direct OSM tiles require User-Agent header which react-native-maps
- * doesn't support. CartoDB uses OSM data but is more permissive.
- * 
- * Attribution: © OpenStreetMap contributors (data source)
- * 
- * OPTIMIZED: Lazy loads react-native-maps and large data files only when screen is accessed
+ * NOTE: All View overlays (loading, info badge) MUST be outside MapView
+ * to avoid Android "addViewAt" errors. Only Marker/Polygon/etc inside MapView.
  */
 
 import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION, isPointInBoundary } from '@/constants/barangay-boundary';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { Fonts } from '@/constants/theme';
+import { useReportsFeed } from '@/hooks/use-reports-feed';
+import type { EmergencyReport } from '@/types';
+import { getSeverityColor } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import MapView, { Callout, Marker, Polygon } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing, borderRadius, shadows } = DesignSystem;
 
-// Fallback region kept for reference; using BARANGAY_176E_REGION below
-const BRGY_176A_REGION = {
-  latitude: 14.7804774,
-  longitude: 121.0374894,
-  latitudeDelta: 0.008,
-  longitudeDelta: 0.008,
+// Get marker icon based on report type
+const getMarkerIcon = (type: string): keyof typeof Ionicons.glyphMap => {
+  switch (type) {
+    case 'fire':
+      return 'flame';
+    case 'medical':
+      return 'medical';
+    case 'crime':
+      return 'shield';
+    case 'accident':
+      return 'car';
+    case 'suspicious':
+      return 'warning';
+    default:
+      return 'location';
+  }
 };
 
-// Types for lazy-loaded components
-type MapViewType = any;
-type MarkerType = any;
-type CalloutType = any;
-type PolygonType = any;
-type UrlTileType = any;
-type MarkerData = any;
-
 export default function MapScreen() {
-  const [MapComponents, setMapComponents] = useState<{
-    MapView: MapViewType;
-    Marker: MarkerType;
-    Callout: CalloutType;
-    Polygon: PolygonType;
-    UrlTile: UrlTileType;
-  } | null>(null);
-  const [mapData, setMapData] = useState<{
-    markers: MarkerData[];
-    GEOJSON: any;
-  } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const mapRef = useRef<any>(null);
+  // Get real-time reports from feed hook
+  const { reports, loading: reportsLoading, fetchReports } = useReportsFeed();
+  const mapRef = useRef<MapView | null>(null);
+  const [mapReady, setMapReady] = React.useState(false);
+  const [showOnlyInBoundary, setShowOnlyInBoundary] = React.useState(false); // Toggle for filtering
 
-  // Lazy load map library and data on mount
+  // Fetch reports on mount (same as news-feed.tsx)
   useEffect(() => {
-    let isMounted = true;
+    fetchReports('all');
+  }, [fetchReports]);
 
-    const loadMap = async () => {
-      try {
-        // Load map library and data in parallel
-        const [mapModule, markersModule, geojsonModule] = await Promise.all([
-          import('react-native-maps'),
-          import('@/constants/heatmap.data'),
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore - Metro bundler supports JSON imports
-          import('@/constants/geojson.json')
-        ]);
-
-        if (!isMounted) return;
-
-        setMapComponents({
-          MapView: mapModule.default,
-          Marker: mapModule.Marker,
-          Callout: mapModule.Callout,
-          Polygon: mapModule.Polygon,
-          UrlTile: mapModule.UrlTile,
-        });
-
-        setMapData({
-          markers: markersModule.markers,
-          GEOJSON: geojsonModule.default,
-        });
-
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error loading map:', error);
-        setIsLoading(false);
-      }
-    };
-
-    loadMap();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  // Convert GeoJSON polygon (lng, lat) to { latitude, longitude } if needed
-  const geojsonCoordinates = useMemo(() => {
-    if (!mapData?.GEOJSON) return [];
-    try {
-      const rings: number[][][] = mapData.GEOJSON.features?.[0]?.geometry?.coordinates ?? [];
-      const firstRing = rings[0] || [];
-      return firstRing.map(([lng, lat]) => ({ latitude: lat, longitude: lng }));
-    } catch {
-      return [] as { latitude: number; longitude: number }[];
+  // Convert reports to markers (only those with coordinates)
+  const reportMarkers = useMemo(() => {
+    const markersWithCoords = reports
+      .filter((report: EmergencyReport) => {
+        // Only include reports with valid coordinates
+        const lat = report.coordinates?.latitude;
+        const lng = report.coordinates?.longitude;
+        return (
+          lat != null && 
+          lng != null && 
+          !isNaN(lat) && 
+          !isNaN(lng) &&
+          lat >= -90 && lat <= 90 &&
+          lng >= -180 && lng <= 180
+        );
+      })
+      .map((report: EmergencyReport) => ({
+        id: report.id,
+        latitude: report.coordinates!.latitude,
+        longitude: report.coordinates!.longitude,
+        title: report.title,
+        description: report.description,
+        type: report.type,
+        severity: report.severity,
+        status: report.status,
+        location: report.location,
+        timestamp: report.timestamp,
+        report: report, // Keep full report for callout
+      }));
+    
+    // Debug logging
+    console.log('[Map] Total reports:', reports.length);
+    console.log('[Map] Reports with coordinates:', markersWithCoords.length);
+    if (reports.length > 0 && markersWithCoords.length === 0) {
+      console.log('[Map] Sample report (no coords):', {
+        id: reports[0].id,
+        title: reports[0].title,
+        coordinates: reports[0].coordinates,
+      });
     }
-  }, [mapData]);
+    
+    return markersWithCoords;
+  }, [reports]);
 
-  // Filter markers to only show those inside Barangay 176E boundary
-  const filteredMarkers = useMemo(() => {
-    if (!mapData?.markers) return [];
-    return mapData.markers.filter((marker: MarkerData) =>
+  // Filter markers to only show those inside Barangay 176E boundary (optional)
+  const markersInBoundary = useMemo(() => {
+    return reportMarkers.filter((marker) =>
       isPointInBoundary({ latitude: marker.latitude, longitude: marker.longitude })
     );
-  }, [mapData]);
+  }, [reportMarkers]);
+
+  // Show all markers OR only those in boundary based on toggle
+  const filteredMarkers = showOnlyInBoundary ? markersInBoundary : reportMarkers;
 
   // Jitter markers that overlap (same/near coordinates) so bubbles don't stack
+  // Memoized to prevent unnecessary recalculations
   const displayedMarkers = useMemo(() => {
     if (!filteredMarkers.length) return [];
     
     // Group by rounded coordinate (~7 decimals ≈ ~1cm; we'll use 5 ≈ ~1m)
     const keyFor = (lat: number, lng: number) => `${lat.toFixed(5)}:${lng.toFixed(5)}`;
-    const groups = new Map<string, MarkerData[]>();
+    const groups = new Map<string, typeof filteredMarkers>();
     for (const m of filteredMarkers) {
       const k = keyFor(m.latitude, m.longitude);
       const arr = groups.get(k) || [];
@@ -138,7 +127,7 @@ export default function MapScreen() {
       groups.set(k, arr);
     }
 
-    const result: (MarkerData & { _lat: number; _lng: number })[] = [];
+    const result: (typeof filteredMarkers[0] & { _lat: number; _lng: number })[] = [];
     const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~2.399
 
     groups.forEach((group) => {
@@ -164,69 +153,42 @@ export default function MapScreen() {
     });
 
     return result;
-  }, [filteredMarkers]);
+  }, [JSON.stringify(filteredMarkers.map(m => m.id))]);
 
-  const getMarkerColor = (marker: MarkerData): string => {
-    switch ((marker as any).type) {
-      case 'waste':
-        return marker.severity === 'high' ? '#DC2626' : marker.severity === 'medium' ? '#F59E0B' : '#10B981';
-      case 'garbage':
-        return marker.severity === 'high' ? '#B91C1C' : marker.severity === 'medium' ? '#DC2626' : '#EF4444';
-      case 'hazardous':
-        return marker.severity === 'high' ? '#7C3AED' : '#8B5CF6';
-      case 'recycling':
-        return marker.severity === 'high' ? '#059669' : '#10B981';
-      case 'littering':
-        return marker.severity === 'high' ? '#D97706' : marker.severity === 'medium' ? '#F59E0B' : '#FDE047';
+  // Get marker color based on report type and severity
+  const getMarkerColor = (marker: { type: EmergencyReport['type']; severity: EmergencyReport['severity'] }): string => {
+    // Use severity color as base, but adjust by type for better visual distinction
+    const severityColor = getSeverityColor(marker.severity);
+    
+    // Type-specific color adjustments
+    switch (marker.type) {
+      case 'fire':
+        return marker.severity === 'critical' ? '#DC2626' : marker.severity === 'high' ? '#EF4444' : '#F59E0B';
+      case 'medical':
+        return marker.severity === 'critical' ? '#DC2626' : marker.severity === 'high' ? '#EF4444' : '#3B82F6';
+      case 'crime':
+        return marker.severity === 'critical' ? '#991B1B' : marker.severity === 'high' ? '#DC2626' : '#7C2D12';
+      case 'accident':
+        return marker.severity === 'critical' ? '#DC2626' : marker.severity === 'high' ? '#F59E0B' : '#FBBF24';
+      case 'suspicious':
+        return marker.severity === 'critical' ? '#7C3AED' : marker.severity === 'high' ? '#8B5CF6' : '#A78BFA';
       default:
-        return '#6B7280';
+        return severityColor;
     }
   };
 
-  const getMarkerIcon = (marker: MarkerData): keyof typeof Ionicons.glyphMap => {
-    switch ((marker as any).type) {
-      case 'waste':
-        return 'trash-bin';
-      case 'garbage':
-        return 'trash';
-      case 'hazardous':
-        return 'warning';
-      case 'recycling':
-        return 'leaf';
-      case 'littering':
-        return 'sad';
-      default:
-        return 'location';
-    }
-  };
+  // NOTE: getMarkerIcon removed - using default pinColor markers for Android stability
 
   useEffect(() => {
-    if (!MapComponents || !mapRef.current) return;
+    if (!mapRef.current) return;
     const timer = setTimeout(() => {
       mapRef.current?.animateToRegion(BARANGAY_176E_REGION, 1000);
     }, 500);
     return () => clearTimeout(timer);
-  }, [MapComponents]);
+  }, []);
 
-  // Show loading state while map library and data are loading
-  if (isLoading || !MapComponents || !mapData) {
-    return (
-      <SafeAreaView style={globalStyles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerTopRow}>
-            <Text style={styles.headerTitle}>Incident Map</Text>
-          </View>
-          <Text style={styles.headerSubtitle}>View incidents near you</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary.blue} />
-          <Text style={styles.loadingText}>Loading map...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const { MapView, Marker, Callout, Polygon, UrlTile } = MapComponents;
+  // Show loading state if reports are still loading
+  const isLoadingData = reportsLoading;
 
   return (
     <SafeAreaView style={globalStyles.container}>
@@ -243,12 +205,6 @@ export default function MapScreen() {
 
       {/* Map View */}
       <View style={{ flex: 1 }}>
-        {/* OSM Attribution - Required by OpenStreetMap */}
-        <View style={styles.attributionContainer}>
-          <Text style={styles.attributionText}>
-            © OpenStreetMap contributors
-          </Text>
-        </View>
         <MapView
           ref={mapRef}
           style={{ ...StyleSheet.absoluteFillObject }}
@@ -256,21 +212,10 @@ export default function MapScreen() {
           showsUserLocation={false}
           showsMyLocationButton={false}
           showsCompass={true}
-          // Focus on Barangay 176E - reasonable zoom levels for local area
-          minZoomLevel={14}
-          maxZoomLevel={18}
-          // Use custom OSM tiles instead of Google Maps
-          mapType="none"
+          onMapReady={() => {
+            setMapReady(true);
+          }}
         >
-          {/* CartoDB Positron - Uses OSM data, more permissive than direct OSM tiles */}
-          {/* This uses OpenStreetMap data but rendered by CartoDB (no User-Agent required) */}
-          <UrlTile
-            urlTemplate="https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
-            maximumZ={19}
-            minimumZ={10}
-            tileSize={256}
-            shouldReplaceMapContent={true}
-          />
 
           {/* Barangay 176E Boundary - from constants (fills + stroke) */}
           <Polygon
@@ -280,78 +225,109 @@ export default function MapScreen() {
             strokeWidth={BARANGAY_176E_BOUNDARY.strokeWidth}
           />
 
-          {/* GeoJSON overlay (same area) - using the geojson.json data */}
-          {geojsonCoordinates.length > 0 && (
-            <Polygon
-              coordinates={geojsonCoordinates}
-              fillColor="transparent"
-              strokeColor="rgba(30,58,138,0.4)"
-              strokeWidth={1}
-            />
-          )}
-          {displayedMarkers.map((marker) => (
-            <Marker
-              key={marker.id}
-              coordinate={{
-                latitude: (marker as any)._lat ?? marker.latitude,
-                longitude: (marker as any)._lng ?? marker.longitude,
-              }}
-            >
-              {/* Custom Marker with Badge */}
-              <View style={styles.markerContainer}>
-                <View 
-                  style={[
-                    styles.markerBadge, 
-                    { backgroundColor: getMarkerColor(marker) }
-                  ]}
-                >
-                  <Ionicons 
-                    name={getMarkerIcon(marker)} 
-                    size={18} 
-                    color="white" 
-                  />
-                  {marker.severity === 'high' && (
-                    <View style={styles.alertDot} />
-                  )}
-                </View>
-                <View 
-                  style={[
-                    styles.markerArrow, 
-                    { borderTopColor: getMarkerColor(marker) }
-                  ]} 
-                />
-              </View>
+          {/* Filtered Markers - Only inside boundary */}
+          {/* Only render markers when map is ready to prevent Android view hierarchy issues */}
+          {mapReady &&
+            displayedMarkers.map((marker) => {
+              const lat = marker._lat ?? marker.latitude;
+              const lng = marker._lng ?? marker.longitude;
 
-              {/* Custom Callout (info popup when marker is tapped) */}
-              <Callout
-                onPress={() =>
-                  router.push({
-                    pathname: 'report-details',
-                    params: { reportId: marker.id },
-                  } as any)
-                }
-              >
-                <View style={styles.calloutContainer}>
-                  <Text style={styles.calloutTitle}>{marker.title}</Text>
-                  <Text style={styles.calloutDescription}>{marker.description}</Text>
-                  <View style={styles.calloutFooter}>
-                    <Text style={styles.calloutType}>
-                      {marker.type.toUpperCase()}
-                    </Text>
-                    <Text 
+              // Skip invalid coordinates
+              if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+                return null;
+              }
+
+              const markerColor = getMarkerColor({ type: marker.type, severity: marker.severity });
+              const isCritical = marker.severity === 'critical' || marker.severity === 'high';
+
+              return (
+                <Marker
+                  key={marker.id}
+                  coordinate={{ latitude: lat, longitude: lng }}
+                >
+                  {/* Custom Marker Badge - Same as uw-citizen */}
+                  <View style={styles.markerContainer}>
+                    <View 
                       style={[
-                        styles.calloutSeverity,
-                        { color: getMarkerColor(marker) }
+                        styles.markerBadge, 
+                        { backgroundColor: markerColor }
                       ]}
                     >
-                      {marker.severity.toUpperCase()}
-                    </Text>
+                      <Ionicons 
+                        name={getMarkerIcon(marker.type)} 
+                        size={18} 
+                        color="white" 
+                      />
+                      {isCritical && (
+                        <View style={styles.alertDot} />
+                      )}
+                    </View>
+                    <View 
+                      style={[
+                        styles.markerArrow, 
+                        { borderTopColor: markerColor }
+                      ]} 
+                    />
                   </View>
-                </View>
-              </Callout>
-            </Marker>
-          ))}
+
+                  {/* Custom Callout - Info popup when marker is tapped */}
+                  <Callout
+                    tooltip
+                    onPress={() => {
+                      requestAnimationFrame(() => {
+                        router.push({
+                          pathname: 'report-details',
+                          params: { reportId: marker.id },
+                        } as any);
+                      });
+                    }}
+                  >
+                    <View style={styles.calloutContainer}>
+                      <Text style={styles.calloutTitle}>{marker.title}</Text>
+                      <Text style={styles.calloutDescription} numberOfLines={2}>
+                        {marker.description}
+                      </Text>
+                      <View style={styles.calloutFooter}>
+                        <Text style={styles.calloutType}>
+                          {marker.type.toUpperCase()}
+                        </Text>
+                        <Text 
+                          style={[
+                            styles.calloutSeverity,
+                            { color: markerColor }
+                          ]}
+                        >
+                          {marker.severity.toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={styles.calloutTapHint}>Tap to view details</Text>
+                    </View>
+                  </Callout>
+                </Marker>
+              );
+            })}
         </MapView>
+
+        {/* Show count badge if reports are loading - OUTSIDE MapView to avoid Android issues */}
+        {isLoadingData && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="small" color={colors.primary.blue} />
+            <Text style={styles.loadingOverlayText}>Updating reports...</Text>
+          </View>
+        )}
+
+        {/* Boundary Info Badge - Bottom positioned */}
+        <View style={styles.boundaryInfoContainer}>
+          <View style={styles.boundaryInfoRow}>
+            <View style={styles.boundaryInfoBadge}>
+              <Ionicons name="location" size={16} color="#fff" />
+              <Text style={styles.boundaryInfoText}>Brgy 176 E</Text>
+            </View>
+            <Text style={styles.boundaryInfoCount}>
+              {filteredMarkers.length} {filteredMarkers.length === 1 ? 'report' : 'reports'}
+            </Text>
+          </View>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -400,7 +376,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   
-  // Custom Marker Styles
+  // Custom Marker Styles (same as uw-citizen)
   markerContainer: {
     alignItems: 'center',
   },
@@ -412,6 +388,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 3,
     borderColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
   },
   markerArrow: {
     width: 0,
@@ -436,15 +417,20 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'white',
   },
-  
-  // Custom Callout Styles
+
+  // Custom Callout Styles - with tooltip styling
   calloutContainer: {
-    width: 200,
+    width: 220,
     padding: 12,
-    backgroundColor: colors.background.card,
-    borderRadius: 20,
+    backgroundColor: 'white',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border.light,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
   calloutTitle: {
     fontSize: 16,
@@ -456,11 +442,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 8,
+    lineHeight: 20,
   },
   calloutFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
   calloutType: {
     fontSize: 10,
@@ -473,22 +463,74 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
-  
-  // OSM Attribution - Required (data source is OpenStreetMap)
-  attributionContainer: {
-    position: 'absolute',
-    bottom: 50,
-    right: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    zIndex: 1000,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+  calloutTapHint: {
+    fontSize: 11,
+    color: colors.primary.blue,
+    fontWeight: '500',
+    marginTop: 8,
+    textAlign: 'center',
   },
-  attributionText: {
-    fontSize: 10,
+  
+  // Loading overlay for real-time updates
+  loadingOverlay: {
+    position: 'absolute',
+    top: 80,
+    right: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  loadingOverlayText: {
+    fontSize: 12,
     color: colors.text.secondary,
+    fontWeight: '500',
+  },
+  
+  // Boundary Info Badge - Bottom positioned, compact design
+  boundaryInfoContainer: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(30, 58, 138, 0.95)', // Primary blue with slight transparency
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  boundaryInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  boundaryInfoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  boundaryInfoText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  boundaryInfoCount: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
 });

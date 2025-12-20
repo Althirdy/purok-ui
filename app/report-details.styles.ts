@@ -1,3 +1,8 @@
+/**
+ * Report Details Styles
+ * This file is excluded from Expo Router routing (see expo-ignore-styles.ts)
+ */
+
 import { DesignSystem } from '@/constants/design-system';
 import { StyleSheet } from 'react-native';
 
@@ -360,4 +365,6 @@ export const reportDetailsStyles = StyleSheet.create({
   },
 });
 
+// Default export to prevent Expo Router from treating this as a route
+export default reportDetailsStyles;
 
