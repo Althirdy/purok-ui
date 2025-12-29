@@ -237,7 +237,7 @@ export default function MapScreen() {
             strokeWidth={BARANGAY_176E_BOUNDARY.strokeWidth}
           />
 
-          {/* Filtered Markers - Only inside boundary */}
+          {/* Filtered Markers - Using native pinColor for Android reliability */}
           {/* Only render markers when map is ready to prevent Android view hierarchy issues */}
           {mapReady &&
             displayedMarkers.map((marker) => {
@@ -250,15 +250,21 @@ export default function MapScreen() {
               }
 
               const markerColor = getMarkerColor({ type: marker.type, severity: marker.severity });
-              const isCritical = marker.severity === 'critical' || marker.severity === 'high';
-
-              const isSelected = selectedMarker?.id === marker.id;
               
               return (
                 <Marker
                   key={marker.id}
                   coordinate={{ latitude: lat, longitude: lng }}
-                  tracksViewChanges={isSelected}
+                  pinColor={markerColor}
+                  title={marker.title || 'Incident Report'}
+                  description={marker.location || 'Unknown location'}
+                  onCalloutPress={() => {
+                    // Navigate to report details when callout is pressed
+                    router.push({
+                      pathname: '/report-details',
+                      params: { reportId: marker.id },
+                    } as any);
+                  }}
                   onPress={() => {
                     // Show bottom info card when marker is tapped
                     setSelectedMarker({
@@ -271,37 +277,7 @@ export default function MapScreen() {
                       color: markerColor,
                     });
                   }}
-                >
-                  {/* Custom Marker - Circular badge with icon */}
-                  <View style={styles.markerWrapper}>
-                    <View 
-                      style={[
-                        styles.markerCircle, 
-                        { backgroundColor: markerColor },
-                        isSelected && styles.markerCircleSelected,
-                      ]}
-                    >
-                      <Ionicons 
-                        name={getMarkerIcon(marker.type)} 
-                        size={20} 
-                        color="#FFFFFF" 
-                      />
-                    </View>
-                    {/* Pointer arrow below circle */}
-                    <View style={styles.markerPointerContainer}>
-                      <View 
-                        style={[
-                          styles.markerPointer, 
-                          { borderTopColor: markerColor }
-                        ]} 
-                      />
-                    </View>
-                    {/* Alert indicator for critical/high */}
-                    {isCritical && (
-                      <View style={styles.markerAlert} />
-                    )}
-                  </View>
-                </Marker>
+                />
               );
             })}
         </MapView>
@@ -437,56 +413,6 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   
-  // Custom Marker Styles - Circular badge with icon (Android & iOS compatible)
-  markerWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  markerCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    // Simple elevation for Android (avoid complex shadows)
-    elevation: 6,
-  },
-  markerCircleSelected: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 4,
-    borderColor: colors.primary.blue,
-  },
-  markerPointerContainer: {
-    marginTop: -4,
-    alignItems: 'center',
-  },
-  markerPointer: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 8,
-    borderRightWidth: 8,
-    borderTopWidth: 12,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-  },
-  markerAlert: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#FBBF24',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-
   // Bottom Info Card Styles - Uniform system colors
   infoCardContainer: {
     position: 'absolute',

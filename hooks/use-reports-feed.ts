@@ -11,6 +11,17 @@ import type { EmergencyReport, FeedSource } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+// Helper to safely trigger push notification (works in dev builds, gracefully fails in Expo Go)
+const tryScheduleNotification = async (title: string, body: string, data?: Record<string, any>) => {
+  try {
+    const { scheduleNotification } = await import('@/services/notifications');
+    await scheduleNotification(title, body, data);
+  } catch (error) {
+    // Silently fail in Expo Go - toast/haptic still work
+    console.log('[ReportsFeed] Push notification skipped (Expo Go)');
+  }
+};
+
 interface UseReportsFeedOptions {
   onNewReport?: (report: EmergencyReport) => void;
 }
@@ -119,6 +130,18 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
         });
         addNotificationFromReportRef.current(report);
         onNewReportRef.current?.(report);
+
+        // 🔔 Trigger push notification with sound (if available - dev builds only)
+        const severityEmoji = report.severity === 'critical' ? '🚨' : report.severity === 'high' ? '⚠️' : '📢';
+        tryScheduleNotification(
+          `${severityEmoji} ${report.title}`,
+          report.description,
+          {
+            type: 'sensor_alert',
+            reportId: report.id,
+            severity: report.severity,
+          }
+        );
       });
     firebaseUnsubscribeRef.current = firebaseUnsubscribe;
 
@@ -169,6 +192,21 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
           } else {
             console.warn('[ReportsFeed] ⚠️ onNewReport callback is not set');
           }
+
+          // 🔔 Trigger push notification with sound (if available - dev builds only)
+          const severityEmoji = report.severity === 'critical' ? '🚨' : report.severity === 'high' ? '⚠️' : '📢';
+          const categoryLabel = (report as any).originalCategory?.toUpperCase() || 'CONCERN';
+          tryScheduleNotification(
+            `${severityEmoji} New ${categoryLabel} Report`,
+            report.title || report.description,
+            {
+              type: 'citizen_report',
+              reportId: report.id,
+              severity: report.severity,
+              category: (report as any).originalCategory,
+            }
+          );
+          console.log('[ReportsFeed] 🔔 Notification triggered for:', report.id);
         }
       ).then((unsubscribe) => {
         unsubscribePusher = unsubscribe;
