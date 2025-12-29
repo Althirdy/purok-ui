@@ -21,9 +21,9 @@ import type { EmergencyReport } from '@/types';
 import { getSeverityColor } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useMemo, useRef } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import MapView, { Callout, Marker, Polygon } from 'react-native-maps';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import MapView, { Marker, Polygon } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing, borderRadius, shadows } = DesignSystem;
@@ -46,12 +46,24 @@ const getMarkerIcon = (type: string): keyof typeof Ionicons.glyphMap => {
   }
 };
 
+// Type for selected marker
+type SelectedMarker = {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  severity: string;
+  location: string;
+  color: string;
+} | null;
+
 export default function MapScreen() {
   // Get real-time reports from feed hook
   const { reports, loading: reportsLoading, fetchReports } = useReportsFeed();
   const mapRef = useRef<MapView | null>(null);
-  const [mapReady, setMapReady] = React.useState(false);
-  const [showOnlyInBoundary, setShowOnlyInBoundary] = React.useState(false); // Toggle for filtering
+  const [mapReady, setMapReady] = useState(false);
+  const [showOnlyInBoundary, setShowOnlyInBoundary] = useState(false); // Toggle for filtering
+  const [selectedMarker, setSelectedMarker] = useState<SelectedMarker>(null);
 
   // Fetch reports on mount (same as news-feed.tsx)
   useEffect(() => {
@@ -240,73 +252,135 @@ export default function MapScreen() {
               const markerColor = getMarkerColor({ type: marker.type, severity: marker.severity });
               const isCritical = marker.severity === 'critical' || marker.severity === 'high';
 
+              const isSelected = selectedMarker?.id === marker.id;
+              
               return (
                 <Marker
                   key={marker.id}
                   coordinate={{ latitude: lat, longitude: lng }}
+                  tracksViewChanges={isSelected}
+                  onPress={() => {
+                    // Show bottom info card when marker is tapped
+                    setSelectedMarker({
+                      id: marker.id,
+                      title: marker.title || 'Incident Report',
+                      description: marker.description || 'No description available',
+                      type: marker.type || 'unknown',
+                      severity: marker.severity || 'low',
+                      location: marker.location || 'Unknown location',
+                      color: markerColor,
+                    });
+                  }}
                 >
-                  {/* Custom Marker Badge - Same as uw-citizen */}
-                  <View style={styles.markerContainer}>
+                  {/* Custom Marker - Circular badge with icon */}
+                  <View style={styles.markerWrapper}>
                     <View 
                       style={[
-                        styles.markerBadge, 
-                        { backgroundColor: markerColor }
+                        styles.markerCircle, 
+                        { backgroundColor: markerColor },
+                        isSelected && styles.markerCircleSelected,
                       ]}
                     >
                       <Ionicons 
                         name={getMarkerIcon(marker.type)} 
-                        size={18} 
-                        color="white" 
+                        size={20} 
+                        color="#FFFFFF" 
                       />
-                      {isCritical && (
-                        <View style={styles.alertDot} />
-                      )}
                     </View>
-                    <View 
-                      style={[
-                        styles.markerArrow, 
-                        { borderTopColor: markerColor }
-                      ]} 
-                    />
+                    {/* Pointer arrow below circle */}
+                    <View style={styles.markerPointerContainer}>
+                      <View 
+                        style={[
+                          styles.markerPointer, 
+                          { borderTopColor: markerColor }
+                        ]} 
+                      />
+                    </View>
+                    {/* Alert indicator for critical/high */}
+                    {isCritical && (
+                      <View style={styles.markerAlert} />
+                    )}
                   </View>
-
-                  {/* Custom Callout - Info popup when marker is tapped */}
-                  <Callout
-                    tooltip
-                    onPress={() => {
-                      requestAnimationFrame(() => {
-                        router.push({
-                          pathname: 'report-details',
-                          params: { reportId: marker.id },
-                        } as any);
-                      });
-                    }}
-                  >
-                    <View style={styles.calloutContainer}>
-                      <Text style={styles.calloutTitle}>{marker.title}</Text>
-                      <Text style={styles.calloutDescription} numberOfLines={2}>
-                        {marker.description}
-                      </Text>
-                      <View style={styles.calloutFooter}>
-                        <Text style={styles.calloutType}>
-                          {marker.type.toUpperCase()}
-                        </Text>
-                        <Text 
-                          style={[
-                            styles.calloutSeverity,
-                            { color: markerColor }
-                          ]}
-                        >
-                          {marker.severity.toUpperCase()}
-                        </Text>
-                      </View>
-                      <Text style={styles.calloutTapHint}>Tap to view details</Text>
-                    </View>
-                  </Callout>
                 </Marker>
               );
             })}
         </MapView>
+
+        {/* Bottom Info Card - Shows when marker is selected */}
+        {selectedMarker && (
+          <View style={styles.infoCardContainer}>
+            <Pressable 
+              style={styles.infoCardBackdrop} 
+              onPress={() => setSelectedMarker(null)} 
+            />
+            <View style={styles.infoCard}>
+              {/* Close button */}
+              <Pressable 
+                style={styles.infoCardClose}
+                onPress={() => setSelectedMarker(null)}
+              >
+                <Ionicons name="close" size={20} color="#6B7280" />
+              </Pressable>
+              
+              {/* Header with type badge */}
+              <View style={styles.infoCardHeader}>
+                <View style={[styles.infoCardIcon, { backgroundColor: selectedMarker.color }]}>
+                  <Ionicons 
+                    name={getMarkerIcon(selectedMarker.type)} 
+                    size={24} 
+                    color="white" 
+                  />
+                </View>
+                <View style={styles.infoCardHeaderText}>
+                  <Text style={styles.infoCardTitle} numberOfLines={1}>
+                    {selectedMarker.title}
+                  </Text>
+                  <Text style={styles.infoCardLocation} numberOfLines={1}>
+                    📍 {selectedMarker.location}
+                  </Text>
+                </View>
+              </View>
+              
+              {/* Description */}
+              <Text style={styles.infoCardDescription} numberOfLines={2}>
+                {selectedMarker.description}
+              </Text>
+              
+              {/* Badges */}
+              <View style={styles.infoCardBadges}>
+                <View style={[styles.infoCardBadge, { backgroundColor: colors.primary.blue }]}>
+                  <Text style={styles.infoCardBadgeText}>
+                    {selectedMarker.type.toUpperCase()}
+                  </Text>
+                </View>
+                <View style={[
+                  styles.infoCardBadge, 
+                  { backgroundColor: getSeverityColor(selectedMarker.severity as EmergencyReport['severity']) }
+                ]}>
+                  <Text style={styles.infoCardBadgeText}>
+                    {selectedMarker.severity.toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+              
+              {/* View Details Button */}
+              <Pressable 
+                style={styles.infoCardButton}
+                onPress={() => {
+                  const reportId = selectedMarker.id;
+                  setSelectedMarker(null);
+                  router.push({
+                    pathname: '/report-details',
+                    params: { reportId },
+                  } as any);
+                }}
+              >
+                <Text style={styles.infoCardButtonText}>View Full Details</Text>
+                <Ionicons name="arrow-forward" size={18} color="white" />
+              </Pressable>
+            </View>
+          </View>
+        )}
 
         {/* Show count badge if reports are loading - OUTSIDE MapView to avoid Android issues */}
         {isLoadingData && (
@@ -315,19 +389,6 @@ export default function MapScreen() {
             <Text style={styles.loadingOverlayText}>Updating reports...</Text>
           </View>
         )}
-
-        {/* Boundary Info Badge - Bottom positioned */}
-        <View style={styles.boundaryInfoContainer}>
-          <View style={styles.boundaryInfoRow}>
-            <View style={styles.boundaryInfoBadge}>
-              <Ionicons name="location" size={16} color="#fff" />
-              <Text style={styles.boundaryInfoText}>Brgy 176 E</Text>
-            </View>
-            <Text style={styles.boundaryInfoCount}>
-              {filteredMarkers.length} {filteredMarkers.length === 1 ? 'report' : 'reports'}
-            </Text>
-          </View>
-        </View>
       </View>
     </SafeAreaView>
   );
@@ -376,99 +437,157 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   
-  // Custom Marker Styles (same as uw-citizen)
-  markerContainer: {
+  // Custom Marker Styles - Circular badge with icon (Android & iOS compatible)
+  markerWrapper: {
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  markerBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  markerCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
+    borderColor: '#FFFFFF',
+    // Simple elevation for Android (avoid complex shadows)
+    elevation: 6,
   },
-  markerArrow: {
+  markerCircleSelected: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 4,
+    borderColor: colors.primary.blue,
+  },
+  markerPointerContainer: {
+    marginTop: -4,
+    alignItems: 'center',
+  },
+  markerPointer: {
     width: 0,
     height: 0,
     backgroundColor: 'transparent',
     borderStyle: 'solid',
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 10,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 12,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    marginTop: -2,
   },
-  alertDot: {
+  markerAlert: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    top: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: '#FBBF24',
     borderWidth: 2,
-    borderColor: 'white',
+    borderColor: '#FFFFFF',
   },
 
-  // Custom Callout Styles - with tooltip styling
-  calloutContainer: {
-    width: 220,
-    padding: 12,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+  // Bottom Info Card Styles - Uniform system colors
+  infoCardContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    top: 0,
+  },
+  infoCardBackdrop: {
+    flex: 1,
+  },
+  infoCard: {
+    backgroundColor: colors.background.primary,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    padding: spacing.lg,
+    paddingBottom: spacing['2xl'],
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  calloutTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#1F2937',
-  },
-  calloutDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  calloutFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-    paddingTop: 8,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 24,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: colors.border.light,
   },
-  calloutType: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#9CA3AF',
+  infoCardClose: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    padding: spacing.sm,
+    zIndex: 10,
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.full,
+  },
+  infoCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  infoCardIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: borderRadius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  infoCardHeaderText: {
+    flex: 1,
+    paddingRight: spacing['2xl'],
+  },
+  infoCardTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  infoCardLocation: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+  },
+  infoCardDescription: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    lineHeight: 20,
+    marginBottom: spacing.md,
+    backgroundColor: colors.background.secondary,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  infoCardBadges: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  infoCardBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+  },
+  infoCardBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: '#FFFFFF',
     letterSpacing: 0.5,
   },
-  calloutSeverity: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
+  infoCardButton: {
+    backgroundColor: colors.primary.blue,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    gap: spacing.sm,
   },
-  calloutTapHint: {
-    fontSize: 11,
-    color: colors.primary.blue,
-    fontWeight: '500',
-    marginTop: 8,
-    textAlign: 'center',
+  infoCardButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: '#FFFFFF',
   },
   
   // Loading overlay for real-time updates
@@ -495,42 +614,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.text.secondary,
     fontWeight: '500',
-  },
-  
-  // Boundary Info Badge - Bottom positioned, compact design
-  boundaryInfoContainer: {
-    position: 'absolute',
-    bottom: 24,
-    left: 16,
-    right: 16,
-    backgroundColor: 'rgba(30, 58, 138, 0.95)', // Primary blue with slight transparency
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  boundaryInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  boundaryInfoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  boundaryInfoText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  boundaryInfoCount: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.8)',
   },
 });

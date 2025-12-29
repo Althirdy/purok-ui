@@ -16,7 +16,7 @@ export const realtimeConfig = {
   citizenReportEvent: 'report.created',
   purokChannelPrefix: 'private-purok-leader.',
   purokAssignmentEvent: 'concern.assigned',
-  authEndpoint: (process.env.EXPO_PUBLIC_PUSHER_AUTH_ENDPOINT ?? 'https://www.urbanwatch.me/broadcasting/auth'),
+  authEndpoint: (process.env.EXPO_PUBLIC_PUSHER_AUTH_ENDPOINT ?? 'https://uniniquitous-semimaturely-amie.ngrok-free.dev/broadcasting/auth'),
 } as const;
 
 export type RealtimeConfig = typeof realtimeConfig;

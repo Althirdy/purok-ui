@@ -1,6 +1,6 @@
 // Lightweight API helper using fetch (no axios dependency)
 // Defaults to production API if env is not provided
-export const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
+export const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://uniniquitous-semimaturely-amie.ngrok-free.dev';
 
 export async function httpGet<T = any>(path: string, init?: RequestInit): Promise<T> {
   const fullUrl = `${API_BASE}${path}`;
