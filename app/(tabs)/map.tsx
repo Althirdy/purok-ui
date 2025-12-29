@@ -1,196 +1,38 @@
 /**
  * Map Screen - View incidents on map (REALTIME)
  * 
- * Uses default Google Maps (same as uw-citizen heatmap.tsx)
- * - Focused on Barangay 176E area only
- * - Uses GeoJSON boundary data from constants/barangay-boundary.ts
- * - REALTIME: Shows reports from useReportsFeed hook (updates automatically)
- * - Custom styled markers with icons (matching uw-citizen design)
- * - tracksViewChanges={false} for Android performance
- * 
- * NOTE: All View overlays (loading, info badge) MUST be outside MapView
- * to avoid Android "addViewAt" errors. Only Marker/Polygon/etc inside MapView.
+ * Uses default Google Maps with native markers for Android reliability.
+ * Shows real-time reports from useReportsFeed hook.
  */
 
-import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION, isPointInBoundary } from '@/constants/barangay-boundary';
+import { InfoCard } from '@/components/map/info-card';
+import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION } from '@/constants/barangay-boundary';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { Fonts } from '@/constants/theme';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
 import type { EmergencyReport } from '@/types';
-import { getSeverityColor } from '@/utils/reportHelpers';
+import { getMarkerColor, processMarkersWithJitter, type SelectedMarker } from '@/utils/mapHelpers';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polygon } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { styles } from './map.styles';
 
-const { colors, typography, spacing, borderRadius, shadows } = DesignSystem;
-
-// Get marker icon based on report type
-const getMarkerIcon = (type: string): keyof typeof Ionicons.glyphMap => {
-  switch (type) {
-    case 'fire':
-      return 'flame';
-    case 'medical':
-      return 'medical';
-    case 'crime':
-      return 'shield';
-    case 'accident':
-      return 'car';
-    case 'suspicious':
-      return 'warning';
-    default:
-      return 'location';
-  }
-};
-
-// Type for selected marker
-type SelectedMarker = {
-  id: string;
-  title: string;
-  description: string;
-  type: string;
-  severity: string;
-  location: string;
-  color: string;
-} | null;
+const { colors } = DesignSystem;
 
 export default function MapScreen() {
-  // Get real-time reports from feed hook
-  const { reports, loading: reportsLoading, fetchReports } = useReportsFeed();
+  const { reports, loading, fetchReports } = useReportsFeed();
   const mapRef = useRef<MapView | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [showOnlyInBoundary, setShowOnlyInBoundary] = useState(false); // Toggle for filtering
   const [selectedMarker, setSelectedMarker] = useState<SelectedMarker>(null);
 
-  // Fetch reports on mount (same as news-feed.tsx)
+  // Fetch reports on mount
   useEffect(() => {
     fetchReports('all');
   }, [fetchReports]);
 
-  // Convert reports to markers (only those with coordinates)
-  const reportMarkers = useMemo(() => {
-    const markersWithCoords = reports
-      .filter((report: EmergencyReport) => {
-        // Only include reports with valid coordinates
-        const lat = report.coordinates?.latitude;
-        const lng = report.coordinates?.longitude;
-        return (
-          lat != null && 
-          lng != null && 
-          !isNaN(lat) && 
-          !isNaN(lng) &&
-          lat >= -90 && lat <= 90 &&
-          lng >= -180 && lng <= 180
-        );
-      })
-      .map((report: EmergencyReport) => ({
-        id: report.id,
-        latitude: report.coordinates!.latitude,
-        longitude: report.coordinates!.longitude,
-        title: report.title,
-        description: report.description,
-        type: report.type,
-        severity: report.severity,
-        status: report.status,
-        location: report.location,
-        timestamp: report.timestamp,
-        report: report, // Keep full report for callout
-      }));
-    
-    // Debug logging
-    console.log('[Map] Total reports:', reports.length);
-    console.log('[Map] Reports with coordinates:', markersWithCoords.length);
-    if (reports.length > 0 && markersWithCoords.length === 0) {
-      console.log('[Map] Sample report (no coords):', {
-        id: reports[0].id,
-        title: reports[0].title,
-        coordinates: reports[0].coordinates,
-      });
-    }
-    
-    return markersWithCoords;
-  }, [reports]);
-
-  // Filter markers to only show those inside Barangay 176E boundary (optional)
-  const markersInBoundary = useMemo(() => {
-    return reportMarkers.filter((marker) =>
-      isPointInBoundary({ latitude: marker.latitude, longitude: marker.longitude })
-    );
-  }, [reportMarkers]);
-
-  // Show all markers OR only those in boundary based on toggle
-  const filteredMarkers = showOnlyInBoundary ? markersInBoundary : reportMarkers;
-
-  // Jitter markers that overlap (same/near coordinates) so bubbles don't stack
-  // Memoized to prevent unnecessary recalculations
-  const displayedMarkers = useMemo(() => {
-    if (!filteredMarkers.length) return [];
-    
-    // Group by rounded coordinate (~7 decimals ≈ ~1cm; we'll use 5 ≈ ~1m)
-    const keyFor = (lat: number, lng: number) => `${lat.toFixed(5)}:${lng.toFixed(5)}`;
-    const groups = new Map<string, typeof filteredMarkers>();
-    for (const m of filteredMarkers) {
-      const k = keyFor(m.latitude, m.longitude);
-      const arr = groups.get(k) || [];
-      arr.push(m);
-      groups.set(k, arr);
-    }
-
-    const result: (typeof filteredMarkers[0] & { _lat: number; _lng: number })[] = [];
-    const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~2.399
-
-    groups.forEach((group) => {
-      // Base coordinate
-      const baseLat = group[0].latitude;
-      const baseLng = group[0].longitude;
-      const cosLat = Math.cos((baseLat * Math.PI) / 180);
-      const metersPerDegLat = 111_320; // approx
-      const metersPerDegLng = 111_320 * cosLat; // approx
-
-      group.forEach((m, idx) => {
-        if (group.length === 1) {
-          result.push({ ...m, _lat: baseLat, _lng: baseLng });
-          return;
-        }
-        // Spiral offset: radius grows slowly with idx; 4m step
-        const radiusMeters = 4 * Math.sqrt(idx); // 0, 4, 5.6, 6.9, ...
-        const angle = idx * GOLDEN_ANGLE;
-        const dx = (radiusMeters * Math.cos(angle)) / metersPerDegLng; // degrees lon
-        const dy = (radiusMeters * Math.sin(angle)) / metersPerDegLat; // degrees lat
-        result.push({ ...m, _lat: baseLat + dy, _lng: baseLng + dx });
-      });
-    });
-
-    return result;
-  }, [JSON.stringify(filteredMarkers.map(m => m.id))]);
-
-  // Get marker color based on report type and severity
-  const getMarkerColor = (marker: { type: EmergencyReport['type']; severity: EmergencyReport['severity'] }): string => {
-    // Use severity color as base, but adjust by type for better visual distinction
-    const severityColor = getSeverityColor(marker.severity);
-    
-    // Type-specific color adjustments
-    switch (marker.type) {
-      case 'fire':
-        return marker.severity === 'critical' ? '#DC2626' : marker.severity === 'high' ? '#EF4444' : '#F59E0B';
-      case 'medical':
-        return marker.severity === 'critical' ? '#DC2626' : marker.severity === 'high' ? '#EF4444' : '#3B82F6';
-      case 'crime':
-        return marker.severity === 'critical' ? '#991B1B' : marker.severity === 'high' ? '#DC2626' : '#7C2D12';
-      case 'accident':
-        return marker.severity === 'critical' ? '#DC2626' : marker.severity === 'high' ? '#F59E0B' : '#FBBF24';
-      case 'suspicious':
-        return marker.severity === 'critical' ? '#7C3AED' : marker.severity === 'high' ? '#8B5CF6' : '#A78BFA';
-      default:
-        return severityColor;
-    }
-  };
-
-  // NOTE: getMarkerIcon removed - using default pinColor markers for Android stability
-
+  // Animate to region on mount
   useEffect(() => {
     if (!mapRef.current) return;
     const timer = setTimeout(() => {
@@ -199,8 +41,44 @@ export default function MapScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Show loading state if reports are still loading
-  const isLoadingData = reportsLoading;
+  // Convert reports to markers (only valid coordinates)
+  const reportMarkers = useMemo(() => {
+    return reports
+      .filter((r: EmergencyReport) => {
+        const { latitude: lat, longitude: lng } = r.coordinates ?? {};
+        return lat != null && lng != null && !isNaN(lat) && !isNaN(lng) &&
+          lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+      })
+      .map((r: EmergencyReport) => ({
+        id: r.id,
+        latitude: r.coordinates!.latitude,
+        longitude: r.coordinates!.longitude,
+        title: r.title,
+        description: r.description,
+        type: r.type,
+        severity: r.severity,
+        location: r.location,
+      }));
+  }, [reports]);
+
+  // Process markers with jitter for overlapping coordinates
+  const displayedMarkers = useMemo(
+    () => processMarkersWithJitter(reportMarkers),
+    [reportMarkers]
+  );
+
+  const handleMarkerPress = (marker: typeof displayedMarkers[0]) => {
+    const color = getMarkerColor(marker.type as EmergencyReport['type'], marker.severity as EmergencyReport['severity']);
+    setSelectedMarker({
+      id: marker.id,
+      title: marker.title || 'Incident Report',
+      description: marker.description || 'No description available',
+      type: marker.type || 'unknown',
+      severity: marker.severity || 'low',
+      location: marker.location || 'Unknown location',
+      color,
+    });
+  };
 
   return (
     <SafeAreaView style={globalStyles.container}>
@@ -215,21 +93,15 @@ export default function MapScreen() {
         <Text style={styles.headerSubtitle}>View incidents near you</Text>
       </View>
 
-      {/* Map View */}
+      {/* Map */}
       <View style={{ flex: 1 }}>
         <MapView
           ref={mapRef}
-          style={{ ...StyleSheet.absoluteFillObject }}
+          style={StyleSheet.absoluteFillObject}
           initialRegion={BARANGAY_176E_REGION}
-          showsUserLocation={false}
-          showsMyLocationButton={false}
-          showsCompass={true}
-          onMapReady={() => {
-            setMapReady(true);
-          }}
+          showsCompass
+          onMapReady={() => setMapReady(true)}
         >
-
-          {/* Barangay 176E Boundary - from constants (fills + stroke) */}
           <Polygon
             coordinates={BARANGAY_176E_BOUNDARY.coordinates}
             fillColor={BARANGAY_176E_BOUNDARY.fillColor}
@@ -237,129 +109,25 @@ export default function MapScreen() {
             strokeWidth={BARANGAY_176E_BOUNDARY.strokeWidth}
           />
 
-          {/* Filtered Markers - Using native pinColor for Android reliability */}
-          {/* Only render markers when map is ready to prevent Android view hierarchy issues */}
-          {mapReady &&
-            displayedMarkers.map((marker) => {
-              const lat = marker._lat ?? marker.latitude;
-              const lng = marker._lng ?? marker.longitude;
-
-              // Skip invalid coordinates
-              if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
-                return null;
-              }
-
-              const markerColor = getMarkerColor({ type: marker.type, severity: marker.severity });
-              
-              return (
-                <Marker
-                  key={marker.id}
-                  coordinate={{ latitude: lat, longitude: lng }}
-                  pinColor={markerColor}
-                  title={marker.title || 'Incident Report'}
-                  description={marker.location || 'Unknown location'}
-                  onCalloutPress={() => {
-                    // Navigate to report details when callout is pressed
-                    router.push({
-                      pathname: '/report-details',
-                      params: { reportId: marker.id },
-                    } as any);
-                  }}
-                  onPress={() => {
-                    // Show bottom info card when marker is tapped
-                    setSelectedMarker({
-                      id: marker.id,
-                      title: marker.title || 'Incident Report',
-                      description: marker.description || 'No description available',
-                      type: marker.type || 'unknown',
-                      severity: marker.severity || 'low',
-                      location: marker.location || 'Unknown location',
-                      color: markerColor,
-                    });
-                  }}
-                />
-              );
-            })}
+          {mapReady && displayedMarkers.map((m) => (
+            <Marker
+              key={m.id}
+              coordinate={{ latitude: m._lat, longitude: m._lng }}
+              pinColor={getMarkerColor(m.type as EmergencyReport['type'], m.severity as EmergencyReport['severity'])}
+              title={m.title}
+              description={m.location}
+              onPress={() => handleMarkerPress(m)}
+            />
+          ))}
         </MapView>
 
-        {/* Bottom Info Card - Shows when marker is selected */}
+        {/* Info Card */}
         {selectedMarker && (
-          <View style={styles.infoCardContainer}>
-            <Pressable 
-              style={styles.infoCardBackdrop} 
-              onPress={() => setSelectedMarker(null)} 
-            />
-            <View style={styles.infoCard}>
-              {/* Close button */}
-              <Pressable 
-                style={styles.infoCardClose}
-                onPress={() => setSelectedMarker(null)}
-              >
-                <Ionicons name="close" size={20} color="#6B7280" />
-              </Pressable>
-              
-              {/* Header with type badge */}
-              <View style={styles.infoCardHeader}>
-                <View style={[styles.infoCardIcon, { backgroundColor: selectedMarker.color }]}>
-                  <Ionicons 
-                    name={getMarkerIcon(selectedMarker.type)} 
-                    size={24} 
-                    color="white" 
-                  />
-                </View>
-                <View style={styles.infoCardHeaderText}>
-                  <Text style={styles.infoCardTitle} numberOfLines={1}>
-                    {selectedMarker.title}
-                  </Text>
-                  <Text style={styles.infoCardLocation} numberOfLines={1}>
-                    📍 {selectedMarker.location}
-                  </Text>
-                </View>
-              </View>
-              
-              {/* Description */}
-              <Text style={styles.infoCardDescription} numberOfLines={2}>
-                {selectedMarker.description}
-              </Text>
-              
-              {/* Badges */}
-              <View style={styles.infoCardBadges}>
-                <View style={[styles.infoCardBadge, { backgroundColor: colors.primary.blue }]}>
-                  <Text style={styles.infoCardBadgeText}>
-                    {selectedMarker.type.toUpperCase()}
-                  </Text>
-                </View>
-                <View style={[
-                  styles.infoCardBadge, 
-                  { backgroundColor: getSeverityColor(selectedMarker.severity as EmergencyReport['severity']) }
-                ]}>
-                  <Text style={styles.infoCardBadgeText}>
-                    {selectedMarker.severity.toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-              
-              {/* View Details Button */}
-              <Pressable 
-                style={styles.infoCardButton}
-                onPress={() => {
-                  const reportId = selectedMarker.id;
-                  setSelectedMarker(null);
-                  router.push({
-                    pathname: '/report-details',
-                    params: { reportId },
-                  } as any);
-                }}
-              >
-                <Text style={styles.infoCardButtonText}>View Full Details</Text>
-                <Ionicons name="arrow-forward" size={18} color="white" />
-              </Pressable>
-            </View>
-          </View>
+          <InfoCard marker={selectedMarker} onClose={() => setSelectedMarker(null)} />
         )}
 
-        {/* Show count badge if reports are loading - OUTSIDE MapView to avoid Android issues */}
-        {isLoadingData && (
+        {/* Loading Overlay */}
+        {loading && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="small" color={colors.primary.blue} />
             <Text style={styles.loadingOverlayText}>Updating reports...</Text>
@@ -369,176 +137,3 @@ export default function MapScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.background.primary,
-  },
-  headerTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  
-  headerTitle: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    fontFamily: Fonts.rounded,
-  },
-  headerSubtitle: {
-    marginTop: 4,
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-  },
-  headerActions: {
-    padding: 10,
-    borderRadius: 16,
-    backgroundColor: colors.background.secondary,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-  },
-  
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: spacing.md,
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-  },
-  
-  // Bottom Info Card Styles - Uniform system colors
-  infoCardContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    top: 0,
-  },
-  infoCardBackdrop: {
-    flex: 1,
-  },
-  infoCard: {
-    backgroundColor: colors.background.primary,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    padding: spacing.lg,
-    paddingBottom: spacing['2xl'],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 24,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: colors.border.light,
-  },
-  infoCardClose: {
-    position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
-    padding: spacing.sm,
-    zIndex: 10,
-    backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.full,
-  },
-  infoCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  infoCardIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: borderRadius.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  infoCardHeaderText: {
-    flex: 1,
-    paddingRight: spacing['2xl'],
-  },
-  infoCardTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  infoCardLocation: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-  },
-  infoCardDescription: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    lineHeight: 20,
-    marginBottom: spacing.md,
-    backgroundColor: colors.background.secondary,
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  infoCardBadges: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  infoCardBadge: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.md,
-  },
-  infoCardBadgeText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  infoCardButton: {
-    backgroundColor: colors.primary.blue,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
-    gap: spacing.sm,
-  },
-  infoCardButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: '#FFFFFF',
-  },
-  
-  // Loading overlay for real-time updates
-  loadingOverlay: {
-    position: 'absolute',
-    top: 80,
-    right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  loadingOverlayText: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    fontWeight: '500',
-  },
-});
