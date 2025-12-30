@@ -6,7 +6,7 @@
  * No personal information, images, or detailed descriptions.
  */
 
-import api from '@/lib/axios';
+import { httpGet } from '@/lib/axios';
 
 export interface HeatmapPoint {
   latitude: number;
@@ -42,15 +42,15 @@ export async function fetchHeatmapData(options?: {
     }
 
     const queryString = params.toString();
-    const url = `/incidents/heatmap${queryString ? `?${queryString}` : ''}`;
+    const url = `/api/v1/incidents/heatmap${queryString ? `?${queryString}` : ''}`;
     
     console.log('[HeatmapService] Fetching heatmap data:', url);
-    
-    const response = await api.get<HeatmapResponse>(url);
-    
-    if (response.data.success && Array.isArray(response.data.data)) {
-      console.log('[HeatmapService] Received', response.data.data.length, 'points');
-      return response.data.data;
+
+    const response = await httpGet<HeatmapResponse>(url);
+
+    if (response.success && Array.isArray(response.data)) {
+      console.log('[HeatmapService] Received', response.data.length, 'points');
+      return response.data;
     }
     
     console.warn('[HeatmapService] Invalid response format');
@@ -96,4 +96,5 @@ export function severityToColor(severity: HeatmapPoint['severity']): string {
       return '#6B7280'; // Gray
   }
 }
+
 
