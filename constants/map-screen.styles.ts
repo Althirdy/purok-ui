@@ -1,5 +1,6 @@
 /**
  * Map Screen Styles
+ * Moved from app/(tabs)/map.styles.ts to avoid Expo Router route warnings
  */
 
 import { DesignSystem } from '@/constants/design-system';
@@ -8,7 +9,7 @@ import { StyleSheet } from 'react-native';
 
 const { colors, typography, spacing, borderRadius } = DesignSystem;
 
-export const styles = StyleSheet.create({
+export const mapStyles = StyleSheet.create({
   header: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
@@ -145,7 +146,7 @@ export const styles = StyleSheet.create({
   // Loading overlay
   loadingOverlay: {
     position: 'absolute',
-    top: 80,
+    top: 16,
     right: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingHorizontal: 12,
@@ -184,49 +185,6 @@ export const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
     color: '#10B981',
-  },
-
-  // Heatmap Legend
-  heatmapLegend: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    minWidth: 140,
-  },
-  legendTitle: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  legendItems: {
-    gap: 6,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  legendText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
   },
 
   // Privacy Notice in InfoCard
@@ -278,5 +236,4 @@ export const styles = StyleSheet.create({
     lineHeight: 16,
   },
 });
-
 

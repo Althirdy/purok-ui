@@ -1,51 +1,27 @@
 /**
- * Map Screen - Heatmap View of Verified Incidents
+ * Map Screen - View of Verified Incidents
  * 
- * PRIVACY-FIRST: Shows only verified/acknowledged incidents.
- * Displays heatmap overlay + generic icons (no personal info/photos).
+ * Shows only verified/acknowledged incidents with markers.
+ * No heatmap circles - just clean markers for incident locations.
  * 
- * User Story: Citizens can identify "Red Zones" (High Risk Areas)
- * without violating privacy of people involved.
+ * For Purok Officials: To acknowledge/verify reports for citizen visibility.
  */
 
 import { InfoCard } from '@/components/map/info-card';
 import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION } from '@/constants/barangay-boundary';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
+import { mapStyles as styles } from '@/constants/map-screen.styles';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
 import type { EmergencyReport } from '@/types';
 import { getMarkerColor, processMarkersWithJitter, type SelectedMarker } from '@/utils/mapHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import MapView, { Circle, Marker, Polygon } from 'react-native-maps';
+import MapView, { Marker, Polygon } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { styles } from './map.styles';
 
 const { colors } = DesignSystem;
-
-// Heatmap radius based on severity (meters)
-const HEATMAP_RADIUS = {
-  critical: 150,
-  high: 120,
-  medium: 90,
-  low: 60,
-};
-
-// Heatmap colors with transparency (RGBA)
-const HEATMAP_COLORS = {
-  critical: 'rgba(220, 38, 38, 0.35)', // Red
-  high: 'rgba(245, 158, 11, 0.30)',    // Orange
-  medium: 'rgba(59, 130, 246, 0.25)',  // Blue
-  low: 'rgba(16, 185, 129, 0.20)',     // Green
-};
-
-const HEATMAP_STROKE = {
-  critical: 'rgba(220, 38, 38, 0.6)',
-  high: 'rgba(245, 158, 11, 0.5)',
-  medium: 'rgba(59, 130, 246, 0.4)',
-  low: 'rgba(16, 185, 129, 0.3)',
-};
 
 export default function MapScreen() {
   const { reports, loading, fetchReports } = useReportsFeed();
@@ -102,17 +78,6 @@ export default function MapScreen() {
     [reportMarkers]
   );
 
-  // Count incidents by severity for legend
-  const incidentCounts = useMemo(() => {
-    return {
-      critical: reportMarkers.filter(m => m.severity === 'critical').length,
-      high: reportMarkers.filter(m => m.severity === 'high').length,
-      medium: reportMarkers.filter(m => m.severity === 'medium').length,
-      low: reportMarkers.filter(m => m.severity === 'low').length,
-      total: reportMarkers.length,
-    };
-  }, [reportMarkers]);
-
   const handleMarkerPress = (marker: typeof displayedMarkers[0]) => {
     const color = getMarkerColor(marker.type as EmergencyReport['type'], marker.severity as EmergencyReport['severity']);
     setSelectedMarker({
@@ -132,7 +97,7 @@ export default function MapScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
-          <Text style={styles.headerTitle}>Incident Heatmap</Text>
+          <Text style={styles.headerTitle}>Incident Map</Text>
           <View style={styles.headerActions}>
             <View style={styles.verifiedBadge}>
               <Ionicons name="shield-checkmark" size={14} color="#10B981" />
@@ -141,7 +106,7 @@ export default function MapScreen() {
           </View>
         </View>
         <Text style={styles.headerSubtitle}>
-          {incidentCounts.total} verified incidents in your area
+          {reportMarkers.length} verified incidents in your area
         </Text>
       </View>
 
@@ -162,19 +127,7 @@ export default function MapScreen() {
             strokeWidth={BARANGAY_176E_BOUNDARY.strokeWidth}
           />
 
-          {/* Heatmap Circles (render first, below markers) */}
-          {mapReady && displayedMarkers.map((m) => (
-            <Circle
-              key={`heat-${m.id}`}
-              center={{ latitude: m._lat, longitude: m._lng }}
-              radius={HEATMAP_RADIUS[m.severity as keyof typeof HEATMAP_RADIUS] || 80}
-              fillColor={HEATMAP_COLORS[m.severity as keyof typeof HEATMAP_COLORS] || HEATMAP_COLORS.medium}
-              strokeColor={HEATMAP_STROKE[m.severity as keyof typeof HEATMAP_STROKE] || HEATMAP_STROKE.medium}
-              strokeWidth={1}
-            />
-          ))}
-
-          {/* Markers (render on top of heatmap) */}
+          {/* Markers only - no heatmap circles */}
           {mapReady && displayedMarkers.map((m) => (
             <Marker
               key={m.id}
@@ -187,29 +140,6 @@ export default function MapScreen() {
           ))}
         </MapView>
 
-        {/* Heatmap Legend */}
-        <View style={styles.heatmapLegend}>
-          <Text style={styles.legendTitle}>Risk Zones</Text>
-          <View style={styles.legendItems}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#DC2626' }]} />
-              <Text style={styles.legendText}>Critical ({incidentCounts.critical})</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
-              <Text style={styles.legendText}>High ({incidentCounts.high})</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
-              <Text style={styles.legendText}>Medium ({incidentCounts.medium})</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
-              <Text style={styles.legendText}>Low ({incidentCounts.low})</Text>
-            </View>
-          </View>
-        </View>
-
         {/* Info Card - Privacy Safe (no photos) */}
         {selectedMarker && (
           <InfoCard marker={selectedMarker} onClose={() => setSelectedMarker(null)} />
@@ -219,7 +149,7 @@ export default function MapScreen() {
         {loading && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="small" color={colors.primary.blue} />
-            <Text style={styles.loadingOverlayText}>Updating reports...</Text>
+            <Text style={styles.loadingOverlayText}>Updating...</Text>
           </View>
         )}
       </View>

@@ -16,7 +16,7 @@ import { getSeverityColor } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { styles } from '@/app/(tabs)/map.styles';
+import { mapStyles as styles } from '@/constants/map-screen.styles';
 
 const { colors } = DesignSystem;
 
