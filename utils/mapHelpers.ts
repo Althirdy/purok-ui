@@ -2,9 +2,9 @@
  * Map Helper Functions
  */
 
-import type { Ionicons } from '@expo/vector-icons';
 import type { EmergencyReport } from '@/types';
 import { getSeverityColor } from '@/utils/reportHelpers';
+import type { Ionicons } from '@expo/vector-icons';
 
 /**
  * Get marker icon based on report type
@@ -94,7 +94,7 @@ export function processMarkersWithJitter<T extends { id: string; latitude: numbe
 }
 
 /**
- * Selected marker type
+ * Selected marker type (Privacy-safe: no photos/personal info)
  */
 export type SelectedMarker = {
   id: string;
@@ -104,6 +104,7 @@ export type SelectedMarker = {
   severity: string;
   location: string;
   color: string;
+  timestamp?: Date; // When the incident occurred
 } | null;
 
 

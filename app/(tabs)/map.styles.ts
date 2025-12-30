@@ -167,6 +167,116 @@ export const styles = StyleSheet.create({
     color: colors.text.secondary,
     fontWeight: '500',
   },
+
+  // Verified badge in header
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  verifiedBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: '#10B981',
+  },
+
+  // Heatmap Legend
+  heatmapLegend: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    minWidth: 140,
+  },
+  legendTitle: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  legendItems: {
+    gap: 6,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+  },
+
+  // Privacy Notice in InfoCard
+  privacyNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: spacing.md,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  privacyNoticeText: {
+    fontSize: typography.fontSize.xs,
+    color: '#10B981',
+    fontWeight: typography.fontWeight.medium,
+  },
+
+  // Timestamp row
+  timestampRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: spacing.md,
+    backgroundColor: colors.background.secondary,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  timestampText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+  },
+
+  // Privacy info box (replaces View Details button)
+  infoPrivacyBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: 'rgba(107, 114, 128, 0.1)',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(107, 114, 128, 0.2)',
+  },
+  infoPrivacyText: {
+    flex: 1,
+    fontSize: typography.fontSize.xs,
+    color: '#6B7280',
+    lineHeight: 16,
+  },
 });
 
 

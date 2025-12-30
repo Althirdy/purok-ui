@@ -2,43 +2,85 @@
  * Heatmap Service
  * 
  * Fetches verified incident data for heatmap display.
- * This endpoint returns ONLY location and severity (privacy-safe).
- * No personal information, images, or detailed descriptions.
+ * Endpoint: GET /api/v1/incidents/heatmap
+ * 
+ * PRIVACY PROTECTED:
+ * - Only returns verified/resolved incidents
+ * - NO images or personal details
+ * - Only: lat, lng, severity, type, title, occurred_at
  */
 
 import { httpGet } from '@/lib/axios';
 
+/**
+ * Raw incident from backend API
+ */
+export interface HeatmapIncident {
+  id: number;
+  lat: number;
+  lng: number;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  type: string; // fire, accident, crime, medical, suspicious
+  title: string;
+  occurred_at: string; // ISO date string
+}
+
+/**
+ * Normalized heatmap point for map display
+ */
 export interface HeatmapPoint {
+  id: number;
   latitude: number;
   longitude: number;
   severity: 'critical' | 'high' | 'medium' | 'low';
-  type?: string; // fire, accident, crime, medical, suspicious
+  type: string;
+  title: string;
+  occurredAt: Date;
 }
 
+/**
+ * Backend API response format
+ */
 export interface HeatmapResponse {
   success: boolean;
-  data: HeatmapPoint[];
-  message?: string;
+  message: string;
+  data: {
+    incidents: HeatmapIncident[];
+    total: number;
+  };
+}
+
+/**
+ * Filter options for heatmap API
+ */
+export interface HeatmapFilters {
+  accidentType?: string;  // Filter by type (fire, accident, etc.)
+  severity?: 'critical' | 'high' | 'medium' | 'low';
+  fromDate?: string;      // ISO date string
+  toDate?: string;        // ISO date string
 }
 
 /**
  * Fetch heatmap data (verified incidents only)
  * 
  * @param options - Optional filters
- * @returns Array of heatmap points with lat/lng/severity
+ * @returns Array of normalized heatmap points
  */
-export async function fetchHeatmapData(options?: {
-  since?: string; // ISO date string
-  type?: string;  // Filter by incident type
-}): Promise<HeatmapPoint[]> {
+export async function fetchHeatmapData(options?: HeatmapFilters): Promise<HeatmapPoint[]> {
   try {
     const params = new URLSearchParams();
     
-    if (options?.since) {
-      params.append('since', options.since);
+    if (options?.accidentType) {
+      params.append('accident_type', options.accidentType);
     }
-    if (options?.type) {
-      params.append('type', options.type);
+    if (options?.severity) {
+      params.append('severity', options.severity);
+    }
+    if (options?.fromDate) {
+      params.append('from_date', options.fromDate);
+    }
+    if (options?.toDate) {
+      params.append('to_date', options.toDate);
     }
 
     const queryString = params.toString();
@@ -48,15 +90,26 @@ export async function fetchHeatmapData(options?: {
 
     const response = await httpGet<HeatmapResponse>(url);
 
-    if (response.success && Array.isArray(response.data)) {
-      console.log('[HeatmapService] Received', response.data.length, 'points');
-      return response.data;
+    if (response.success && response.data?.incidents) {
+      const incidents = response.data.incidents;
+      console.log('[HeatmapService] ✅ Received', incidents.length, 'verified incidents');
+      
+      // Normalize the data (convert lat/lng to latitude/longitude)
+      return incidents.map((incident): HeatmapPoint => ({
+        id: incident.id,
+        latitude: incident.lat,
+        longitude: incident.lng,
+        severity: incident.severity,
+        type: incident.type,
+        title: incident.title,
+        occurredAt: new Date(incident.occurred_at),
+      }));
     }
     
-    console.warn('[HeatmapService] Invalid response format');
+    console.warn('[HeatmapService] Invalid response format:', response);
     return [];
   } catch (error) {
-    console.error('[HeatmapService] Error fetching heatmap data:', error);
+    console.error('[HeatmapService] ❌ Error fetching heatmap data:', error);
     return [];
   }
 }
