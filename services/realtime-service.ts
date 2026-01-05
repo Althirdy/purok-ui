@@ -306,6 +306,86 @@ export async function subscribeToCitizenReports(
 }
 
 /**
+ * Payload for accident status updates from CCTV system
+ * Channel: active-accidents (public channel)
+ * Event: accident.status.updated
+ */
+type AccidentStatusUpdatedPayload = {
+  id: number;
+  latitude: string | number;
+  longitude: string | number;
+  accidentType: string;
+  severity: string;
+  status: string; // 'Pending', 'In Progress', 'Resolved'
+  title: string;
+  occuredAt: string; // "2 hours ago" format
+};
+
+/**
+ * Subscribe to CCTV accident status updates
+ * 
+ * Channel: active-accidents (PUBLIC channel)
+ * Event: accident.status.updated
+ * 
+ * Broadcasts when Operator acknowledges/resolves an accident.
+ * Used to update map markers in real-time.
+ * 
+ * @param onAccidentUpdate - Callback when accident status changes
+ */
+export async function subscribeToAccidentStatusUpdates(
+  onAccidentUpdate: (accident: AccidentStatusUpdatedPayload) => void
+): Promise<() => void> {
+  try {
+    const client = await getPusherClient();
+    
+    // Public channel - no authentication needed
+    const channelName = 'active-accidents';
+    console.log('[Pusher] Subscribing to accident updates on channel:', channelName);
+    
+    const channel = client.subscribe(channelName);
+
+    channel.bind('pusher:subscription_succeeded', () => {
+      console.log('[Pusher] ✅ Subscribed to accident updates on', channelName);
+    });
+
+    channel.bind('pusher:subscription_error', (err: any) => {
+      console.error('[Pusher] ❌ Accident subscription error:', err);
+    });
+
+    // Event handler for accident status updates
+    const handler = (data: AccidentStatusUpdatedPayload) => {
+      try {
+        console.log('[Pusher] 🚗 Accident Status Update:', {
+          id: data.id,
+          status: data.status,
+          title: data.title,
+          type: data.accidentType,
+        });
+        onAccidentUpdate(data);
+      } catch (error) {
+        console.error('[Pusher] ❌ Failed to process accident update:', error);
+      }
+    };
+
+    // Bind to the event (both with and without leading dot for safety)
+    channel.bind('.accident.status.updated', handler);
+    channel.bind('accident.status.updated', handler);
+
+    console.log('[Pusher] ✅ Listening for accident.status.updated events');
+
+    return () => {
+      console.log('[Pusher] Unsubscribing from accident updates');
+      channel.unbind('.accident.status.updated', handler);
+      channel.unbind('accident.status.updated', handler);
+      client.unsubscribe(channelName);
+    };
+  } catch (error) {
+    console.error('[Pusher] Error setting up accident subscription:', error);
+    return () => {};
+  }
+}
+
+/**
  * Subscribe to status update events for concerns
  * 
  * Channel: private-purok-leader.{userId}

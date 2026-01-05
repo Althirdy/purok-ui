@@ -1,10 +1,14 @@
 /**
- * Map Screen - View of Verified Incidents
+ * Map Screen - View of Verified/Ongoing Incidents
  * 
- * Shows only verified/acknowledged incidents with markers.
- * No heatmap circles - just clean markers for incident locations.
+ * Shows TWO types of incidents on the map:
+ * 1. Citizen Concerns (acknowledged/resolved by Purok)
+ * 2. CCTV Accidents (In Progress - acknowledged by Operator)
  * 
- * For Purok Officials: To acknowledge/verify reports for citizen visibility.
+ * PRIVACY PROTECTED:
+ * - Photos are NOT shown (hidden in info card)
+ * - Only verified/acknowledged incidents appear
+ * - Purok Leaders (Role 3) don't get media from API
  */
 
 import { InfoCard } from '@/components/map/info-card';
@@ -13,26 +17,120 @@ import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { mapStyles as styles } from '@/constants/map-screen.styles';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
+import { fetchActiveAccidentMarkers, markerToEmergencyReport } from '@/services/active-accidents-service';
+import { subscribeToAccidentStatusUpdates } from '@/services/realtime-service';
 import type { EmergencyReport } from '@/types';
 import { getMarkerColor, processMarkersWithJitter, type SelectedMarker } from '@/utils/mapHelpers';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polygon } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors } = DesignSystem;
 
 export default function MapScreen() {
-  const { reports, loading, fetchReports } = useReportsFeed();
+  // Citizen concerns from Pusher/API
+  const { reports, loading: loadingConcerns, fetchReports } = useReportsFeed();
+  
+  // CCTV accidents (ongoing)
+  const [cctvAccidents, setCctvAccidents] = useState<EmergencyReport[]>([]);
+  const [loadingAccidents, setLoadingAccidents] = useState(false);
+  
   const mapRef = useRef<MapView | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [selectedMarker, setSelectedMarker] = useState<SelectedMarker>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch reports on mount
+  // Fetch citizen concerns on mount
   useEffect(() => {
     fetchReports('all');
   }, [fetchReports]);
+
+  // Fetch CCTV accidents on mount
+  const fetchAccidents = useCallback(async () => {
+    setLoadingAccidents(true);
+    try {
+      const markers = await fetchActiveAccidentMarkers();
+      const converted = markers.map(markerToEmergencyReport);
+      setCctvAccidents(converted);
+      console.log('[MapScreen] ✅ Loaded', converted.length, 'CCTV accidents');
+    } catch (error) {
+      console.error('[MapScreen] Error fetching CCTV accidents:', error);
+    } finally {
+      setLoadingAccidents(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAccidents();
+  }, [fetchAccidents]);
+
+  // Subscribe to real-time accident status updates
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+
+    const setupRealtimeSubscription = async () => {
+      try {
+        unsubscribe = await subscribeToAccidentStatusUpdates((accident) => {
+          console.log('[MapScreen] 🔔 Real-time accident update:', accident);
+          
+          // If status changed to "In Progress", add/update marker
+          if (accident.status === 'In Progress') {
+            setCctvAccidents(prev => {
+              const existing = prev.find(a => a.id === `accident-${accident.id}`);
+              if (existing) {
+                // Update existing
+                return prev.map(a => 
+                  a.id === `accident-${accident.id}` 
+                    ? {
+                        ...a,
+                        title: accident.title,
+                        coordinates: {
+                          latitude: typeof accident.latitude === 'string' ? parseFloat(accident.latitude) : accident.latitude,
+                          longitude: typeof accident.longitude === 'string' ? parseFloat(accident.longitude) : accident.longitude,
+                        },
+                      }
+                    : a
+                );
+              }
+              // Add new marker
+              const lat = typeof accident.latitude === 'string' ? parseFloat(accident.latitude) : accident.latitude;
+              const lng = typeof accident.longitude === 'string' ? parseFloat(accident.longitude) : accident.longitude;
+              return [...prev, {
+                id: `accident-${accident.id}`,
+                type: 'accident' as const,
+                title: accident.title,
+                description: 'CCTV detected incident',
+                location: 'Location pending...',
+                timestamp: new Date(),
+                status: 'acknowledged' as const,
+                severity: (accident.severity?.toLowerCase() || 'medium') as EmergencyReport['severity'],
+                source: 'cctv' as const,
+                coordinates: { latitude: lat, longitude: lng },
+              }];
+            });
+          }
+          
+          // If status changed to "Resolved", remove marker from active
+          if (accident.status === 'Resolved') {
+            setCctvAccidents(prev => prev.filter(a => a.id !== `accident-${accident.id}`));
+          }
+        });
+        console.log('[MapScreen] ✅ Subscribed to accident real-time updates');
+      } catch (error) {
+        console.error('[MapScreen] Failed to setup real-time subscription:', error);
+      }
+    };
+
+    setupRealtimeSubscription();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
 
   // Animate to region on mount
   useEffect(() => {
@@ -43,16 +141,31 @@ export default function MapScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  // PRIVACY FILTER: Only show verified/acknowledged incidents (not pending)
-  const verifiedReports = useMemo(() => {
+  // Handle pull-to-refresh
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchReports('all'),
+      fetchAccidents(),
+    ]);
+    setRefreshing(false);
+  }, [fetchReports, fetchAccidents]);
+
+  // PRIVACY FILTER: Only show verified/acknowledged citizen concerns
+  const verifiedConcerns = useMemo(() => {
     return reports.filter((r: EmergencyReport) => 
       r.status === 'acknowledged' || r.status === 'resolved'
     );
   }, [reports]);
 
-  // Convert verified reports to markers (only valid coordinates)
-  const reportMarkers = useMemo(() => {
-    return verifiedReports
+  // Combine both sources: verified citizen concerns + CCTV accidents
+  const allIncidents = useMemo(() => {
+    return [...verifiedConcerns, ...cctvAccidents];
+  }, [verifiedConcerns, cctvAccidents]);
+
+  // Convert to markers (only valid coordinates)
+  const incidentMarkers = useMemo(() => {
+    return allIncidents
       .filter((r: EmergencyReport) => {
         const { latitude: lat, longitude: lng } = r.coordinates ?? {};
         return lat != null && lng != null && !isNaN(lat) && !isNaN(lng) &&
@@ -69,13 +182,14 @@ export default function MapScreen() {
         location: r.location,
         timestamp: r.timestamp,
         status: r.status,
+        source: r.source,
       }));
-  }, [verifiedReports]);
+  }, [allIncidents]);
 
   // Process markers with jitter for overlapping coordinates
   const displayedMarkers = useMemo(
-    () => processMarkersWithJitter(reportMarkers),
-    [reportMarkers]
+    () => processMarkersWithJitter(incidentMarkers),
+    [incidentMarkers]
   );
 
   const handleMarkerPress = (marker: typeof displayedMarkers[0]) => {
@@ -92,22 +206,49 @@ export default function MapScreen() {
     });
   };
 
+  const loading = loadingConcerns || loadingAccidents;
+  const citizenCount = verifiedConcerns.length;
+  const cctvCount = cctvAccidents.length;
+
   return (
     <SafeAreaView style={globalStyles.container}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <Text style={styles.headerTitle}>Incident Map</Text>
-          <View style={styles.headerActions}>
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="shield-checkmark" size={14} color="#10B981" />
-              <Text style={styles.verifiedBadgeText}>Verified Only</Text>
-            </View>
+          <TouchableOpacity 
+            style={styles.refreshButton} 
+            onPress={handleRefresh}
+            disabled={loading || refreshing}
+          >
+            <Ionicons 
+              name="refresh" 
+              size={20} 
+              color={loading || refreshing ? colors.text.secondary : colors.primary.blue} 
+            />
+          </TouchableOpacity>
+        </View>
+        
+        {/* Stats Row */}
+        <View style={styles.statsRow}>
+          {/* Citizen Concerns Badge */}
+          <View style={styles.statBadge}>
+            <Ionicons name="people" size={14} color="#3B82F6" />
+            <Text style={styles.statBadgeText}>{citizenCount} Citizen</Text>
+          </View>
+          
+          {/* CCTV Accidents Badge */}
+          <View style={[styles.statBadge, { backgroundColor: '#FEF3C7' }]}>
+            <Ionicons name="videocam" size={14} color="#D97706" />
+            <Text style={[styles.statBadgeText, { color: '#D97706' }]}>{cctvCount} CCTV</Text>
+          </View>
+          
+          {/* Verified Badge */}
+          <View style={styles.verifiedBadge}>
+            <Ionicons name="shield-checkmark" size={14} color="#10B981" />
+            <Text style={styles.verifiedBadgeText}>Verified Only</Text>
           </View>
         </View>
-        <Text style={styles.headerSubtitle}>
-          {reportMarkers.length} verified incidents in your area
-        </Text>
       </View>
 
       {/* Map */}
@@ -127,7 +268,7 @@ export default function MapScreen() {
             strokeWidth={BARANGAY_176E_BOUNDARY.strokeWidth}
           />
 
-          {/* Markers only - no heatmap circles */}
+          {/* Incident Markers */}
           {mapReady && displayedMarkers.map((m) => (
             <Marker
               key={m.id}
@@ -140,18 +281,30 @@ export default function MapScreen() {
           ))}
         </MapView>
 
-        {/* Info Card - Privacy Safe (no photos) */}
+        {/* Info Card - Privacy Safe (NO photos) */}
         {selectedMarker && (
           <InfoCard marker={selectedMarker} onClose={() => setSelectedMarker(null)} />
         )}
 
         {/* Loading Overlay */}
-        {loading && (
+        {loading && !refreshing && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="small" color={colors.primary.blue} />
-            <Text style={styles.loadingOverlayText}>Updating...</Text>
+            <Text style={styles.loadingOverlayText}>Loading incidents...</Text>
           </View>
         )}
+
+        {/* Legend */}
+        <View style={styles.legend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
+            <Text style={styles.legendText}>Citizen</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: '#D97706' }]} />
+            <Text style={styles.legendText}>CCTV</Text>
+          </View>
+        </View>
       </View>
     </SafeAreaView>
   );

@@ -51,8 +51,9 @@ export const getMarkerColor = (
 
 /**
  * Process markers to jitter overlapping coordinates
+ * Works with both citizen concerns and CCTV accidents
  */
-export function processMarkersWithJitter<T extends { id: string; latitude: number; longitude: number }>(
+export function processMarkersWithJitter<T extends { id: string; latitude: number; longitude: number; source?: string }>(
   markers: T[]
 ): (T & { _lat: number; _lng: number })[] {
   if (!markers.length) return [];
