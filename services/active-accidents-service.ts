@@ -72,12 +72,18 @@ interface AccidentDetailResponse {
  * 
  * Returns minimal data for fast map rendering:
  * - id, latitude, longitude, accident_type, severity
+ * 
+ * @param token - Authentication token (required)
  */
-export async function fetchActiveAccidentMarkers(): Promise<AccidentMarker[]> {
+export async function fetchActiveAccidentMarkers(token: string): Promise<AccidentMarker[]> {
   try {
     console.log('[ActiveAccidents] Fetching active accident markers...');
     
-    const response = await httpGet<MarkersResponse>('/api/v1/active-accidents');
+    const response = await httpGet<MarkersResponse>('/api/v1/active-accidents', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
     if (response.success && response.data?.markers) {
       const markers = response.data.markers;
@@ -97,12 +103,19 @@ export async function fetchActiveAccidentMarkers(): Promise<AccidentMarker[]> {
  * Fetch full details of a specific active accident
  * 
  * Note: For Role 3 (Purok Leaders), media/photos are NOT returned
+ * 
+ * @param id - Accident ID
+ * @param token - Authentication token (required)
  */
-export async function fetchActiveAccidentDetail(id: number): Promise<ActiveAccident | null> {
+export async function fetchActiveAccidentDetail(id: number, token: string): Promise<ActiveAccident | null> {
   try {
     console.log('[ActiveAccidents] Fetching accident details:', id);
     
-    const response = await httpGet<AccidentDetailResponse>(`/api/v1/active-accidents/${id}`);
+    const response = await httpGet<AccidentDetailResponse>(`/api/v1/active-accidents/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
     if (response.success && response.data?.accident) {
       console.log('[ActiveAccidents] ✅ Got accident details');

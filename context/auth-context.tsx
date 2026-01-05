@@ -22,7 +22,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_TOKEN_KEY = '@urbanwatch:auth_token';
 const NOTIFICATIONS_STORAGE_KEY = '@urbanwatch:notifications';
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
+// Default to ngrok URL for mobile development (ddev share)
+// For production, set EXPO_PUBLIC_API_URL=https://www.urbanwatch.me
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://uniniquitous-semimaturely-amie.ngrok-free.dev';
 const LOGIN_ENDPOINT = '/api/v1/login/purok-leader';
 const CURRENT_USER_ENDPOINT = '/api/v1/auth/user';
 // Control whether session persists across app restarts
@@ -95,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       headers: {
         'Accept': 'application/json',
         'Authorization': `Bearer ${token}`,
+        'ngrok-skip-browser-warning': 'true', // Required for ngrok free tier
       },
     });
     if (!resp.ok) {
@@ -112,22 +115,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsSubmitting(true);
     try {
       const base = await getApiBase();
-      const resp = await fetch(`${base}${LOGIN_ENDPOINT}`, {
+      const url = `${base}${LOGIN_ENDPOINT}`;
+      
+      console.log('[Auth] Logging in to:', url);
+      console.log('[Auth] PIN being sent:', pin, 'type:', typeof pin, 'length:', pin.length);
+      
+      // Ensure pin is trimmed - backend expects pin as STRING
+      const cleanPin = String(pin).trim();
+      
+      // Send PIN as string (backend validation requires: 'pin' => 'required|string')
+      const bodyStr = JSON.stringify({ pin: cleanPin });
+      console.log('[Auth] Request body:', bodyStr);
+      
+      // Try JSON format - Laravel accepts both JSON and form-data
+      const resp = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true', // Required for ngrok free tier
         },
-        body: JSON.stringify({ pin }),
+        body: bodyStr,
       });
+      
+      console.log('[Auth] Response status:', resp.status);
+      
+      // Get response text first for debugging
+      const responseText = await resp.text();
+      console.log('[Auth] Response body:', responseText.substring(0, 500));
+      
+      // Parse as JSON
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (e) {
+        console.error('[Auth] Failed to parse response as JSON');
+        throw new Error('Invalid response from server');
+      }
+      
       if (!resp.ok) {
-        const message = await resp
-          .json()
-          .then(data => data?.message ?? `Login failed: ${resp.status}`)
-          .catch(() => `Login failed: ${resp.status}`);
+        const message = responseData?.message ?? `Login failed: ${resp.status}`;
+        console.error('[Auth] Login failed:', message);
         throw new Error(message);
       }
-      const loginData = await resp.json();
+      
+      // Use the already-parsed response data
+      const loginData = responseData;
       const token: string | undefined = loginData?.token || loginData?.accessToken || loginData?.data?.token;
       if (!token) {
         console.error('[Auth] Login response missing token:', {

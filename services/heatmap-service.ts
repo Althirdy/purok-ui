@@ -14,11 +14,12 @@ import { httpGet } from '@/lib/axios';
 
 /**
  * Raw incident from backend API
+ * Note: Backend returns lat/lng as strings (e.g., "14.5000000")
  */
 export interface HeatmapIncident {
   id: number;
-  lat: number;
-  lng: number;
+  lat: string | number; // Backend returns as string
+  lng: string | number; // Backend returns as string
   severity: 'critical' | 'high' | 'medium' | 'low';
   type: string; // fire, accident, crime, medical, suspicious
   title: string;
@@ -63,10 +64,11 @@ export interface HeatmapFilters {
 /**
  * Fetch heatmap data (verified incidents only)
  * 
+ * @param token - Authentication token (required)
  * @param options - Optional filters
  * @returns Array of normalized heatmap points
  */
-export async function fetchHeatmapData(options?: HeatmapFilters): Promise<HeatmapPoint[]> {
+export async function fetchHeatmapData(token: string, options?: HeatmapFilters): Promise<HeatmapPoint[]> {
   try {
     const params = new URLSearchParams();
     
@@ -88,17 +90,22 @@ export async function fetchHeatmapData(options?: HeatmapFilters): Promise<Heatma
     
     console.log('[HeatmapService] Fetching heatmap data:', url);
 
-    const response = await httpGet<HeatmapResponse>(url);
+    const response = await httpGet<HeatmapResponse>(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
     if (response.success && response.data?.incidents) {
       const incidents = response.data.incidents;
       console.log('[HeatmapService] ✅ Received', incidents.length, 'verified incidents');
       
       // Normalize the data (convert lat/lng to latitude/longitude)
+      // Backend returns lat/lng as strings, convert to numbers
       return incidents.map((incident): HeatmapPoint => ({
         id: incident.id,
-        latitude: incident.lat,
-        longitude: incident.lng,
+        latitude: typeof incident.lat === 'string' ? parseFloat(incident.lat) : incident.lat,
+        longitude: typeof incident.lng === 'string' ? parseFloat(incident.lng) : incident.lng,
         severity: incident.severity,
         type: incident.type,
         title: incident.title,

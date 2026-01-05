@@ -9,6 +9,8 @@ export async function httpGet<T = any>(path: string, init?: RequestInit): Promis
   const mergedHeaders = new Headers();
   mergedHeaders.set('Accept', 'application/json');
   mergedHeaders.set('X-Requested-With', 'XMLHttpRequest');
+  // Required for ngrok free tier - bypasses the browser warning page
+  mergedHeaders.set('ngrok-skip-browser-warning', 'true');
   
   if (init?.headers) {
     if (init.headers instanceof Headers) {
@@ -85,6 +87,8 @@ export async function httpPost<T = any>(path: string, body?: any, init?: Request
   mergedHeaders.set('Content-Type', 'application/json');
   mergedHeaders.set('Accept', 'application/json');
   mergedHeaders.set('X-Requested-With', 'XMLHttpRequest');
+  // Required for ngrok free tier - bypasses the browser warning page
+  mergedHeaders.set('ngrok-skip-browser-warning', 'true');
   
   if (init?.headers) {
     if (init.headers instanceof Headers) {
@@ -162,6 +166,8 @@ export async function httpPut<T = any>(path: string, body?: any, init?: RequestI
   mergedHeaders.set('Content-Type', 'application/json');
   mergedHeaders.set('Accept', 'application/json');
   mergedHeaders.set('X-Requested-With', 'XMLHttpRequest');
+  // Required for ngrok free tier - bypasses the browser warning page
+  mergedHeaders.set('ngrok-skip-browser-warning', 'true');
   
   // Add custom headers from init, but don't override our required headers
   if (init?.headers) {

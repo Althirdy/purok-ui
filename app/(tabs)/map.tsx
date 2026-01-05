@@ -1,13 +1,15 @@
 /**
- * Map Screen - View of Verified/Ongoing Incidents
+ * Map Screen - View of Verified/Ongoing Incidents with Heatmap
  * 
- * Shows TWO types of incidents on the map:
- * 1. Citizen Concerns (acknowledged/resolved by Purok)
- * 2. CCTV Accidents (In Progress - acknowledged by Operator)
+ * Shows THREE types of data on the map:
+ * 1. Citizen Concerns (acknowledged/resolved by Purok) - Markers
+ * 2. CCTV Accidents (In Progress - acknowledged by Operator) - Markers
+ * 3. Heatmap Overlay (verified/resolved incidents) - Circle overlays (Waze-style)
  * 
  * PRIVACY PROTECTED:
  * - Photos are NOT shown (hidden in info card)
- * - Only verified/acknowledged incidents appear
+ * - Only verified/acknowledged incidents appear as markers
+ * - Heatmap shows only verified/resolved incidents (no pending)
  * - Purok Leaders (Role 3) don't get media from API
  */
 
@@ -16,26 +18,35 @@ import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION } from '@/constants/barang
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { mapStyles as styles } from '@/constants/map-screen.styles';
+import { useAuth } from '@/context/auth-context';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
 import { fetchActiveAccidentMarkers, markerToEmergencyReport } from '@/services/active-accidents-service';
+import { fetchHeatmapData, severityToColor, type HeatmapPoint } from '@/services/heatmap-service';
 import { subscribeToAccidentStatusUpdates } from '@/services/realtime-service';
 import type { EmergencyReport } from '@/types';
 import { getMarkerColor, processMarkersWithJitter, type SelectedMarker } from '@/utils/mapHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, Polygon } from 'react-native-maps';
+import MapView, { Circle, Marker, Polygon } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors } = DesignSystem;
 
 export default function MapScreen() {
+  // Get auth token for authenticated requests
+  const { accessToken } = useAuth();
+  
   // Citizen concerns from Pusher/API
   const { reports, loading: loadingConcerns, fetchReports } = useReportsFeed();
   
   // CCTV accidents (ongoing)
   const [cctvAccidents, setCctvAccidents] = useState<EmergencyReport[]>([]);
   const [loadingAccidents, setLoadingAccidents] = useState(false);
+  
+  // Heatmap data (verified/resolved incidents)
+  const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
+  const [loadingHeatmap, setLoadingHeatmap] = useState(false);
   
   const mapRef = useRef<MapView | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -49,9 +60,13 @@ export default function MapScreen() {
 
   // Fetch CCTV accidents on mount
   const fetchAccidents = useCallback(async () => {
+    if (!accessToken) {
+      console.warn('[MapScreen] No auth token, skipping CCTV accidents fetch');
+      return;
+    }
     setLoadingAccidents(true);
     try {
-      const markers = await fetchActiveAccidentMarkers();
+      const markers = await fetchActiveAccidentMarkers(accessToken);
       const converted = markers.map(markerToEmergencyReport);
       setCctvAccidents(converted);
       console.log('[MapScreen] ✅ Loaded', converted.length, 'CCTV accidents');
@@ -60,11 +75,33 @@ export default function MapScreen() {
     } finally {
       setLoadingAccidents(false);
     }
-  }, []);
+  }, [accessToken]);
 
   useEffect(() => {
     fetchAccidents();
   }, [fetchAccidents]);
+
+  // Fetch heatmap data on mount
+  const fetchHeatmap = useCallback(async () => {
+    if (!accessToken) {
+      console.warn('[MapScreen] No auth token, skipping heatmap fetch');
+      return;
+    }
+    setLoadingHeatmap(true);
+    try {
+      const data = await fetchHeatmapData(accessToken);
+      setHeatmapData(data);
+      console.log('[MapScreen] ✅ Loaded', data.length, 'heatmap points');
+    } catch (error) {
+      console.error('[MapScreen] Error fetching heatmap data:', error);
+    } finally {
+      setLoadingHeatmap(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    fetchHeatmap();
+  }, [fetchHeatmap]);
 
   // Subscribe to real-time accident status updates
   useEffect(() => {
@@ -147,9 +184,10 @@ export default function MapScreen() {
     await Promise.all([
       fetchReports('all'),
       fetchAccidents(),
+      fetchHeatmap(),
     ]);
     setRefreshing(false);
-  }, [fetchReports, fetchAccidents]);
+  }, [fetchReports, fetchAccidents, fetchHeatmap]);
 
   // PRIVACY FILTER: Only show verified/acknowledged citizen concerns
   const verifiedConcerns = useMemo(() => {
@@ -206,9 +244,82 @@ export default function MapScreen() {
     });
   };
 
-  const loading = loadingConcerns || loadingAccidents;
+  const loading = loadingConcerns || loadingAccidents || loadingHeatmap;
   const citizenCount = verifiedConcerns.length;
   const cctvCount = cctvAccidents.length;
+  const heatmapCount = heatmapData.length;
+
+  // Helper function to zoom to coordinates
+  const zoomToCoordinates = useCallback((coordinates: { latitude: number; longitude: number }[]) => {
+    if (coordinates.length === 0 || !mapRef.current) {
+      return;
+    }
+
+    // If only one point, zoom to it with a reasonable radius
+    if (coordinates.length === 1) {
+      mapRef.current.animateToRegion({
+        latitude: coordinates[0].latitude,
+        longitude: coordinates[0].longitude,
+        latitudeDelta: 0.01, // Zoom level
+        longitudeDelta: 0.01,
+      }, 1000);
+    } else {
+      // Fit all points in view
+      mapRef.current.fitToCoordinates(coordinates, {
+        edgePadding: {
+          top: 100,
+          right: 50,
+          bottom: 100,
+          left: 50,
+        },
+        animated: true,
+      });
+    }
+  }, []);
+
+  // Zoom to citizen concerns when badge is clicked
+  const handleCitizenBadgePress = useCallback(() => {
+    const coordinates = verifiedConcerns
+      .filter((r) => {
+        const { latitude: lat, longitude: lng } = r.coordinates ?? {};
+        return lat != null && lng != null && !isNaN(lat) && !isNaN(lng);
+      })
+      .map((r) => ({
+        latitude: r.coordinates!.latitude,
+        longitude: r.coordinates!.longitude,
+      }));
+
+    zoomToCoordinates(coordinates);
+  }, [verifiedConcerns, zoomToCoordinates]);
+
+  // Zoom to CCTV accidents when badge is clicked
+  const handleCctvBadgePress = useCallback(() => {
+    const coordinates = cctvAccidents
+      .filter((r) => {
+        const { latitude: lat, longitude: lng } = r.coordinates ?? {};
+        return lat != null && lng != null && !isNaN(lat) && !isNaN(lng);
+      })
+      .map((r) => ({
+        latitude: r.coordinates!.latitude,
+        longitude: r.coordinates!.longitude,
+      }));
+
+    zoomToCoordinates(coordinates);
+  }, [cctvAccidents, zoomToCoordinates]);
+
+  // Zoom to heatmap locations when badge is clicked
+  const handleHeatmapBadgePress = useCallback(() => {
+    const coordinates = heatmapData
+      .map((point) => {
+        const lat = typeof point.latitude === 'string' ? parseFloat(point.latitude) : point.latitude;
+        const lng = typeof point.longitude === 'string' ? parseFloat(point.longitude) : point.longitude;
+        if (isNaN(lat) || isNaN(lng)) return null;
+        return { latitude: lat, longitude: lng };
+      })
+      .filter((coord): coord is { latitude: number; longitude: number } => coord !== null);
+
+    zoomToCoordinates(coordinates);
+  }, [heatmapData, zoomToCoordinates]);
 
   return (
     <SafeAreaView style={globalStyles.container}>
@@ -231,23 +342,45 @@ export default function MapScreen() {
         
         {/* Stats Row */}
         <View style={styles.statsRow}>
-          {/* Citizen Concerns Badge */}
-          <View style={styles.statBadge}>
+          {/* Citizen Concerns Badge - Clickable to zoom */}
+          <TouchableOpacity 
+            style={styles.statBadge}
+            onPress={handleCitizenBadgePress}
+            activeOpacity={0.7}
+            disabled={citizenCount === 0}
+          >
             <Ionicons name="people" size={14} color="#3B82F6" />
             <Text style={styles.statBadgeText}>{citizenCount} Citizen</Text>
-          </View>
+          </TouchableOpacity>
           
-          {/* CCTV Accidents Badge */}
-          <View style={[styles.statBadge, { backgroundColor: '#FEF3C7' }]}>
+          {/* CCTV Accidents Badge - Clickable to zoom */}
+          <TouchableOpacity 
+            style={[styles.statBadge, { backgroundColor: '#FEF3C7' }]}
+            onPress={handleCctvBadgePress}
+            activeOpacity={0.7}
+            disabled={cctvCount === 0}
+          >
             <Ionicons name="videocam" size={14} color="#D97706" />
             <Text style={[styles.statBadgeText, { color: '#D97706' }]}>{cctvCount} CCTV</Text>
-          </View>
+          </TouchableOpacity>
           
-          {/* Verified Badge */}
+          {/* Verified Badge - Info only */}
           <View style={styles.verifiedBadge}>
             <Ionicons name="shield-checkmark" size={14} color="#10B981" />
             <Text style={styles.verifiedBadgeText}>Verified Only</Text>
           </View>
+          
+          {/* Heatmap Badge - Clickable to zoom to heatmap locations */}
+          {heatmapCount > 0 && (
+            <TouchableOpacity 
+              style={[styles.statBadge, { backgroundColor: '#FEE2E2' }]}
+              onPress={handleHeatmapBadgePress}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="flame" size={14} color="#DC2626" />
+              <Text style={[styles.statBadgeText, { color: '#DC2626' }]}>{heatmapCount} Heatmap</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -268,7 +401,64 @@ export default function MapScreen() {
             strokeWidth={BARANGAY_176E_BOUNDARY.strokeWidth}
           />
 
-          {/* Incident Markers */}
+          {/* Heatmap Overlay - Verified/Resolved Incidents (Waze-style) */}
+          {mapReady && heatmapData.map((point) => {
+            const color = severityToColor(point.severity);
+            const radius = point.severity === 'critical' ? 150 : 
+                          point.severity === 'high' ? 120 : 
+                          point.severity === 'medium' ? 100 : 80;
+            // Convert string coordinates to numbers (Circle component requires numbers)
+            const lat = typeof point.latitude === 'string' ? parseFloat(point.latitude) : point.latitude;
+            const lng = typeof point.longitude === 'string' ? parseFloat(point.longitude) : point.longitude;
+            
+            // Skip if coordinates are invalid
+            if (isNaN(lat) || isNaN(lng)) {
+              return null;
+            }
+            
+            return (
+              <React.Fragment key={`heatmap-${point.id}`}>
+                {/* Heatmap Circle */}
+                <Circle
+                  center={{ latitude: lat, longitude: lng }}
+                  radius={radius}
+                  fillColor={`${color}60`} // 60 = 37% opacity (more visible)
+                  strokeColor={color}
+                  strokeWidth={3}
+                />
+                {/* Clickable Marker on top of circle - small visible dot */}
+                <Marker
+                  coordinate={{ latitude: lat, longitude: lng }}
+                  onPress={() => {
+                    const markerColor = severityToColor(point.severity);
+                    setSelectedMarker({
+                      id: `heatmap-${point.id}`,
+                      title: point.title || 'Heatmap Incident',
+                      description: `Type: ${point.type}\nSeverity: ${point.severity}\nDate: ${point.occurredAt.toLocaleDateString()}`,
+                      type: point.type || 'other',
+                      severity: point.severity || 'low',
+                      location: `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`,
+                      timestamp: point.occurredAt,
+                      color: markerColor,
+                    });
+                  }}
+                  anchor={{ x: 0.5, y: 0.5 }}
+                >
+                  {/* Small visible dot to indicate clickable area */}
+                  <View style={{ 
+                    width: 12, 
+                    height: 12, 
+                    borderRadius: 6, 
+                    backgroundColor: color,
+                    borderWidth: 2,
+                    borderColor: '#FFFFFF',
+                  }} />
+                </Marker>
+              </React.Fragment>
+            );
+          })}
+
+          {/* Incident Markers (Active/Current Incidents) */}
           {mapReady && displayedMarkers.map((m) => (
             <Marker
               key={m.id}
@@ -294,17 +484,6 @@ export default function MapScreen() {
           </View>
         )}
 
-        {/* Legend */}
-        <View style={styles.legend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#3B82F6' }]} />
-            <Text style={styles.legendText}>Citizen</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#D97706' }]} />
-            <Text style={styles.legendText}>CCTV</Text>
-          </View>
-        </View>
       </View>
     </SafeAreaView>
   );

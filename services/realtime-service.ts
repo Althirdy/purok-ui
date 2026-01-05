@@ -95,14 +95,16 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
   };
 
   // Add authentication for private channels
-  // Use www.urbanwatch.me to match the API base URL (https://www.urbanwatch.me)
+  // Uses configurable auth endpoint from constants/realtime.ts
+  // Development: ngrok URL (ddev share) | Production: www.urbanwatch.me
   // Status 0 = endpoint not reachable, Status 403 = endpoint reachable but auth failed
   if (authToken) {
-    pusherOptions.authEndpoint = 'https://www.urbanwatch.me/broadcasting/auth';
+    pusherOptions.authEndpoint = realtimeConfig.authEndpoint;
     pusherOptions.auth = {
       headers: {
         'Authorization': `Bearer ${authToken}`, // Pass the logged-in user's Sanctum token
         'Accept': 'application/json',
+        'ngrok-skip-browser-warning': 'true', // Required for ngrok free tier
       },
     };
     console.log('[Pusher] Configuring auth endpoint:', pusherOptions.authEndpoint);
