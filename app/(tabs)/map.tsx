@@ -1,15 +1,14 @@
 /**
- * Map Screen - View of Verified/Ongoing Incidents with Heatmap
+ * Map Screen - View of Verified/Ongoing Incidents
  * 
  * Shows THREE types of data on the map:
  * 1. Citizen Concerns (acknowledged/resolved by Purok) - Markers
  * 2. CCTV Accidents (In Progress - acknowledged by Operator) - Markers
- * 3. Heatmap Overlay (verified/resolved incidents) - Circle overlays (Waze-style)
+ * 3. Verified Incidents (from heatmap API) - Small dot markers (clickable)
  * 
  * PRIVACY PROTECTED:
  * - Photos are NOT shown (hidden in info card)
  * - Only verified/acknowledged incidents appear as markers
- * - Heatmap shows only verified/resolved incidents (no pending)
  * - Purok Leaders (Role 3) don't get media from API
  */
 
@@ -28,7 +27,7 @@ import { getMarkerColor, processMarkersWithJitter, type SelectedMarker } from '@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Circle, Marker, Polygon } from 'react-native-maps';
+import MapView, { Marker, Polygon } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors } = DesignSystem;
@@ -247,7 +246,6 @@ export default function MapScreen() {
   const loading = loadingConcerns || loadingAccidents || loadingHeatmap;
   const citizenCount = verifiedConcerns.length;
   const cctvCount = cctvAccidents.length;
-  const heatmapCount = heatmapData.length;
 
   // Helper function to zoom to coordinates
   const zoomToCoordinates = useCallback((coordinates: { latitude: number; longitude: number }[]) => {
@@ -307,20 +305,6 @@ export default function MapScreen() {
     zoomToCoordinates(coordinates);
   }, [cctvAccidents, zoomToCoordinates]);
 
-  // Zoom to heatmap locations when badge is clicked
-  const handleHeatmapBadgePress = useCallback(() => {
-    const coordinates = heatmapData
-      .map((point) => {
-        const lat = typeof point.latitude === 'string' ? parseFloat(point.latitude) : point.latitude;
-        const lng = typeof point.longitude === 'string' ? parseFloat(point.longitude) : point.longitude;
-        if (isNaN(lat) || isNaN(lng)) return null;
-        return { latitude: lat, longitude: lng };
-      })
-      .filter((coord): coord is { latitude: number; longitude: number } => coord !== null);
-
-    zoomToCoordinates(coordinates);
-  }, [heatmapData, zoomToCoordinates]);
-
   return (
     <SafeAreaView style={globalStyles.container}>
       {/* Header */}
@@ -369,18 +353,6 @@ export default function MapScreen() {
             <Ionicons name="shield-checkmark" size={14} color="#10B981" />
             <Text style={styles.verifiedBadgeText}>Verified Only</Text>
           </View>
-          
-          {/* Heatmap Badge - Clickable to zoom to heatmap locations */}
-          {heatmapCount > 0 && (
-            <TouchableOpacity 
-              style={[styles.statBadge, { backgroundColor: '#FEE2E2' }]}
-              onPress={handleHeatmapBadgePress}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="flame" size={14} color="#DC2626" />
-              <Text style={[styles.statBadgeText, { color: '#DC2626' }]}>{heatmapCount} Heatmap</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </View>
 
@@ -401,13 +373,10 @@ export default function MapScreen() {
             strokeWidth={BARANGAY_176E_BOUNDARY.strokeWidth}
           />
 
-          {/* Heatmap Overlay - Verified/Resolved Incidents (Waze-style) */}
+          {/* Verified Incidents Markers (clickable markers only, no circle overlay) */}
           {mapReady && heatmapData.map((point) => {
             const color = severityToColor(point.severity);
-            const radius = point.severity === 'critical' ? 150 : 
-                          point.severity === 'high' ? 120 : 
-                          point.severity === 'medium' ? 100 : 80;
-            // Convert string coordinates to numbers (Circle component requires numbers)
+            // Convert string coordinates to numbers
             const lat = typeof point.latitude === 'string' ? parseFloat(point.latitude) : point.latitude;
             const lng = typeof point.longitude === 'string' ? parseFloat(point.longitude) : point.longitude;
             
@@ -417,44 +386,34 @@ export default function MapScreen() {
             }
             
             return (
-              <React.Fragment key={`heatmap-${point.id}`}>
-                {/* Heatmap Circle */}
-                <Circle
-                  center={{ latitude: lat, longitude: lng }}
-                  radius={radius}
-                  fillColor={`${color}60`} // 60 = 37% opacity (more visible)
-                  strokeColor={color}
-                  strokeWidth={3}
-                />
-                {/* Clickable Marker on top of circle - small visible dot */}
-                <Marker
-                  coordinate={{ latitude: lat, longitude: lng }}
-                  onPress={() => {
-                    const markerColor = severityToColor(point.severity);
-                    setSelectedMarker({
-                      id: `heatmap-${point.id}`,
-                      title: point.title || 'Heatmap Incident',
-                      description: `Type: ${point.type}\nSeverity: ${point.severity}\nDate: ${point.occurredAt.toLocaleDateString()}`,
-                      type: point.type || 'other',
-                      severity: point.severity || 'low',
-                      location: `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`,
-                      timestamp: point.occurredAt,
-                      color: markerColor,
-                    });
-                  }}
-                  anchor={{ x: 0.5, y: 0.5 }}
-                >
-                  {/* Small visible dot to indicate clickable area */}
-                  <View style={{ 
-                    width: 12, 
-                    height: 12, 
-                    borderRadius: 6, 
-                    backgroundColor: color,
-                    borderWidth: 2,
-                    borderColor: '#FFFFFF',
-                  }} />
-                </Marker>
-              </React.Fragment>
+              <Marker
+                key={`heatmap-${point.id}`}
+                coordinate={{ latitude: lat, longitude: lng }}
+                onPress={() => {
+                  const markerColor = severityToColor(point.severity);
+                  setSelectedMarker({
+                    id: `heatmap-${point.id}`,
+                    title: point.title || 'Verified Incident',
+                    description: `Type: ${point.type}\nSeverity: ${point.severity}\nDate: ${point.occurredAt.toLocaleDateString()}`,
+                    type: point.type || 'other',
+                    severity: point.severity || 'low',
+                    location: `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`,
+                    timestamp: point.occurredAt,
+                    color: markerColor,
+                  });
+                }}
+                anchor={{ x: 0.5, y: 0.5 }}
+              >
+                {/* Small visible dot marker */}
+                <View style={{ 
+                  width: 12, 
+                  height: 12, 
+                  borderRadius: 6, 
+                  backgroundColor: color,
+                  borderWidth: 2,
+                  borderColor: '#FFFFFF',
+                }} />
+              </Marker>
             );
           })}
 

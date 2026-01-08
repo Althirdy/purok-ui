@@ -5,6 +5,8 @@
 import type { User } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { setTokenRefreshFunction } from '@/lib/axios';
+import { resetPusherClient } from '@/services/realtime-service';
 
 interface AuthContextType {
   user: User | null;
@@ -12,19 +14,22 @@ interface AuthContextType {
   isInitializing: boolean;
   isSubmitting: boolean;
   accessToken: string | null;
+  refreshToken: string | null;
   loginWithPin: (pin: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  refreshAccessToken: () => Promise<string | null>;
   sessionStartMs: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_TOKEN_KEY = '@urbanwatch:auth_token';
+const REFRESH_TOKEN_KEY = '@urbanwatch:refresh_token';
 const NOTIFICATIONS_STORAGE_KEY = '@urbanwatch:notifications';
-// Default to ngrok URL for mobile development (ddev share)
-// For production, set EXPO_PUBLIC_API_URL=https://www.urbanwatch.me
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://uniniquitous-semimaturely-amie.ngrok-free.dev';
+// Default to production URL
+// For development, set EXPO_PUBLIC_API_URL to ngrok URL in .env
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
 const LOGIN_ENDPOINT = '/api/v1/login/purok-leader';
 const CURRENT_USER_ENDPOINT = '/api/v1/auth/user';
 // Control whether session persists across app restarts
@@ -40,25 +45,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sessionStartMs, setSessionStartMs] = useState<number>(Date.now());
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
 
   useEffect(() => {
     initialize();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Register refresh function with axios interceptor when available
+  useEffect(() => {
+    setTokenRefreshFunction(refreshAccessToken);
+  }, [refreshAccessToken]);
+
   const initialize = async () => {
     try {
       if (!PERSIST_SESSION) {
-        await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, NOTIFICATIONS_STORAGE_KEY]);
+        await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, NOTIFICATIONS_STORAGE_KEY]);
         setUser(null);
         setAccessToken(null);
+        setRefreshToken(null);
         return;
       }
       const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      const storedRefreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
       if (token) {
         await fetchCurrentUser(token);
         setSessionStartMs(Date.now());
         setAccessToken(token);
+        setRefreshToken(storedRefreshToken);
       }
     } catch (err) {
       // noop; stay unauthenticated on init failure
@@ -160,31 +174,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       // Use the already-parsed response data
-      const loginData = responseData;
-      const token: string | undefined = loginData?.token || loginData?.accessToken || loginData?.data?.token;
+      const loginData = responseData?.data ?? responseData;
+      const token: string | undefined = loginData?.token || loginData?.accessToken || responseData?.token;
+      const refreshTokenValue: string | undefined = loginData?.refreshToken || responseData?.refreshToken;
+      
       if (!token) {
         console.error('[Auth] Login response missing token:', {
           hasToken: !!loginData?.token,
           hasAccessToken: !!loginData?.accessToken,
-          hasDataToken: !!loginData?.data?.token,
+          hasDataToken: !!responseData?.token,
           loginDataKeys: Object.keys(loginData || {}),
+          responseDataKeys: Object.keys(responseData || {}),
         });
         throw new Error('Login response missing token');
       }
+      
+      if (!refreshTokenValue) {
+        console.warn('[Auth] ⚠️ Login response missing refreshToken - token refresh will not work');
+      }
+      
       console.log('[Auth] ✅ Token extracted from login response:', {
         tokenLength: token.length,
         tokenPrefix: token.substring(0, 20) + '...',
-        tokenFormat: token.includes('|') ? 'valid (has pipe)' : 'invalid (no pipe)',
-        source: loginData?.token ? 'loginData.token' : 
-                loginData?.accessToken ? 'loginData.accessToken' : 
-                'loginData.data.token',
+        hasRefreshToken: !!refreshTokenValue,
+        refreshTokenPrefix: refreshTokenValue ? refreshTokenValue.substring(0, 20) + '...' : 'none',
       });
+      
+      // Store both tokens
       await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+      if (refreshTokenValue) {
+        await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshTokenValue);
+      }
       setAccessToken(token);
-      console.log('[Auth] ✅ Token stored in AsyncStorage and context');
+      setRefreshToken(refreshTokenValue || null);
+      console.log('[Auth] ✅ Tokens stored in AsyncStorage and context');
+      
       // Optimistically set user from login response if available
-      if (loginData?.data?.user) {
-        setUser(normalizeUser(loginData.data.user));
+      if (loginData?.user) {
+        setUser(normalizeUser(loginData.user));
       }
       setSessionStartMs(Date.now());
       await fetchCurrentUser(token);
@@ -194,9 +221,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchCurrentUser]);
 
   const logout = useCallback(async () => {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, NOTIFICATIONS_STORAGE_KEY]);
+    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, NOTIFICATIONS_STORAGE_KEY]);
     setUser(null);
     setAccessToken(null);
+    setRefreshToken(null);
   }, []);
 
   const refreshUser = useCallback(async () => {
@@ -205,17 +233,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await fetchCurrentUser(token);
   }, [fetchCurrentUser]);
 
+  const refreshAccessToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const storedRefreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+      if (!storedRefreshToken) {
+        console.warn('[Auth] No refresh token available');
+        return null;
+      }
+
+      const base = await getApiBase();
+      const url = `${base}/api/v1/refresh-token`;
+      
+      console.log('[Auth] 🔄 Refreshing access token...');
+      
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${storedRefreshToken}`,
+          'ngrok-skip-browser-warning': 'true',
+        },
+      });
+
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        console.error('[Auth] ❌ Token refresh failed:', resp.status, errorText);
+        
+        // If refresh token is expired/invalid, logout
+        if (resp.status === 401 || resp.status === 403) {
+          console.log('[Auth] 🔒 Refresh token expired, logging out...');
+          await logout();
+        }
+        return null;
+      }
+
+      const responseData = await resp.json();
+      const data = responseData?.data ?? responseData;
+      const newAccessToken = data?.token;
+      const newRefreshToken = data?.refreshToken;
+
+      if (!newAccessToken) {
+        console.error('[Auth] ❌ Refresh response missing token');
+        return null;
+      }
+
+      // Update stored tokens
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, newAccessToken);
+      if (newRefreshToken) {
+        await AsyncStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
+        setRefreshToken(newRefreshToken);
+      }
+      setAccessToken(newAccessToken);
+      
+      // Reset Pusher client to reconnect with new token
+      resetPusherClient();
+      
+      console.log('[Auth] ✅ Access token refreshed successfully');
+      return newAccessToken;
+    } catch (error) {
+      console.error('[Auth] ❌ Error refreshing token:', error);
+      return null;
+    }
+  }, [logout]);
+
   const value = useMemo<AuthContextType>(() => ({
     user,
     isAuthenticated: !!user,
     isInitializing,
     isSubmitting,
     accessToken,
+    refreshToken,
     loginWithPin,
     logout,
     refreshUser,
+    refreshAccessToken,
     sessionStartMs,
-  }), [user, isInitializing, isSubmitting, accessToken, loginWithPin, logout, refreshUser, sessionStartMs]);
+  }), [user, isInitializing, isSubmitting, accessToken, refreshToken, loginWithPin, logout, refreshUser, refreshAccessToken, sessionStartMs]);
 
   return (
     <AuthContext.Provider value={value}>

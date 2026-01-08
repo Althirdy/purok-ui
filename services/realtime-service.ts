@@ -68,8 +68,33 @@ type ConcernStatusUpdatedPayload = {
 
 let pusherClient: Pusher | null = null;
 let connectionHandlersBound = false;
+let lastToken: string | null = null;
+
+// Force disconnect and clear Pusher client (useful when token is refreshed)
+export function resetPusherClient() {
+  if (pusherClient) {
+    console.log('[Pusher] 🔄 Resetting Pusher client (token refreshed)');
+    pusherClient.disconnect();
+    pusherClient = null;
+    connectionHandlersBound = false;
+    lastToken = null;
+  }
+}
 
 async function getPusherClient(authToken?: string): Promise<Pusher> {
+  // Get current token from storage if not provided
+  if (!authToken) {
+    authToken = await AsyncStorage.getItem(AUTH_TOKEN_KEY) ?? undefined;
+  }
+
+  // If token changed, reset client to force reconnection with new token
+  if (pusherClient && lastToken && authToken && lastToken !== authToken) {
+    console.log('[Pusher] 🔄 Token changed, resetting client...');
+    pusherClient.disconnect();
+    pusherClient = null;
+    connectionHandlersBound = false;
+  }
+
   // If client exists and is connected, return it
   if (pusherClient && pusherClient.connection.state === 'connected') {
     return pusherClient;
@@ -80,13 +105,13 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
     pusherClient.disconnect();
     pusherClient = null;
   }
+  
+  // Store current token
+  lastToken = authToken || null;
 
   Pusher.logToConsole = __DEV__;
 
-  // Get auth token if not provided
-  if (!authToken) {
-    authToken = await AsyncStorage.getItem(AUTH_TOKEN_KEY) ?? undefined;
-  }
+  // Token is already retrieved above
 
   const pusherOptions: any = {
     cluster: realtimeConfig.pusherCluster,
@@ -99,18 +124,144 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
   // Development: ngrok URL (ddev share) | Production: www.urbanwatch.me
   // Status 0 = endpoint not reachable, Status 403 = endpoint reachable but auth failed
   if (authToken) {
-    pusherOptions.authEndpoint = realtimeConfig.authEndpoint;
-    pusherOptions.auth = {
-      headers: {
-        'Authorization': `Bearer ${authToken}`, // Pass the logged-in user's Sanctum token
-        'Accept': 'application/json',
-        'ngrok-skip-browser-warning': 'true', // Required for ngrok free tier
-      },
+    // Use custom authorizer function to handle token refresh
+    // IMPORTANT: When using authorizer, do NOT set authEndpoint or auth
+    // Pusher will use the authorizer function instead
+    pusherOptions.authorizer = (channel: any, options: any) => {
+      return {
+        authorize: async (socketId: string, callback: (err: any, auth: any) => void) => {
+          try {
+            // Get fresh token from storage
+            let currentToken = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+            
+            if (!currentToken) {
+              console.error('[Pusher] ❌ No access token available');
+              callback(new Error('No access token available'), null);
+              return;
+            }
+            
+            const authEndpoint = realtimeConfig.authEndpoint;
+            console.log('[Pusher] 🔐 Authorizing channel:', channel.name);
+            
+            // First attempt with current token
+            let response = await fetch(authEndpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${currentToken}`,
+                'ngrok-skip-browser-warning': 'true',
+              },
+              body: JSON.stringify({
+                socket_id: socketId,
+                channel_name: channel.name,
+              }),
+            });
+
+            // Get response text
+            let responseText = await response.text();
+            const isEmpty = !responseText || responseText.trim().length === 0;
+            
+            // Handle empty response or 401 - token expired
+            if (isEmpty || response.status === 401) {
+              console.log('[Pusher] 🔄 Token expired or empty response, refreshing token...');
+              
+              // Try to refresh token
+              const refreshToken = await AsyncStorage.getItem('@urbanwatch:refresh_token');
+              if (!refreshToken) {
+                console.error('[Pusher] ❌ No refresh token available');
+                callback(new Error('No refresh token available'), null);
+                return;
+              }
+              
+              const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
+              const refreshResponse = await fetch(`${API_BASE}/api/v1/refresh-token`, {
+                method: 'POST',
+                headers: {
+                  'Accept': 'application/json',
+                  'Authorization': `Bearer ${refreshToken}`,
+                  'ngrok-skip-browser-warning': 'true',
+                },
+              });
+
+              if (!refreshResponse.ok) {
+                console.error('[Pusher] ❌ Token refresh failed:', refreshResponse.status);
+                callback(new Error('Token refresh failed'), null);
+                return;
+              }
+
+              const refreshData = await refreshResponse.json();
+              const data = refreshData?.data ?? refreshData;
+              const newAccessToken = data?.token;
+              const newRefreshToken = data?.refreshToken;
+
+              if (!newAccessToken) {
+                console.error('[Pusher] ❌ Refresh response missing token');
+                callback(new Error('Refresh response missing token'), null);
+                return;
+              }
+
+              // Store new tokens
+              await AsyncStorage.setItem(AUTH_TOKEN_KEY, newAccessToken);
+              if (newRefreshToken) {
+                await AsyncStorage.setItem('@urbanwatch:refresh_token', newRefreshToken);
+              }
+              currentToken = newAccessToken;
+              console.log('[Pusher] ✅ Token refreshed, retrying auth...');
+              
+              // Retry auth with new token
+              response = await fetch(authEndpoint, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                  'Authorization': `Bearer ${currentToken}`,
+                  'ngrok-skip-browser-warning': 'true',
+                },
+                body: JSON.stringify({
+                  socket_id: socketId,
+                  channel_name: channel.name,
+                }),
+              });
+
+              responseText = await response.text();
+            }
+
+            // Handle non-OK responses
+            if (!response.ok) {
+              console.error('[Pusher] ❌ Auth failed:', response.status, responseText);
+              callback(new Error(`Auth failed: ${response.status}`), null);
+              return;
+            }
+
+            // Check if response is still empty
+            if (!responseText || responseText.trim().length === 0) {
+              console.error('[Pusher] ❌ Empty response from auth endpoint');
+              callback(new Error('Empty response from auth endpoint'), null);
+              return;
+            }
+
+            // Parse and return auth data
+            try {
+              const authData = JSON.parse(responseText);
+              console.log('[Pusher] ✅ Authorization successful for channel:', channel.name);
+              callback(null, authData);
+            } catch (parseError) {
+              console.error('[Pusher] ❌ Failed to parse auth response:', parseError);
+              console.error('[Pusher] Response text:', responseText);
+              callback(new Error('Invalid JSON in auth response'), null);
+            }
+          } catch (error: any) {
+            console.error('[Pusher] ❌ Auth error:', error);
+            callback(error, null);
+          }
+        },
+      };
     };
-    console.log('[Pusher] Configuring auth endpoint:', pusherOptions.authEndpoint);
-    console.log('[Pusher] Auth token present:', !!authToken);
+    
+    console.log('[Pusher] ✅ Custom authorizer configured for endpoint:', realtimeConfig.authEndpoint);
   } else {
-    console.warn('[Pusher] No auth token provided - private channel subscription will fail');
+    console.warn('[Pusher] ⚠️ No auth token provided - private channel subscription will fail');
   }
 
   pusherClient = new Pusher(realtimeConfig.pusherKey, pusherOptions);

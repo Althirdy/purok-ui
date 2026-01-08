@@ -1,16 +1,8 @@
 /**
- * Report Service - Handles report generation and management
+ * Report Service - Handles report formatting and statistics
  */
 
 import type { EmergencyReport } from '@/types';
-import { anomalyToReport as sensorDataToReport, type SensorData } from './firebase-service';
-
-/**
- * Generate a comprehensive report from sensor data
- */
-export function generateReport(sensorData: SensorData): EmergencyReport {
-  return sensorDataToReport(sensorData);
-}
 
 /**
  * Format report data for display
@@ -57,4 +49,3 @@ export function generateReportSummary(reports: EmergencyReport[]): {
     }, {} as Record<string, number>),
   };
 }
-

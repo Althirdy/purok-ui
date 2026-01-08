@@ -4,7 +4,6 @@
 
 import { useAuth } from '@/context/auth-context';
 import { useNotifications } from '@/context/notification-context';
-import { anomalyToReport, fetchLatestAnomaliesSince, listenToAnomalies } from '@/services/firebase-service';
 import { fetchAssignedConcerns, updateAssignedConcernStatus } from '@/services/purok-leader-service';
 import { subscribeToCitizenReports, subscribeToStatusUpdates } from '@/services/realtime-service';
 import type { EmergencyReport, FeedSource } from '@/types';
@@ -37,7 +36,7 @@ interface UseReportsFeedReturn {
 
 export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsFeedReturn {
   const { onNewReport } = options;
-  const { user, accessToken, sessionStartMs } = useAuth();
+  const { user, accessToken } = useAuth();
   const { addNotificationFromReport, addNotification } = useNotifications();
 
   const [reports, setReports] = useState<EmergencyReport[]>([]);
@@ -52,7 +51,6 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
   const notifiedReportIds = useRef<Set<string>>(new Set());
   const syncInProgressRef = useRef(false);
   const pusherSubscriptionRef = useRef<(() => void) | null>(null);
-  const firebaseUnsubscribeRef = useRef<(() => void) | null>(null);
 
   // Update refs when callbacks change
   useEffect(() => {
@@ -61,21 +59,11 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
     addNotificationRef.current = addNotification;
   }, [onNewReport, addNotificationFromReport, addNotification]);
 
-  // Fetch reports from all sources
+  // Fetch reports from API
   const fetchReports = useCallback(async (source: FeedSource) => {
     try {
       setLoading(true);
       const allReports: EmergencyReport[] = [];
-
-      // Fetch Firebase sensor data
-      try {
-        const sensorDataList = await fetchLatestAnomaliesSince(sessionStartMs, 40);
-        const sensorReports = sensorDataList.map(anomalyToReport);
-        allReports.push(...sensorReports);
-        console.log('[ReportsFeed] Fetched sensor reports:', sensorReports.length);
-      } catch (error) {
-        console.error('[ReportsFeed] Error fetching sensor data:', error);
-      }
 
       // Fetch assigned concerns from API (if authenticated)
       if (accessToken && user?.id) {
@@ -101,7 +89,7 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
     } finally {
       setLoading(false);
     }
-  }, [accessToken, user?.id, sessionStartMs]);
+  }, [accessToken, user?.id]);
 
   // Handle refresh (same as fetch but with refreshing state)
   const handleRefresh = useCallback(async (source: FeedSource) => {
@@ -116,34 +104,6 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
   // Set up real-time subscriptions
   useEffect(() => {
     if (!user?.id) return;
-
-      // Firebase listener for sensor data
-      const firebaseUnsubscribe = listenToAnomalies((sensorData, report) => {
-        if (processedReportIds.current.has(report.id)) {
-          return; // Skip if already processed
-        }
-        processedReportIds.current.add(report.id);
-        console.log('[ReportsFeed] New sensor report:', report.id);
-        setReports(prev => {
-          // Sort by timestamp (newest first) after adding
-          return [report, ...prev].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-        });
-        addNotificationFromReportRef.current(report);
-        onNewReportRef.current?.(report);
-
-        // 🔔 Trigger push notification with sound (if available - dev builds only)
-        const severityEmoji = report.severity === 'critical' ? '🚨' : report.severity === 'high' ? '⚠️' : '📢';
-        tryScheduleNotification(
-          `${severityEmoji} ${report.title}`,
-          report.description,
-          {
-            type: 'sensor_alert',
-            reportId: report.id,
-            severity: report.severity,
-          }
-        );
-      });
-    firebaseUnsubscribeRef.current = firebaseUnsubscribe;
 
     // Pusher subscription for citizen reports
     let syncTimer: ReturnType<typeof setInterval> | null = null;
@@ -331,7 +291,6 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
 
     // Cleanup
     return () => {
-      firebaseUnsubscribe();
       if (pusherSubscriptionRef.current) {
         pusherSubscriptionRef.current();
       }
@@ -376,8 +335,6 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
         
         if (!authToken) {
           console.error('[ReportsFeed] ❌ No auth token available for status update');
-          console.error('[ReportsFeed] accessToken from context:', accessToken);
-          console.error('[ReportsFeed] Token from storage:', await AsyncStorage.getItem('@urbanwatch:auth_token'));
           // Rollback
           setReports(prevReports =>
             prevReports.map(report =>
@@ -391,9 +348,7 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
         console.log('[ReportsFeed] Using auth token:', {
           tokenLength: authToken.length,
           tokenPrefix: authToken.substring(0, 20) + '...',
-          tokenFormat: authToken.includes('|') ? 'valid (has pipe)' : 'invalid (no pipe)',
           source: accessToken ? 'context' : 'storage',
-          matchesContext: accessToken === authToken,
         });
 
         const numericId = reportId.replace('PUROK-', '');
@@ -415,16 +370,11 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
           reportId,
           apiStatus,
           response: updateResponse,
-          hasData: !!updateResponse?.data,
-          newStatus: updateResponse?.data?.new_status,
         });
         
         // Trust the API response - it confirms the status was updated
-        // The response.new_status is the source of truth
         const responseStatus = updateResponse?.data?.new_status;
         
-        // If response is empty or missing new_status, we still trust the optimistic update
-        // and will refresh to get the actual status from the backend
         if (responseStatus) {
           // Map backend status from response to frontend status
           const responseStatusMap: Record<string, EmergencyReport['status']> = {
@@ -440,25 +390,20 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
             reportId,
             apiResponse: responseStatus,
             mappedStatus,
-            expectedStatus: status,
           });
           
-          // Ensure the status is correctly set (even if already optimistic)
+          // Ensure the status is correctly set
           setReports(prevReports =>
             prevReports.map(report =>
               report.id === reportId ? { ...report, status: mappedStatus } : report
             )
           );
-        } else {
-          console.warn('[ReportsFeed] ⚠️ API response missing new_status, will refresh to get actual status');
         }
         
-        // Always refresh the report after update to get the latest status from backend
-        // This is important because the backend might update distribution_status, not concern.status
-        // Use retry logic to keep checking until status is updated
+        // Refresh report after update to get the latest status from backend
         let retryCount = 0;
         const maxRetries = 5;
-        const retryDelay = 1000; // 1 second between retries
+        const retryDelay = 1000;
         
         const refreshReport = async () => {
           try {
@@ -482,22 +427,16 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
                 )
               );
               
-              // If status matches, we're done
               if (statusMatches) {
                 console.log('[ReportsFeed] ✅ Status update confirmed by backend');
                 return;
               }
               
-              // If status doesn't match and we have retries left, try again
               if (retryCount < maxRetries - 1) {
                 retryCount++;
                 setTimeout(refreshReport, retryDelay);
-              } else {
-                console.warn('[ReportsFeed] ⚠️ Status not updated after max retries, keeping optimistic update');
               }
             } else {
-              console.warn('[ReportsFeed] ⚠️ Report not found after refresh:', reportId);
-              // Retry if report not found (might be a timing issue)
               if (retryCount < maxRetries - 1) {
                 retryCount++;
                 setTimeout(refreshReport, retryDelay);
@@ -505,7 +444,6 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
             }
           } catch (error) {
             console.error('[ReportsFeed] Error refreshing report after update:', error);
-            // Retry on error
             if (retryCount < maxRetries - 1) {
               retryCount++;
               setTimeout(refreshReport, retryDelay);
@@ -513,11 +451,8 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
           }
         };
         
-        // Start refresh after initial delay
         setTimeout(refreshReport, 1000);
         
-        // Backend should broadcast this update to citizen's private channel
-        // Expected event: concern.status.updated or concern.updated on citizen's channel
       } catch (error) {
         console.error('[ReportsFeed] Error updating concern status via API:', error);
         // Rollback on error
