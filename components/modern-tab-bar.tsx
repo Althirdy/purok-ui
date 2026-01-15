@@ -29,6 +29,11 @@ const tabs: TabConfig[] = [
     icon: (focused) => focused ? 'map' : 'map-outline',
   },
   {
+    routeName: 'news',
+    label: 'News',
+    icon: (focused) => focused ? 'megaphone' : 'megaphone-outline',
+  },
+  {
     routeName: 'profile',
     label: 'Profile',
     icon: (focused) => focused ? 'person' : 'person-outline',
