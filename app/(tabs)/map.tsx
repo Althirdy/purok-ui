@@ -1,15 +1,18 @@
 /**
  * Map Screen - View of Verified/Ongoing Incidents
  * 
- * Shows THREE types of data on the map:
+ * Shows TWO types of data on the map:
  * 1. Citizen Concerns (acknowledged/resolved by Purok) - Markers
  * 2. CCTV Accidents (In Progress - acknowledged by Operator) - Markers
- * 3. Verified Incidents (from heatmap API) - Small dot markers (clickable)
  * 
- * PRIVACY PROTECTED:
- * - Photos are NOT shown (hidden in info card)
+ * Data Sources:
+ * - Citizen Concerns: GET /api/v1/purok-leader/concerns
+ * - CCTV Accidents: GET /api/v1/active-accidents (markers) + GET /api/v1/active-accidents/{id} (details)
+ * 
+ * PRIVACY LOGIC (unified for both citizen concerns and CCTV accidents):
+ * - Photos/images shown ONLY if incident is verified (acknowledged/resolved)
  * - Only verified/acknowledged incidents appear as markers
- * - Purok Leaders (Role 3) don't get media from API
+ * - InfoCard handles the privacy display logic for images
  */
 
 import { InfoCard } from '@/components/map/info-card';
@@ -19,8 +22,7 @@ import { globalStyles } from '@/constants/global-styles';
 import { mapStyles as styles } from '@/constants/map-screen.styles';
 import { useAuth } from '@/context/auth-context';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
-import { fetchActiveAccidentMarkers, markerToEmergencyReport } from '@/services/active-accidents-service';
-import { fetchHeatmapData, severityToColor, type HeatmapPoint } from '@/services/heatmap-service';
+import { fetchActiveAccidentDetail, fetchActiveAccidentMarkers, markerToEmergencyReport } from '@/services/active-accidents-service';
 import { subscribeToAccidentStatusUpdates } from '@/services/realtime-service';
 import type { EmergencyReport } from '@/types';
 import { getMarkerColor, processMarkersWithJitter, type SelectedMarker } from '@/utils/mapHelpers';
@@ -42,10 +44,6 @@ export default function MapScreen() {
   // CCTV accidents (ongoing)
   const [cctvAccidents, setCctvAccidents] = useState<EmergencyReport[]>([]);
   const [loadingAccidents, setLoadingAccidents] = useState(false);
-  
-  // Heatmap data (verified/resolved incidents)
-  const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
-  const [loadingHeatmap, setLoadingHeatmap] = useState(false);
   
   const mapRef = useRef<MapView | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -79,28 +77,6 @@ export default function MapScreen() {
   useEffect(() => {
     fetchAccidents();
   }, [fetchAccidents]);
-
-  // Fetch heatmap data on mount
-  const fetchHeatmap = useCallback(async () => {
-    if (!accessToken) {
-      console.warn('[MapScreen] No auth token, skipping heatmap fetch');
-      return;
-    }
-    setLoadingHeatmap(true);
-    try {
-      const data = await fetchHeatmapData(accessToken);
-      setHeatmapData(data);
-      console.log('[MapScreen] ✅ Loaded', data.length, 'heatmap points');
-    } catch (error) {
-      console.error('[MapScreen] Error fetching heatmap data:', error);
-    } finally {
-      setLoadingHeatmap(false);
-    }
-  }, [accessToken]);
-
-  useEffect(() => {
-    fetchHeatmap();
-  }, [fetchHeatmap]);
 
   // Subscribe to real-time accident status updates
   useEffect(() => {
@@ -183,10 +159,9 @@ export default function MapScreen() {
     await Promise.all([
       fetchReports('all'),
       fetchAccidents(),
-      fetchHeatmap(),
     ]);
     setRefreshing(false);
-  }, [fetchReports, fetchAccidents, fetchHeatmap]);
+  }, [fetchReports, fetchAccidents]);
 
   // PRIVACY FILTER: Only show verified/acknowledged citizen concerns
   const verifiedConcerns = useMemo(() => {
@@ -220,6 +195,7 @@ export default function MapScreen() {
         timestamp: r.timestamp,
         status: r.status,
         source: r.source,
+        images: r.images, // Include images for verified incidents
       }));
   }, [allIncidents]);
 
@@ -229,21 +205,93 @@ export default function MapScreen() {
     [incidentMarkers]
   );
 
-  const handleMarkerPress = (marker: typeof displayedMarkers[0]) => {
+  // Loading state for fetching accident details
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const handleMarkerPress = async (marker: typeof displayedMarkers[0]) => {
     const color = getMarkerColor(marker.type as EmergencyReport['type'], marker.severity as EmergencyReport['severity']);
-    setSelectedMarker({
-      id: marker.id,
-      title: marker.title || 'Incident Report',
-      description: marker.description || 'No description available',
-      type: marker.type || 'unknown',
-      severity: marker.severity || 'low',
-      location: marker.location || 'Unknown location',
-      timestamp: marker.timestamp,
-      color,
-    });
+    
+    // Check if this is a CCTV accident (id starts with 'accident-')
+    const isCctvAccident = marker.id.startsWith('accident-');
+    
+    if (isCctvAccident && accessToken) {
+      // Fetch full details from backend for CCTV accidents
+      const accidentId = parseInt(marker.id.replace('accident-', ''), 10);
+      
+      // Show loading state with basic info first
+      setSelectedMarker({
+        id: marker.id,
+        title: marker.title || 'Loading...',
+        description: 'Fetching details...',
+        type: marker.type || 'unknown',
+        severity: marker.severity || 'low',
+        location: marker.location || 'Unknown location',
+        timestamp: marker.timestamp,
+        color,
+      });
+      
+      setLoadingDetails(true);
+      try {
+        const details = await fetchActiveAccidentDetail(accidentId, accessToken);
+        if (details) {
+          // Build location string from details
+          let locationStr = marker.location || 'Unknown location';
+          if (details.location) {
+            const parts = [
+              details.location.location_name,
+              details.location.barangay,
+              details.location.landmark,
+            ].filter(Boolean);
+            if (parts.length > 0) {
+              locationStr = parts.join(', ');
+            }
+          }
+          
+          // Extract images from details (same logic as citizen concerns)
+          // Images shown only if verified (handled by InfoCard privacy logic)
+          let images: string[] | undefined;
+          if (details.media && Array.isArray(details.media)) {
+            images = details.media.map(m => m.url).filter(Boolean);
+          } else if (details.images && Array.isArray(details.images)) {
+            images = details.images.filter(Boolean);
+          }
+
+          setSelectedMarker({
+            id: marker.id,
+            title: details.title || marker.title || 'CCTV Incident',
+            description: details.description || 'CCTV detected incident',
+            type: marker.type || 'accident',
+            severity: marker.severity || 'medium',
+            location: locationStr,
+            timestamp: marker.timestamp,
+            color,
+            status: 'acknowledged', // CCTV accidents are acknowledged by default
+            images: images && images.length > 0 ? images : undefined, // Same privacy logic as citizen concerns
+          });
+        }
+      } catch (error) {
+        console.error('[MapScreen] Error fetching accident details:', error);
+      } finally {
+        setLoadingDetails(false);
+      }
+    } else {
+      // For citizen concerns, use the existing data (includes images if verified)
+      setSelectedMarker({
+        id: marker.id,
+        title: marker.title || 'Incident Report',
+        description: marker.description || 'No description available',
+        type: marker.type || 'unknown',
+        severity: marker.severity || 'low',
+        location: marker.location || 'Unknown location',
+        timestamp: marker.timestamp,
+        color,
+        status: marker.status, // Include status for privacy logic
+        images: marker.images, // Include images for verified incidents
+      });
+    }
   };
 
-  const loading = loadingConcerns || loadingAccidents || loadingHeatmap;
+  const loading = loadingConcerns || loadingAccidents;
   const citizenCount = verifiedConcerns.length;
   const cctvCount = cctvAccidents.length;
 
@@ -373,51 +421,7 @@ export default function MapScreen() {
             strokeWidth={BARANGAY_176E_BOUNDARY.strokeWidth}
           />
 
-          {/* Verified Incidents Markers (clickable markers only, no circle overlay) */}
-          {mapReady && heatmapData.map((point) => {
-            const color = severityToColor(point.severity);
-            // Convert string coordinates to numbers
-            const lat = typeof point.latitude === 'string' ? parseFloat(point.latitude) : point.latitude;
-            const lng = typeof point.longitude === 'string' ? parseFloat(point.longitude) : point.longitude;
-            
-            // Skip if coordinates are invalid
-            if (isNaN(lat) || isNaN(lng)) {
-              return null;
-            }
-            
-            return (
-              <Marker
-                key={`heatmap-${point.id}`}
-                coordinate={{ latitude: lat, longitude: lng }}
-                onPress={() => {
-                  const markerColor = severityToColor(point.severity);
-                  setSelectedMarker({
-                    id: `heatmap-${point.id}`,
-                    title: point.title || 'Verified Incident',
-                    description: `Type: ${point.type}\nSeverity: ${point.severity}\nDate: ${point.occurredAt.toLocaleDateString()}`,
-                    type: point.type || 'other',
-                    severity: point.severity || 'low',
-                    location: `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`,
-                    timestamp: point.occurredAt,
-                    color: markerColor,
-                  });
-                }}
-                anchor={{ x: 0.5, y: 0.5 }}
-              >
-                {/* Small visible dot marker */}
-                <View style={{ 
-                  width: 12, 
-                  height: 12, 
-                  borderRadius: 6, 
-                  backgroundColor: color,
-                  borderWidth: 2,
-                  borderColor: '#FFFFFF',
-                }} />
-              </Marker>
-            );
-          })}
-
-          {/* Incident Markers (Active/Current Incidents) */}
+          {/* Incident Markers (Citizen Concerns + CCTV Accidents) */}
           {mapReady && displayedMarkers.map((m) => (
             <Marker
               key={m.id}

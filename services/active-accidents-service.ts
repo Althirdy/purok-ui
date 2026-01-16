@@ -4,10 +4,11 @@
  * Fetches ongoing/active accidents from CCTV detection (acknowledged by Operator).
  * Endpoint: GET /api/v1/active-accidents
  * 
- * PRIVACY NOTES:
- * - Role 3 (Purok Leaders): NO photos/media returned
+ * PRIVACY NOTES (same as citizen concerns):
+ * - Photos/media shown only if incident is verified (acknowledged/resolved)
  * - Only shows "In Progress" accidents (acknowledged by Operator)
  * - Full details fetched when clicking on marker
+ * - InfoCard handles privacy logic for displaying images
  */
 
 import { httpGet } from '@/lib/axios';
@@ -26,7 +27,7 @@ export interface AccidentMarker {
 
 /**
  * Full accident details from GET /api/v1/active-accidents/{id}
- * Note: Role 3 (Purok) does NOT get media/photos
+ * Note: Media/photos availability depends on role and verification status
  */
 export interface ActiveAccident {
   id: number;
@@ -45,7 +46,13 @@ export interface ActiveAccident {
     latitude?: string;
     longitude?: string;
   };
-  // Note: media is NOT included for Role 3 (Purok Leaders) - privacy protected
+  // Media/images - available for verified incidents (same logic as citizen concerns)
+  media?: Array<{
+    id: number;
+    url: string;
+    type?: string;
+  }>;
+  images?: string[]; // Alternative format - array of URLs
 }
 
 interface MarkersResponse {
@@ -102,7 +109,7 @@ export async function fetchActiveAccidentMarkers(token: string): Promise<Acciden
 /**
  * Fetch full details of a specific active accident
  * 
- * Note: For Role 3 (Purok Leaders), media/photos are NOT returned
+ * Note: Media/photos availability depends on verification status (same as citizen concerns)
  * 
  * @param id - Accident ID
  * @param token - Authentication token (required)
@@ -174,6 +181,9 @@ export function accidentToEmergencyReport(accident: ActiveAccident): EmergencyRe
     }
   }
 
+  // Extract images from media array or images field (same logic as citizen concerns)
+  const images = extractAccidentImages(accident);
+
   return {
     id: `accident-${accident.id}`,
     type: normalizeAccidentType(accident.accident_type),
@@ -188,8 +198,37 @@ export function accidentToEmergencyReport(accident: ActiveAccident): EmergencyRe
       latitude: lat,
       longitude: lng,
     },
-    // Note: NO images - privacy protected for Purok Leaders
+    // Images shown if verified (same privacy logic as citizen concerns)
+    images: images.length > 0 ? images : undefined,
   };
+}
+
+/**
+ * Extract images from accident details
+ * Handles both media array and images array formats
+ */
+function extractAccidentImages(accident: ActiveAccident): string[] {
+  const images: string[] = [];
+
+  // Extract from media array (if available)
+  if (accident.media && Array.isArray(accident.media)) {
+    for (const item of accident.media) {
+      if (item.url) {
+        images.push(item.url);
+      }
+    }
+  }
+
+  // Extract from images array (alternative format)
+  if (accident.images && Array.isArray(accident.images)) {
+    for (const url of accident.images) {
+      if (url && !images.includes(url)) {
+        images.push(url);
+      }
+    }
+  }
+
+  return images;
 }
 
 /**

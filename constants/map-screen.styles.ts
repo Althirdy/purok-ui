@@ -203,6 +203,50 @@ export const mapStyles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
   },
 
+  // Description row
+  descriptionRow: {
+    marginBottom: spacing.md,
+    backgroundColor: colors.background.secondary,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary.blue,
+  },
+  descriptionText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.primary,
+    lineHeight: 20,
+  },
+
+  // Evidence Photos section
+  evidenceSection: {
+    marginBottom: spacing.md,
+  },
+  evidenceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: spacing.sm,
+  },
+  evidenceHeaderText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: '#3B82F6',
+  },
+  evidenceScroll: {
+    gap: spacing.sm,
+  },
+  evidenceImageContainer: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  evidenceImage: {
+    width: 120,
+    height: 90,
+  },
+
   // Timestamp row
   timestampRow: {
     flexDirection: 'row',

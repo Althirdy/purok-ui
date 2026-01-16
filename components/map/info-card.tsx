@@ -1,12 +1,11 @@
 /**
- * Map Info Card Component - PRIVACY SAFE
+ * Map Info Card Component
  * 
  * Shows incident details when a marker is selected.
- * IMPORTANT: This component intentionally HIDES:
- * - Photos/Evidence images (privacy protection)
- * - Personal information of people involved
  * 
- * Shows ONLY: Title, Time, Location, Severity, Type
+ * PRIVACY LOGIC:
+ * - If status is "acknowledged" or "resolved" → Show evidence photos
+ * - If status is "pending" or unknown → Hide photos, show privacy message
  */
 
 import { DesignSystem } from '@/constants/design-system';
@@ -14,8 +13,9 @@ import type { EmergencyReport } from '@/types';
 import { getMarkerIcon, type SelectedMarker } from '@/utils/mapHelpers';
 import { getSeverityColor } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { mapStyles as styles } from '@/constants/map-screen.styles';
 
 const { colors } = DesignSystem;
@@ -53,8 +53,9 @@ function formatTimestamp(timestamp?: Date): string {
 }
 
 export function InfoCard({ marker, onClose }: InfoCardProps) {
-  // NOTE: View Details button removed intentionally for citizen privacy
-  // Citizens should NOT be able to see full report details including photos
+  // Check if incident is verified (acknowledged or resolved)
+  const isVerified = marker.status === 'acknowledged' || marker.status === 'resolved';
+  const hasImages = marker.images && marker.images.length > 0;
 
   return (
     <View style={styles.infoCardContainer}>
@@ -65,13 +66,19 @@ export function InfoCard({ marker, onClose }: InfoCardProps) {
           <Ionicons name="close" size={20} color="#6B7280" />
         </Pressable>
 
-        {/* Privacy Notice */}
+        {/* Status Notice */}
         <View style={styles.privacyNotice}>
-          <Ionicons name="shield-checkmark" size={14} color="#10B981" />
-          <Text style={styles.privacyNoticeText}>Verified Incident • Privacy Protected</Text>
+          <Ionicons 
+            name={isVerified ? "shield-checkmark" : "time-outline"} 
+            size={14} 
+            color={isVerified ? "#10B981" : "#F59E0B"} 
+          />
+          <Text style={[styles.privacyNoticeText, { color: isVerified ? "#10B981" : "#F59E0B" }]}>
+            {isVerified ? "Verified Incident" : "Pending Verification"}
+          </Text>
         </View>
 
-        {/* Header with Generic Icon (no photo) */}
+        {/* Header with Generic Icon */}
         <View style={styles.infoCardHeader}>
           <View style={[styles.infoCardIcon, { backgroundColor: marker.color }]}>
             <Ionicons name={getMarkerIcon(marker.type)} size={24} color="white" />
@@ -86,7 +93,39 @@ export function InfoCard({ marker, onClose }: InfoCardProps) {
           </View>
         </View>
 
-        {/* Timestamp - Important for heatmap context */}
+        {/* Description - Show actual incident details */}
+        {marker.description && marker.description.length > 0 && (
+          <View style={styles.descriptionRow}>
+            <Text style={styles.descriptionText}>{marker.description}</Text>
+          </View>
+        )}
+
+        {/* Evidence Photos - Only shown if VERIFIED */}
+        {isVerified && hasImages && (
+          <View style={styles.evidenceSection}>
+            <View style={styles.evidenceHeader}>
+              <Ionicons name="images-outline" size={16} color="#3B82F6" />
+              <Text style={styles.evidenceHeaderText}>Evidence Photos</Text>
+            </View>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.evidenceScroll}
+            >
+              {marker.images!.map((imageUrl, index) => (
+                <View key={index} style={styles.evidenceImageContainer}>
+                  <Image
+                    source={{ uri: imageUrl }}
+                    style={styles.evidenceImage}
+                    contentFit="cover"
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Timestamp */}
         <View style={styles.timestampRow}>
           <Ionicons name="time-outline" size={16} color="#6B7280" />
           <Text style={styles.timestampText}>{formatTimestamp(marker.timestamp)}</Text>
@@ -107,13 +146,17 @@ export function InfoCard({ marker, onClose }: InfoCardProps) {
           </View>
         </View>
 
-        {/* Info Text (replaces View Details button for privacy) */}
-        <View style={styles.infoPrivacyBox}>
-          <Ionicons name="eye-off-outline" size={18} color="#6B7280" />
-          <Text style={styles.infoPrivacyText}>
-            Evidence photos are hidden to protect privacy of individuals involved.
-          </Text>
-        </View>
+        {/* Privacy Notice - Only shown if NOT verified OR no images */}
+        {(!isVerified || !hasImages) && (
+          <View style={styles.infoPrivacyBox}>
+            <Ionicons name="eye-off-outline" size={18} color="#6B7280" />
+            <Text style={styles.infoPrivacyText}>
+              {!isVerified 
+                ? "Evidence photos will be available once the incident is verified."
+                : "No evidence photos available for this incident."}
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );

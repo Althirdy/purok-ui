@@ -2,11 +2,11 @@
  * Auth Context - Manages PIN login and authenticated user
  */
 
+import { setTokenRefreshFunction } from '@/lib/axios';
+import { resetPusherClient } from '@/services/realtime-service';
 import type { User } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { setTokenRefreshFunction } from '@/lib/axios';
-import { resetPusherClient } from '@/services/realtime-service';
 
 interface AuthContextType {
   user: User | null;
@@ -30,7 +30,7 @@ const NOTIFICATIONS_STORAGE_KEY = '@urbanwatch:notifications';
 // Default to production URL
 // For development, set EXPO_PUBLIC_API_URL to ngrok URL in .env
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
-const LOGIN_ENDPOINT = '/api/v1/login/purok-leader';
+const LOGIN_ENDPOINT = '/api/v1/auth/login/purok_leader';
 const CURRENT_USER_ENDPOINT = '/api/v1/auth/user';
 // Control whether session persists across app restarts
 const PERSIST_SESSION = false;

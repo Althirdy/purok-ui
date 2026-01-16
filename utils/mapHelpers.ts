@@ -95,7 +95,8 @@ export function processMarkersWithJitter<T extends { id: string; latitude: numbe
 }
 
 /**
- * Selected marker type (Privacy-safe: no photos/personal info)
+ * Selected marker type
+ * Photos/images only shown if status is verified (acknowledged/resolved)
  */
 export type SelectedMarker = {
   id: string;
@@ -106,6 +107,8 @@ export type SelectedMarker = {
   location: string;
   color: string;
   timestamp?: Date; // When the incident occurred
+  status?: 'pending' | 'acknowledged' | 'resolved' | string; // For privacy control
+  images?: string[]; // Evidence photos (only shown if verified)
 } | null;
 
 
