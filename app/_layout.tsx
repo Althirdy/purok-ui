@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 export const unstable_settings = {
-  initialRouteName: '(auth)',
+  initialRouteName: 'index',
 };
 
 export default function RootLayout() {
@@ -36,6 +36,7 @@ function AuthAwareStack() {
         headerTintColor: '#ffffff',
       }}
     >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="news/post-detail" />
