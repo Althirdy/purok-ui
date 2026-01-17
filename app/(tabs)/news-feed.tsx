@@ -174,13 +174,13 @@ export default function NewsFeedScreen() {
   }, [fetchReports]);
 
   // Handle acknowledge - mark report as acknowledged (first step)
-  const handleAcknowledgePress = useCallback(async (reportId: string) => {
+  const handleAcknowledgePress = useCallback(async (reportId: string, remarks?: string) => {
     const r = reports.find(x => x.id === reportId);
     if (!r || r.status !== 'pending') return;
 
     try {
-      // Mark as acknowledged
-      await updateReportStatus(reportId, 'acknowledged');
+      // Mark as acknowledged with optional remarks
+      await updateReportStatus(reportId, 'acknowledged', remarks);
 
       // Add notification after successful update
       addNotification({
@@ -198,13 +198,13 @@ export default function NewsFeedScreen() {
   }, [reports, addNotification, updateReportStatus]);
 
   // Handle resolve - mark report as resolved (second step)
-  const handleResolvePress = useCallback(async (reportId: string) => {
+  const handleResolvePress = useCallback(async (reportId: string, remarks?: string) => {
     const r = reports.find(x => x.id === reportId);
     if (!r || r.status === 'resolved') return;
 
     try {
-      // Mark as resolved
-      await updateReportStatus(reportId, 'resolved');
+      // Mark as resolved with optional remarks
+      await updateReportStatus(reportId, 'resolved', remarks);
 
       // Add notification after successful update
       addNotification({
@@ -383,9 +383,9 @@ export default function NewsFeedScreen() {
           <AcknowledgeSheet
             visible={!!acknowledgeTarget}
             report={acknowledgeTarget}
-            onConfirm={() => {
+            onConfirm={(remarks) => {
               if (acknowledgeTarget) {
-                handleAcknowledgePress(acknowledgeTarget.id);
+                handleAcknowledgePress(acknowledgeTarget.id, remarks);
               }
               setAcknowledgeTarget(null);
             }}
@@ -400,9 +400,9 @@ export default function NewsFeedScreen() {
           <ResolveSheet
             visible={!!resolveTarget}
             report={resolveTarget}
-            onConfirm={() => {
+            onConfirm={(remarks) => {
               if (resolveTarget) {
-                handleResolvePress(resolveTarget.id);
+                handleResolvePress(resolveTarget.id, remarks);
               }
               setResolveTarget(null);
             }}

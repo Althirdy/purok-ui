@@ -10,8 +10,8 @@ import {
   cleanTitle,
 } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
-import { Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Dimensions, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 
 const { colors, typography, spacing } = DesignSystem;
@@ -21,14 +21,28 @@ const isTablet = SCREEN_WIDTH >= 768;
 export interface ResolveSheetProps {
   visible: boolean;
   report: EmergencyReport | null;
-  onConfirm: () => void;
+  onConfirm: (remarks?: string) => void;
   onCancel: () => void;
 }
 
 export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSheetProps) {
+  const [remarks, setRemarks] = useState('');
+
+  // Reset remarks when modal closes or report changes
+  React.useEffect(() => {
+    if (!visible) {
+      setRemarks('');
+    }
+  }, [visible]);
+
   if (!report) return null;
 
   const severityColor = getSeverityColor(report.severity);
+
+  const handleConfirm = () => {
+    onConfirm(remarks.trim() || undefined);
+    setRemarks('');
+  };
 
   // Parse coordinates from location string if available
   const parseCoordinates = (location: string) => {
@@ -199,6 +213,27 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
               )}
             </View>
 
+            {/* Remarks Input */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Resolution Notes (Optional)</Text>
+              <View style={styles.remarksInputContainer}>
+                <TextInput
+                  style={styles.remarksInput}
+                  placeholder="Describe how the concern was resolved..."
+                  placeholderTextColor={colors.text.tertiary}
+                  value={remarks}
+                  onChangeText={setRemarks}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  maxLength={500}
+                />
+                <Text style={styles.characterCount}>
+                  {remarks.length}/500
+                </Text>
+              </View>
+            </View>
+
             {/* Confirmation Message */}
             <View style={styles.confirmationBox}>
               <Ionicons name="information-circle" size={20} color={colors.primary.blue} />
@@ -222,7 +257,7 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
             <TouchableOpacity
               style={[styles.modalButton, styles.modalButtonPrimary]}
               activeOpacity={0.8}
-              onPress={onConfirm}
+              onPress={handleConfirm}
             >
               <Ionicons name="checkmark-done-circle" size={20} color={colors.text.inverse} style={{ marginRight: 8 }} />
               <Text style={styles.modalButtonText}>Resolve</Text>
@@ -458,6 +493,30 @@ const styles = StyleSheet.create({
   severityBadgeText: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.bold,
+  },
+  remarksInputContainer: {
+    backgroundColor: colors.background.secondary,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    padding: spacing.sm,
+  },
+  remarksInput: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.primary,
+    minHeight: 80,
+    maxHeight: 120,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  characterCount: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    textAlign: 'right',
+    marginTop: spacing.xs,
+    paddingRight: spacing.sm,
   },
   confirmationBox: {
     flexDirection: 'row',

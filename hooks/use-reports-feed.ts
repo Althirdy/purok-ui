@@ -31,7 +31,7 @@ interface UseReportsFeedReturn {
   refreshing: boolean;
   fetchReports: (source: FeedSource) => Promise<void>;
   handleRefresh: (source: FeedSource) => Promise<void>;
-  updateReportStatus: (reportId: string, status: EmergencyReport['status']) => Promise<void>;
+  updateReportStatus: (reportId: string, status: EmergencyReport['status'], remarks?: string) => Promise<void>;
 }
 
 export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsFeedReturn {
@@ -308,7 +308,8 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
   // Update report status (with API call for citizen reports)
   const updateReportStatus = useCallback(async (
     reportId: string,
-    status: EmergencyReport['status']
+    status: EmergencyReport['status'],
+    remarks?: string
   ) => {
     // Optimistic UI update
     const originalReport = reports.find(r => r.id === reportId);
@@ -362,9 +363,10 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
           numericId,
           frontendStatus: status,
           apiStatus,
+          hasRemarks: !!remarks,
         });
 
-        const updateResponse = await updateAssignedConcernStatus(authToken, numericId, apiStatus);
+        const updateResponse = await updateAssignedConcernStatus(authToken, numericId, apiStatus, remarks);
 
         console.log('[ReportsFeed] Status update API call successful:', {
           reportId,
