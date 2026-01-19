@@ -49,10 +49,6 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const handleEditProfile = () => {
-    router.push('./profile-settings');
-  };
-
   if (loading && !user) {
     return (
       <SafeAreaView style={globalStyles.container} edges={['top']}>
@@ -134,46 +130,10 @@ export default function ProfileScreen() {
 
         </View>
 
-        {/* Account Settings */}
+        {/* Help & Support */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Settings</Text>
-
-          <TouchableOpacity style={styles.settingItem} onPress={handleEditProfile}>
-            <View style={styles.settingItemLeft}>
-              <Ionicons name="person-outline" size={20} color="#1e3a8a" />
-              <Text style={styles.settingItemText}>Edit Profile</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-          </TouchableOpacity>
-
           <TouchableOpacity
-            style={styles.settingItem}
-            onPress={() =>
-              Alert.alert('Change PIN', 'This option will be available in a future update.')
-            }
-          >
-            <View style={styles.settingItemLeft}>
-              <Ionicons name="key-outline" size={20} color="#1e3a8a" />
-              <Text style={styles.settingItemText}>Change PIN</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingItem}
-            onPress={() =>
-              Alert.alert('Notifications', 'This option will be available in a future update.')
-            }
-          >
-            <View style={styles.settingItemLeft}>
-              <Ionicons name="notifications-outline" size={20} color="#1e3a8a" />
-              <Text style={styles.settingItemText}>Notifications</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.settingItem}
+            style={styles.settingItemNoBorder}
             onPress={() =>
               Alert.alert('Help & Support', 'This option will be available in a future update.')
             }
@@ -332,6 +292,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
+  },
+  settingItemNoBorder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
   },
   settingItemLeft: {
     flexDirection: 'row',
