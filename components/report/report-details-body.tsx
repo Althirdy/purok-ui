@@ -136,18 +136,32 @@ export function ReportDetailsBody({
 
           {/* Voice Transcript */}
           <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.section}>
-            <Text style={styles.sectionLabel}>Voice Transcript</Text>
+            <View style={styles.transcriptHeader}>
+              <Ionicons name="document-text-outline" size={18} color={colors.primary.blue} />
+              <Text style={styles.sectionLabel}>Voice Transcript</Text>
+            </View>
             {report.transcript ? (
-              <Text style={styles.transcriptText}>{report.transcript}</Text>
-            ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <ActivityIndicator size="small" color={colors.primary.blue} />
-                <Text style={styles.transcriptStatusText}>
-                  {'  '}
-                  {report.transcriptionStatus === 'failed'
-                    ? 'We were unable to transcribe this audio.'
-                    : 'Transcribing audio message...'}
+              <View style={styles.transcriptBox}>
+                <Text style={styles.transcriptText}>{report.transcript}</Text>
+              </View>
+            ) : report.transcriptionStatus === 'failed' ? (
+              <View style={styles.transcriptErrorBox}>
+                <Ionicons name="alert-circle-outline" size={24} color={colors.semantic.error} />
+                <Text style={styles.transcriptErrorText}>
+                  We were unable to transcribe this audio recording.
                 </Text>
+              </View>
+            ) : (
+              <View style={styles.transcriptProcessingBox}>
+                <View style={styles.transcriptProcessingIcon}>
+                  <ActivityIndicator size="small" color={colors.primary.blue} />
+                </View>
+                <View style={styles.transcriptProcessingContent}>
+                  <Text style={styles.transcriptProcessingTitle}>Processing Transcript</Text>
+                  <Text style={styles.transcriptProcessingText}>
+                    Your voice recording is being transcribed. This usually takes a few moments...
+                  </Text>
+                </View>
               </View>
             )}
           </Animated.View>
@@ -155,9 +169,9 @@ export function ReportDetailsBody({
       )}
 
       {/* Images Gallery */}
-      {report.images && report.images.length > 0 && (
-        <Animated.View entering={FadeInDown.delay(350).duration(500)} style={styles.section}>
-          <Text style={styles.sectionLabel}>Photos from citizen</Text>
+      <Animated.View entering={FadeInDown.delay(350).duration(500)} style={styles.section}>
+        <Text style={styles.sectionLabel}>Photos from citizen</Text>
+        {report.images && report.images.length > 0 ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -170,8 +184,14 @@ export function ReportDetailsBody({
               </View>
             ))}
           </ScrollView>
-        </Animated.View>
-      )}
+        ) : (
+          <View style={styles.noImageContainer}>
+            <Ionicons name="image-outline" size={40} color={colors.neutral.gray400} />
+            <Text style={styles.noImageText}>No photos attached</Text>
+            <Text style={styles.noImageSubtext}>The citizen did not include any photos</Text>
+          </View>
+        )}
+      </Animated.View>
 
       {/* Info Grid */}
       <Animated.View entering={FadeInDown.delay(420).duration(500)} style={styles.section}>
