@@ -1,6 +1,5 @@
 import { DesignSystem } from '@/constants/design-system';
 import { useAuth } from '@/context/auth-context';
-import type { FeedSource } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
 import {
@@ -53,8 +52,9 @@ export function IncidentHeader(props: IncidentHeaderProps) {
   const displayName = useMemo(() => {
     const name = (user?.name || '').trim();
     const parts = name.split(/\s+/);
-    if (parts.length >= 2) return `${parts[0]} ${parts[parts.length - 1]}`;
-    return name || 'Purok Leader';
+    // Just use first name for a friendlier greeting
+    if (parts.length >= 1 && parts[0]) return parts[0];
+    return 'Purok Leader';
   }, [user]);
 
   return (
@@ -69,7 +69,6 @@ export function IncidentHeader(props: IncidentHeaderProps) {
             <View>
               <Text style={styles.headerTitle}>UrbanWatch</Text>
               <Text style={styles.headerSubtitle}>Purok Feed</Text>
-              <Text style={styles.headerWelcome}>Welcome, {displayName}</Text>
             </View>
           </View>
           <View style={styles.headerRight} />
@@ -78,6 +77,23 @@ export function IncidentHeader(props: IncidentHeaderProps) {
 
       {/* Utilities: Search + Stats */}
       <View style={styles.utilities}>
+        {/* Welcome Card */}
+        <View style={styles.welcomeContainer}>
+          <View style={styles.welcomeRow}>
+            <View style={styles.welcomeIconContainer}>
+              <Ionicons name="person-circle" size={40} color={colors.primary.blue} />
+            </View>
+            <View style={styles.welcomeTextContainer}>
+              <Text style={styles.welcomeText}>Welcome back, {displayName}!</Text>
+              <Text style={styles.welcomeSubtext}>
+                {pendingCount > 0 
+                  ? `You have ${pendingCount} pending concern${pendingCount > 1 ? 's' : ''}`
+                  : 'All concerns are resolved '}
+              </Text>
+            </View>
+          </View>
+        </View>
+
         <View style={styles.searchRow}>
           <View style={styles.searchBar}>
             <TouchableOpacity
@@ -203,12 +219,6 @@ const styles = StyleSheet.create({
     color: colors.text.inverse,
     opacity: 0.9,
   },
-  headerWelcome: {
-    fontSize: isTablet ? typography.fontSize.base : typography.fontSize.xs,
-    color: colors.text.inverse,
-    opacity: 0.85,
-    marginTop: 1,
-  },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -219,6 +229,34 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
     gap: spacing.md,
+  },
+  welcomeContainer: {
+    backgroundColor: colors.background.card,
+    borderRadius: 16,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  welcomeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  welcomeIconContainer: {
+    marginRight: spacing.md,
+  },
+  welcomeTextContainer: {
+    flex: 1,
+  },
+  welcomeText: {
+    fontSize: isTablet ? typography.fontSize.lg : typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  welcomeSubtext: {
+    fontSize: isTablet ? typography.fontSize.sm : typography.fontSize.xs,
+    color: colors.text.secondary,
   },
   searchRow: {
     flexDirection: 'row',

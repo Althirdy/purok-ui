@@ -1,7 +1,9 @@
-import { ModernTabBar } from '@/components/modern-tab-bar';
 import { useAuth } from '@/context/auth-context';
+import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
-import { useEffect } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect } from 'react';
+import { Platform } from 'react-native';
 
 export const unstable_settings = {
   initialRouteName: 'news-feed',
@@ -32,54 +34,84 @@ export default function TabLayout() {
     return <Redirect href="/(auth)/login" />;
   }
   return (
+    <>
       <Tabs
-        tabBar={(props) => <ModernTabBar {...props} />}
         screenOptions={{
+          tabBarActiveTintColor: '#ffffff',
+          tabBarInactiveTintColor: '#94a3b8',
           headerShown: false,
-        }}>
-      <Tabs.Screen
-        name="news-feed"
-        options={{
-          title: 'Incident',
+          tabBarStyle: {
+            backgroundColor: '#1e3a8a',
+            borderTopWidth: 0,
+            paddingTop: Platform.OS === 'android' ? 6 : 8,
+            paddingBottom: Platform.OS === 'android' ? 8 : 4,
+            height: Platform.OS === 'android' ? 58 : 52,
+          },
+          tabBarLabelStyle: {
+            fontSize: 11,
+            fontWeight: '500',
+            marginBottom: Platform.OS === 'android' ? 4 : 2,
+          },
+          tabBarIconStyle: {
+            marginTop: 0,
+          },
         }}
-      />
-      <Tabs.Screen
-        name="map"
-        options={{
-          title: 'Map',
-        }}
-      />
-      <Tabs.Screen
-        name="news"
-        options={{
-          title: 'Safety News',
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-        }}
-      />
-      
-      {/* Hide notifications from tabs */}
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          href: null,
-        }}
-      />
-      
-      
-      {/* Removed Reports & History screen */}
-      
-      {/* Hide profile settings from tabs */}
-      <Tabs.Screen
-        name="profile-settings"
-        options={{
-          href: null,
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="news-feed"
+          options={{
+            title: 'Incident',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="warning-outline" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="map"
+          options={{
+            title: 'Map',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="map-outline" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="news"
+          options={{
+            title: 'Safety News',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="newspaper-outline" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Profile',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="person-outline" size={size} color={color} />
+            ),
+          }}
+        />
+        
+        {/* Hide notifications from tabs */}
+        <Tabs.Screen
+          name="notifications"
+          options={{
+            href: null,
+            headerShown: false,
+          }}
+        />
+        
+        {/* Hide profile settings from tabs */}
+        <Tabs.Screen
+          name="profile-settings"
+          options={{
+            href: null,
+          }}
+        />
+      </Tabs>
+      <StatusBar style="light" backgroundColor="#1e3a8a" />
+    </>
   );
 }

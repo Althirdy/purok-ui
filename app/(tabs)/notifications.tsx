@@ -1,126 +1,50 @@
 /**
- * Notifications Screen - Alert and notification center
+ * Notifications Screen - Exactly like uw-citizen
  */
 
-import { Card } from '@/components/common/card';
 import { NotificationSkeleton } from '@/components/news/notification-skeleton';
-import { DesignSystem } from '@/constants/design-system';
-import { globalStyles } from '@/constants/global-styles';
 import { useNotifications, type Notification } from '@/context/notification-context';
-import { getNotificationIcon } from '@/utils/notificationHelpers';
-import { formatTimestamp } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { colors, typography, spacing } = DesignSystem;
+const formatDate = (timestamp: Date): string => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
 
-// Inline styles
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  markAllRead: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.primary.blue,
-  },
-  unreadSection: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  unreadText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-  },
-  listContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  notificationCard: {
-    marginBottom: spacing.md,
-  },
-  notificationContent: {
-    flexDirection: 'row',
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.background.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  iconContainerUnread: {
-    backgroundColor: `${colors.primary.blue}20`,
-  },
-  textContent: {
-    flex: 1,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  notificationTitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
-    flex: 1,
-  },
-  notificationTitleUnread: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary.blue,
-    marginLeft: spacing.xs,
-  },
-  notificationMessage: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    lineHeight: typography.fontSize.sm * 1.5,
-    marginBottom: spacing.xs,
-  },
-  timestamp: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.tertiary,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing['4xl'],
-  },
-  emptyStateText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-    marginTop: spacing.md,
-  },
-  skeletonContainer: {
-    paddingHorizontal: spacing.lg,
-  },
-});
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+};
+
+const getNotificationIcon = (title: string): string => {
+  if (title.includes('Resolved')) return 'checkmark-circle';
+  if (title.includes('Acknowledged')) return 'time';
+  if (title.includes('New')) return 'notifications';
+  return 'sync';
+};
+
+const getNotificationColor = (title: string): string => {
+  if (title.includes('Resolved')) return '#22c55e';
+  if (title.includes('Acknowledged')) return '#3b82f6';
+  if (title.includes('New') || title.includes('Report')) return '#f59e0b';
+  return '#1e3a8a';
+};
 
 export default function NotificationsScreen() {
-  const { notifications, markAsRead, markAllAsRead, unreadCount } = useNotifications();
+  const { notifications, markAsRead, clearAll } = useNotifications();
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Simulate loading state on mount
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
@@ -128,100 +52,201 @@ export default function NotificationsScreen() {
     return () => clearTimeout(timer);
   }, []);
 
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 500);
+  }, []);
+
   const handleNotificationPress = useCallback((notification: Notification) => {
-    // Mark as read when pressed
     if (!notification.read) {
       markAsRead(notification.id);
     }
-    
-    // Navigate to report if it has a reportId
     if (notification.reportId) {
       router.push({ pathname: 'report-details', params: { reportId: notification.reportId } } as any);
     }
   }, [markAsRead]);
 
-  const renderNotification = useCallback(({ item }: { item: Notification }) => {
-    const iconColor = item.read 
-      ? colors.text.secondary 
-      : (item.severity === 'critical' ? colors.semantic.error : colors.accent.orange);
-    
+  const handleClearAll = useCallback(() => {
+    clearAll();
+  }, [clearAll]);
+
+  const renderItem = useCallback(({ item }: { item: Notification }) => {
+    const iconName = getNotificationIcon(item.title);
+    const iconColor = getNotificationColor(item.title);
+
     return (
-      <Card 
-        onPress={() => handleNotificationPress(item)} 
-        style={styles.notificationCard}
+      <TouchableOpacity
+        style={[styles.notificationItem, item.read && styles.notificationItemRead]}
+        onPress={() => handleNotificationPress(item)}
+        activeOpacity={0.7}
       >
-        <View style={styles.notificationContent}>
-          <View style={[
-            styles.iconContainer,
-            !item.read && styles.iconContainerUnread,
-          ]}>
-            <Ionicons 
-              name={getNotificationIcon(item.type, item.severity, item.reportType) as any} 
-              size={24} 
-              color={iconColor} 
-            />
-          </View>
-          
-          <View style={styles.textContent}>
-            <View style={styles.titleRow}>
-              <Text style={[
-                styles.notificationTitle,
-                !item.read && styles.notificationTitleUnread,
-              ]} numberOfLines={1}>
-                {item.title}
-              </Text>
-              {!item.read && <View style={styles.unreadDot} />}
-            </View>
-            <Text style={styles.notificationMessage} numberOfLines={2}>
-              {item.message}
-            </Text>
-            <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
-          </View>
+        <View style={[styles.iconContainer, { backgroundColor: iconColor + '15' }]}>
+          <Ionicons name={iconName as any} size={24} color={iconColor} />
         </View>
-      </Card>
+        <View style={styles.notificationContent}>
+          <Text style={styles.notificationTitle}>{item.title}</Text>
+          <Text style={styles.notificationBody} numberOfLines={2}>
+            {item.message}
+          </Text>
+          <Text style={styles.notificationDate}>{formatDate(item.timestamp)}</Text>
+        </View>
+        {!item.read && <View style={styles.unreadDot} />}
+      </TouchableOpacity>
     );
   }, [handleNotificationPress]);
+
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="notifications-off-outline" size={64} color="#cbd5e1" />
+      <Text style={styles.emptyText}>No notifications yet</Text>
+      <Text style={styles.emptySubtext}>
+        You'll see updates about concerns here
+      </Text>
+    </View>
+  );
 
   const keyExtractor = useCallback((item: Notification) => item.id, []);
 
   return (
-    <SafeAreaView style={globalStyles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar style="light" backgroundColor="#1e3a8a" />
+      
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Notifications</Text>
-        {unreadCount > 0 && (
-          <TouchableOpacity onPress={markAllAsRead}>
-            <Text style={styles.markAllRead}>Mark all read</Text>
+        {notifications.length > 0 && (
+          <TouchableOpacity onPress={handleClearAll} style={styles.clearButton}>
+            <Text style={styles.clearButtonText}>Clear all</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Unread Count */}
-      {unreadCount > 0 && (
-        <View style={styles.unreadSection}>
-          <Text style={styles.unreadText}>
-            You have {unreadCount} unread notification{unreadCount > 1 ? 's' : ''}
-          </Text>
-        </View>
-      )}
-
-      {/* Notifications List */}
-      <FlatList
-        data={isLoading ? [] : notifications}
-        keyExtractor={keyExtractor}
-        renderItem={renderNotification}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          isLoading ? (
-            <NotificationSkeleton count={6} />
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="notifications-off-outline" size={64} color={colors.neutral.gray600} />
-              <Text style={styles.emptyStateText}>No notifications</Text>
-            </View>
-          )
-        }
-      />
+      {/* Content */}
+      <View style={styles.contentContainer}>
+        <FlatList
+          data={isLoading ? [] : notifications}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            isLoading ? (
+              <View style={styles.skeletonContainer}>
+                <NotificationSkeleton count={6} />
+              </View>
+            ) : renderEmpty()
+          }
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1e3a8a" />
+          }
+        />
+      </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#1e3a8a',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#1e3a8a',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  clearButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  clearButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  listContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
+  notificationItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  notificationItemRead: {
+    backgroundColor: '#f8fafc',
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  notificationContent: {
+    flex: 1,
+  },
+  notificationTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  notificationBody: {
+    fontSize: 14,
+    color: '#64748b',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  notificationDate: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#3b82f6',
+    marginLeft: 8,
+    marginTop: 8,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#64748b',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#94a3b8',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  skeletonContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+});
