@@ -1,5 +1,6 @@
-import React from 'react';
-import { ActivityIndicator, Image, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Image, Linking, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ImageViewer } from '@/components/ui/image-viewer';
 import MapView, { Marker } from 'react-native-maps';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -55,6 +56,14 @@ export function ReportDetailsBody({
   onPlayAudio,
   onStopAudio,
 }: ReportDetailsBodyProps) {
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+  const handleImagePress = (index: number) => {
+    setSelectedImageIndex(index);
+    setImageViewerVisible(true);
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -179,9 +188,16 @@ export function ReportDetailsBody({
             contentContainerStyle={styles.imageGalleryContent}
           >
             {report.images.map((imageUrl, index) => (
-              <View key={index} style={styles.imageContainer}>
+              <Pressable 
+                key={index} 
+                style={styles.imageContainer}
+                onPress={() => handleImagePress(index)}
+              >
                 <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
-              </View>
+                <View style={styles.imageTapHint}>
+                  <Ionicons name="expand-outline" size={16} color={colors.text.inverse} />
+                </View>
+              </Pressable>
             ))}
           </ScrollView>
         ) : (
@@ -192,6 +208,16 @@ export function ReportDetailsBody({
           </View>
         )}
       </Animated.View>
+
+      {/* Image Viewer Modal */}
+      {report.images && report.images.length > 0 && (
+        <ImageViewer
+          images={report.images}
+          initialIndex={selectedImageIndex}
+          visible={imageViewerVisible}
+          onClose={() => setImageViewerVisible(false)}
+        />
+      )}
 
       {/* Info Grid */}
       <Animated.View entering={FadeInDown.delay(420).duration(500)} style={styles.section}>

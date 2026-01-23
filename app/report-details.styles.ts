@@ -115,6 +115,14 @@ export const reportDetailsStyles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  imageTapHint: {
+    position: 'absolute',
+    bottom: spacing.xs,
+    right: spacing.xs,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 4,
+    padding: 4,
+  },
   locationCard: {
     marginTop: spacing.sm,
   },

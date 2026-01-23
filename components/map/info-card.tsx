@@ -14,9 +14,10 @@ import { getMarkerIcon, type SelectedMarker } from '@/utils/mapHelpers';
 import { getSeverityColor } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { mapStyles as styles } from '@/constants/map-screen.styles';
+import { ImageViewer } from '@/components/ui/image-viewer';
 
 const { colors } = DesignSystem;
 
@@ -56,6 +57,15 @@ export function InfoCard({ marker, onClose }: InfoCardProps) {
   // Check if incident is verified (acknowledged or resolved)
   const isVerified = marker.status === 'acknowledged' || marker.status === 'resolved';
   const hasImages = marker.images && marker.images.length > 0;
+
+  // Image viewer state
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+  const handleImagePress = (index: number) => {
+    setSelectedImageIndex(index);
+    setImageViewerVisible(true);
+  };
 
   return (
     <View style={styles.infoCardContainer}>
@@ -113,16 +123,33 @@ export function InfoCard({ marker, onClose }: InfoCardProps) {
               contentContainerStyle={styles.evidenceScroll}
             >
               {marker.images!.map((imageUrl, index) => (
-                <View key={index} style={styles.evidenceImageContainer}>
+                <Pressable 
+                  key={index} 
+                  style={styles.evidenceImageContainer}
+                  onPress={() => handleImagePress(index)}
+                >
                   <Image
                     source={{ uri: imageUrl }}
                     style={styles.evidenceImage}
                     contentFit="cover"
                   />
-                </View>
+                  <View style={localStyles.imageTapHint}>
+                    <Ionicons name="expand-outline" size={12} color="#fff" />
+                  </View>
+                </Pressable>
               ))}
             </ScrollView>
           </View>
+        )}
+
+        {/* Image Viewer Modal */}
+        {hasImages && (
+          <ImageViewer
+            images={marker.images!}
+            initialIndex={selectedImageIndex}
+            visible={imageViewerVisible}
+            onClose={() => setImageViewerVisible(false)}
+          />
         )}
 
         {/* Timestamp */}
@@ -161,5 +188,16 @@ export function InfoCard({ marker, onClose }: InfoCardProps) {
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  imageTapHint: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 4,
+    padding: 3,
+  },
+});
 
 
