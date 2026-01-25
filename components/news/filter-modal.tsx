@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: '#64748b',
+    backgroundColor: '#1e3a8a',
     alignItems: 'center',
   },
   applyButtonText: {

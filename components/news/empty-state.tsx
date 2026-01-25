@@ -14,7 +14,7 @@ export function EmptyState({ loading = false }: EmptyStateProps) {
     <View style={styles.container}>
       <Ionicons name="folder-open-outline" size={64} color={colors.neutral.gray600} />
       <Text style={styles.text}>
-        {loading ? 'Loading reports...' : 'No reports available'}
+        {loading ? 'Loading concerns...' : 'No concerns available'}
       </Text>
     </View>
   );

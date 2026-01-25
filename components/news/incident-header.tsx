@@ -22,6 +22,7 @@ export interface IncidentHeaderProps {
   statusFilter: 'all' | 'pending' | 'ongoing' | 'resolved';
   reportTypeFilter: 'all' | 'manual' | 'voice';
   pendingCount: number;
+  acknowledgedCount: number;
   resolvedCount: number;
   searchQuery: string;
   setSearchQuery: (value: string) => void;
@@ -37,6 +38,7 @@ export function IncidentHeader(props: IncidentHeaderProps) {
     statusFilter,
     reportTypeFilter,
     pendingCount,
+    acknowledgedCount,
     resolvedCount,
     searchQuery,
     setSearchQuery,
@@ -88,7 +90,9 @@ export function IncidentHeader(props: IncidentHeaderProps) {
               <Text style={styles.welcomeSubtext}>
                 {pendingCount > 0 
                   ? `You have ${pendingCount} pending concern${pendingCount > 1 ? 's' : ''}`
-                  : 'All concerns are resolved '}
+                  : acknowledgedCount > 0
+                    ? `${acknowledgedCount} concern${acknowledgedCount > 1 ? 's' : ''} in progress`
+                    : 'All concerns are resolved'}
               </Text>
             </View>
           </View>
@@ -159,8 +163,8 @@ export function IncidentHeader(props: IncidentHeaderProps) {
 
         <View style={styles.statRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Pending</Text>
-            <Text style={styles.statValue}>{pendingCount}</Text>
+            <Text style={styles.statLabel}>Acknowledged</Text>
+            <Text style={styles.statValue}>{acknowledgedCount}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Resolved</Text>
@@ -172,7 +176,7 @@ export function IncidentHeader(props: IncidentHeaderProps) {
       {/* Current Report Section */}
       <View style={styles.currentReportSection}>
         <View style={styles.currentReportHeader}>
-          <Text style={styles.currentReportTitle}>Your Concerns ({pendingCount})</Text>
+          <Text style={styles.currentReportTitle}>Community Concerns ({pendingCount})</Text>
         </View>
       </View>
     </View>

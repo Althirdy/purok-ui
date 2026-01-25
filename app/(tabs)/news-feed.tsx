@@ -140,6 +140,7 @@ export default function NewsFeedScreen() {
         },
       });
       
+      // Note: Notification is added in the useReportsFeed hook
       console.log('[NewsFeed] ✅ Toast displayed for new report');
     },
   });
@@ -268,24 +269,36 @@ export default function NewsFeedScreen() {
   const voiceCount = useMemo(() => reports.filter(r => r.reportType === 'voice' || !!r.audio).length, [reports]);
   const totalCount = reports.length;
   
-  // Derived: reports filtered by search query and source (category)
+  // Derived: reports filtered by search query, status, and report type
   const displayedReports = useMemo(() => {
     const q = committedQuery.trim().toLowerCase();
-    // Source filter (all/cctv/sensor) removed – always show all reports
     let base = reports;
+    
     // Apply status filter
     if (statusFilter !== 'all') {
       const targetStatus = statusFilter === 'ongoing' ? 'acknowledged' : statusFilter;
       base = base.filter(r => r.status === targetStatus);
     }
-    // Note: reportTypeFilter is reserved for future manual/voice classification
+    
+    // Apply report type filter (manual vs voice)
+    if (reportTypeFilter !== 'all') {
+      if (reportTypeFilter === 'voice') {
+        // Voice reports have reportType === 'voice' or have audio
+        base = base.filter(r => r.reportType === 'voice' || !!r.audio);
+      } else if (reportTypeFilter === 'manual') {
+        // Manual reports have reportType === 'manual' or no reportType and no audio
+        base = base.filter(r => r.reportType === 'manual' || (!r.reportType && !r.audio));
+      }
+    }
+    
+    // Apply search query filter
     if (!q) return base;
     return base.filter(r => {
       const title = r.title?.toLowerCase() ?? '';
       const location = r.location?.toLowerCase() ?? '';
       return title.includes(q) || location.includes(q);
     });
-  }, [reports, committedQuery, statusFilter]);
+  }, [reports, committedQuery, statusFilter, reportTypeFilter]);
   
   // Memoize header component - only recompute when dependencies change
   const memoizedHeader = useMemo(() => {
@@ -294,6 +307,7 @@ export default function NewsFeedScreen() {
         statusFilter={statusFilter}
         reportTypeFilter={reportTypeFilter}
         pendingCount={pendingCount}
+        acknowledgedCount={ongoingCount}
         resolvedCount={resolvedCount}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
@@ -304,7 +318,7 @@ export default function NewsFeedScreen() {
         setReportTypeFilter={setReportTypeFilter}
       />
     );
-  }, [pendingCount, resolvedCount, statusFilter, reportTypeFilter, searchQuery, committedQuery]);
+  }, [pendingCount, ongoingCount, resolvedCount, statusFilter, reportTypeFilter, searchQuery, committedQuery]);
 
   return (
     <SafeAreaView style={globalStyles.container}>

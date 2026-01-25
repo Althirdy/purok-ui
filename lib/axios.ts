@@ -100,6 +100,9 @@ async function handleResponseWithTokenRefresh<T>(
 async function processResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get('content-type') || '';
 
+  console.log(`[HTTP] 📥 Response Status: ${response.status} ${response.statusText}`);
+  console.log(`[HTTP] 📥 Content-Type: ${contentType}`);
+
   // Check for HTML response (likely auth redirect)
   if (contentType.includes('text/html')) {
     const responseText = await response.text();
@@ -110,16 +113,30 @@ async function processResponse<T>(response: Response): Promise<T> {
 
   // Handle non-OK responses
   if (!response.ok) {
-    if (contentType.includes('application/json')) {
+    console.error(`❌ [HTTP] Error Response: ${response.status} ${response.statusText}`);
+    
+    // Try to get response body for debugging
+    let errorBody = '';
+    try {
+      errorBody = await response.text();
+      console.error('❌ [HTTP] Error Body:', errorBody.substring(0, 1000));
+    } catch (e) {
+      console.error('❌ [HTTP] Could not read error body');
+    }
+    
+    // Try to parse as JSON if possible
+    if (errorBody && contentType.includes('application/json')) {
       try {
-        const errorData = await response.json();
+        const errorData = JSON.parse(errorBody);
         const errorMessage = errorData?.message || errorData?.error || `HTTP ${response.status}`;
-        throw new Error(errorMessage);
+        console.error('❌ [HTTP] Error Message:', errorMessage);
+        throw new Error(`HTTP ${response.status}: ${errorMessage}`);
       } catch (parseError) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Not valid JSON
       }
     }
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    
+    throw new Error(`HTTP ${response.status}: ${response.statusText || errorBody.substring(0, 100)}`);
   }
 
   // Handle empty or non-JSON responses

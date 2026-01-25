@@ -45,6 +45,17 @@ export default function NotificationsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Debug: Log notifications when they change
+  useEffect(() => {
+    console.log('[NotificationsScreen] 📋 Notifications count:', notifications.length);
+    console.log('[NotificationsScreen] 📋 Notifications:', notifications.map(n => ({
+      id: n.id,
+      title: n.title,
+      type: n.type,
+      read: n.read,
+    })));
+  }, [notifications]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);

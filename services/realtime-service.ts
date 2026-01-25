@@ -20,8 +20,14 @@ type ConcernAssignedPayload = {
     summary?: string | null;
     transcript?: string | null; // Full transcript text (if already processed)
     transcription_status?: 'queued' | 'processing' | 'completed' | 'failed' | null;
+    // Support both formats: nested location object OR separate latitude/longitude fields
     latitude?: string | number | null;
     longitude?: string | number | null;
+    location?: {
+      lat?: string | number | null;
+      lng?: string | number | null;
+    } | null;
+    address?: string | null; // Full address from geocoding
   };
   citizen: {
     name: string;
@@ -289,6 +295,9 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
 function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyReport {
   const { concern, citizen } = payload;
 
+  // Log raw payload for debugging
+  console.log('[Pusher] 📦 Raw concern payload:', JSON.stringify(concern, null, 2));
+
   // Map backend category to frontend type
   const categoryMap: Record<string, EmergencyReport['type']> = {
     'safety': 'other',
@@ -308,25 +317,39 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
     'resolved': 'resolved',
   };
 
-  // Parse coordinates
+  // Parse coordinates - support both formats:
+  // 1. Nested: concern.location.lat / concern.location.lng
+  // 2. Flat: concern.latitude / concern.longitude
   let coordinates: { latitude: number; longitude: number } | undefined;
-  if (concern.latitude && concern.longitude) {
+  
+  // Try nested location first
+  if (concern.location?.lat && concern.location?.lng) {
+    const lat = typeof concern.location.lat === 'string' ? parseFloat(concern.location.lat) : concern.location.lat;
+    const lng = typeof concern.location.lng === 'string' ? parseFloat(concern.location.lng) : concern.location.lng;
+    if (!isNaN(lat) && !isNaN(lng)) {
+      coordinates = { latitude: lat, longitude: lng };
+      console.log('[Pusher] 📍 Parsed nested location:', coordinates);
+    }
+  }
+  // Fallback to flat latitude/longitude
+  else if (concern.latitude && concern.longitude) {
     const lat = typeof concern.latitude === 'string' ? parseFloat(concern.latitude) : concern.latitude;
     const lng = typeof concern.longitude === 'string' ? parseFloat(concern.longitude) : concern.longitude;
     if (!isNaN(lat) && !isNaN(lng)) {
       coordinates = { latitude: lat, longitude: lng };
+      console.log('[Pusher] 📍 Parsed flat location:', coordinates);
     }
   }
 
-  // Build location string
-  const locationParts: string[] = [];
-  if (coordinates) {
-    locationParts.push(`Lat ${coordinates.latitude.toFixed(4)}, Lng ${coordinates.longitude.toFixed(4)}`);
+  // Build location string - prefer address if available
+  let location = 'Location not available';
+  if (concern.address) {
+    location = concern.address;
+    console.log('[Pusher] 📍 Using address:', location);
+  } else if (coordinates) {
+    location = `Lat ${coordinates.latitude.toFixed(4)}, Lng ${coordinates.longitude.toFixed(4)}`;
+    console.log('[Pusher] 📍 Using coordinates as location:', location);
   }
-  if (citizen.name) {
-    locationParts.push(`Reported by ${citizen.name}`);
-  }
-  const location = locationParts.length > 0 ? locationParts.join(' • ') : 'Citizen submitted location';
 
   const category = concern.category?.toLowerCase() || 'other';
   

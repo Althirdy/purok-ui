@@ -9,7 +9,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 
 export interface Notification {
   id: string;
-  type: 'sensor_alert' | 'report_update' | 'system';
+  type: 'sensor_alert' | 'report_update' | 'new_report' | 'system';
   title: string;
   message: string;
   reportId?: string;
@@ -50,6 +50,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const loadNotifications = async () => {
     try {
       const stored = await AsyncStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+      console.log('[NotificationContext] 📂 Loading notifications from storage...');
       if (stored) {
         const parsed = JSON.parse(stored);
         // Convert timestamp strings back to Date objects
@@ -57,7 +58,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           ...n,
           timestamp: new Date(n.timestamp),
         }));
+        console.log('[NotificationContext] 📂 Loaded notifications:', withDates.length);
         setNotifications(withDates);
+      } else {
+        console.log('[NotificationContext] 📂 No stored notifications found');
       }
     } catch (error) {
       console.error('Error loading notifications:', error);
@@ -68,6 +72,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     try {
       // Limit to last 100 notifications to prevent storage bloat
       const toSave = notifications.slice(0, 100);
+      console.log('[NotificationContext] 💾 Saving notifications:', toSave.length);
       await AsyncStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(toSave));
     } catch (error) {
       console.error('Error saving notifications:', error);
@@ -75,13 +80,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   };
 
   const addNotification = useCallback((notification: Notification) => {
+    console.log('[NotificationContext] 🔔 addNotification called with:', notification);
     setNotifications(prev => {
       // Check if notification already exists (prevent duplicates)
       if (prev.some(n => n.id === notification.id)) {
+        console.log('[NotificationContext] ⚠️ Notification already exists, skipping:', notification.id);
         return prev;
       }
       // Add new notification at the beginning (newest first)
-      return [notification, ...prev];
+      const updated = [notification, ...prev];
+      console.log('[NotificationContext] ✅ Notification added, total:', updated.length);
+      return updated;
     });
   }, []);
 

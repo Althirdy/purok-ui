@@ -1,5 +1,5 @@
-import type { EmergencyReport } from '@/types';
 import { httpGet, httpPut } from '@/lib/axios';
+import type { EmergencyReport } from '@/types';
 
 interface AssignedConcernsResponse {
   success: boolean;
@@ -17,8 +17,14 @@ export interface AssignedConcern {
   severity?: 'low' | 'medium' | 'high';
   status?: string; // Concern-level status
   distribution_status?: string; // Distribution-level status
+  // Support both formats: flat latitude/longitude OR nested location object
   latitude?: string | number | null;
   longitude?: string | number | null;
+  location?: {
+    lat?: string | number | null;
+    lng?: string | number | null;
+  } | null;
+  address?: string | null; // Full address from geocoding
   created_at: string;
   updated_at?: string;
   images?: string[];
@@ -195,8 +201,22 @@ export async function updateAssignedConcernStatus(
 }
 
 export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyReport {
-  const latitude = concern.latitude != null ? Number(concern.latitude) : null;
-  const longitude = concern.longitude != null ? Number(concern.longitude) : null;
+  // Parse coordinates - support both formats:
+  // 1. Nested: concern.location.lat / concern.location.lng
+  // 2. Flat: concern.latitude / concern.longitude
+  let latitude: number | null = null;
+  let longitude: number | null = null;
+  
+  // Try nested location first
+  if (concern.location?.lat != null && concern.location?.lng != null) {
+    latitude = Number(concern.location.lat);
+    longitude = Number(concern.location.lng);
+  }
+  // Fallback to flat latitude/longitude
+  else if (concern.latitude != null && concern.longitude != null) {
+    latitude = Number(concern.latitude);
+    longitude = Number(concern.longitude);
+  }
   
   // Map backend status to frontend status (same mapping as in realtime-service.ts)
   // Backend uses: 'pending' | 'ongoing' | 'escalated' | 'resolved'
@@ -282,6 +302,14 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
   const category = concern.category?.toLowerCase() || 'other';
   const reportType = categoryMap[category] ?? 'other';
   
+  // Determine location display - prefer address if available
+  let locationDisplay = 'Location not available';
+  if (concern.address) {
+    locationDisplay = concern.address;
+  } else if (latitude != null && longitude != null) {
+    locationDisplay = `Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}`;
+  }
+
   return {
     id: `PUROK-${concern.id}`,
     title: concern.title,
@@ -290,10 +318,7 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
     severity: (concern.severity as EmergencyReport['severity']) ?? 'medium',
     status: frontendStatus,
     timestamp: new Date(concern.created_at),
-    location:
-      latitude != null && longitude != null
-        ? `Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}`
-        : 'Citizen submitted location',
+    location: locationDisplay,
     source: 'citizen',
     reportedBy: concern.citizen?.name ?? 'citizen',
     images: concern.images,

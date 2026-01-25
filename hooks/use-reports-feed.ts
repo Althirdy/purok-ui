@@ -124,11 +124,28 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
           processedReportIds.current.add(report.id);
           console.log('[ReportsFeed] New citizen report from Pusher:', report.id);
 
-          // Add notification (only once per report)
+          // Add notification for new concern (only once per report)
           if (!notifiedReportIds.current.has(report.id)) {
             notifiedReportIds.current.add(report.id);
-            addNotificationFromReportRef.current(report);
-            console.log('[ReportsFeed] Added notification for report:', report.id);
+            // Use addNotification directly with proper title for new concerns
+            const notification = {
+              id: `new-report-${report.id}-${Date.now()}`,
+              type: 'new_report' as const,
+              title: 'New Concern Reported',
+              message: report.title || report.description || 'New concern reported',
+              reportId: report.id,
+              timestamp: new Date(),
+              read: false,
+              severity: report.severity,
+              reportType: report.type,
+            };
+            console.log('[ReportsFeed] 🔔 Adding notification:', notification);
+            if (addNotificationRef.current) {
+              addNotificationRef.current(notification);
+              console.log('[ReportsFeed] ✅ Notification added for new report:', report.id);
+            } else {
+              console.error('[ReportsFeed] ❌ addNotificationRef is not set!');
+            }
           }
 
           // Add to reports list
