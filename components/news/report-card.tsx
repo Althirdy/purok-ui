@@ -2,17 +2,16 @@
  * Emergency Report Card Component
  */
 
-import { Badge } from '@/components/common/badge';
 import { Card } from '@/components/common/card';
 import { DesignSystem } from '@/constants/design-system';
 import type { EmergencyReport } from '@/types';
 import {
-  formatReportId,
-  formatTimestamp,
-  getCategory,
-  getSeverityColor,
-  getStatusColor,
-  getStatusText,
+    formatReportId,
+    formatTimestamp,
+    getCategory,
+    getSeverityColor,
+    getStatusColor,
+    getStatusText,
 } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
