@@ -90,6 +90,21 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
     return colors.accent.orange;
   };
 
+  // Get category badge colors (background + text)
+  const getCategoryBadgeColors = (originalCategory?: string) => {
+    const categoryStyles: Record<string, { bg: string; text: string }> = {
+      'safety': { bg: '#fef3c7', text: '#b45309' },        // Amber tones
+      'security': { bg: '#fee2e2', text: '#b91c1c' },      // Red tones
+      'infrastructure': { bg: '#dbeafe', text: '#1d4ed8' }, // Blue tones
+      'environment': { bg: '#d1fae5', text: '#047857' },    // Green tones
+      'noise': { bg: '#ede9fe', text: '#6d28d9' },          // Purple tones
+      'other': { bg: '#f1f5f9', text: '#475569' },          // Gray tones
+      'voice_concern': { bg: '#f1f5f9', text: '#475569' },  // Gray tones
+    };
+    const key = originalCategory?.toLowerCase() || 'other';
+    return categoryStyles[key] || categoryStyles['other'];
+  };
+
   const getSeverityBadge = (severity: string) => {
     const badgeColor = getSeverityColor(severity as EmergencyReport['severity']);
     return (
@@ -105,6 +120,7 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
   // All cards are clickable if onPress is provided, regardless of status
   const canOpenDetails = !!onPress;
   const statusBadgeStyle = getStatusColor(report.status);
+  const categoryColor = getCategoryIconColor(report.originalCategory);
 
   return (
     <Card onPress={canOpenDetails ? () => onPress!(report.id) : undefined} variant="default" style={styles.card}>
@@ -129,7 +145,10 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
         {/* Content */}
         <View style={styles.info}>
           <Text style={styles.title} numberOfLines={2}>{report.title}</Text>
-          <Text style={styles.category}>{getCategory(report.type, report.originalCategory)}</Text>
+          {/* Category text with color */}
+          <Text style={[styles.category, { color: categoryColor }]}>
+            {getCategory(report.type, report.originalCategory)}
+          </Text>
         </View>
 
         {/* Severity Badge on Right */}
@@ -313,8 +332,7 @@ const styles = StyleSheet.create({
   
   category: {
     fontSize: 14,
-    color: '#64748b',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   
   meta: {
