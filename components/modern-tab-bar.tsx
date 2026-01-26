@@ -29,6 +29,11 @@ const tabs: TabConfig[] = [
     icon: (focused) => focused ? 'map' : 'map-outline',
   },
   {
+    routeName: 'news',
+    label: 'News',
+    icon: (focused) => focused ? 'megaphone' : 'megaphone-outline',
+  },
+  {
     routeName: 'profile',
     label: 'Profile',
     icon: (focused) => focused ? 'person' : 'person-outline',
@@ -105,11 +110,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary.blue,
     paddingBottom: spacing.xs,
     paddingTop: spacing.xs,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#1e3a8a',
   },
   tabButton: {
     flex: 1,
@@ -122,10 +124,10 @@ const styles = StyleSheet.create({
   activeUnderline: {
     position: 'absolute',
     bottom: 0,
-    left: '20%',
-    right: '20%',
-    height: 2.5,
-    backgroundColor: colors.accent.orange,
+    left: '22%',
+    right: '22%',
+    height: 3,
+    backgroundColor: '#3b82f6',
     borderRadius: borderRadius.sm,
   },
   iconContainer: {

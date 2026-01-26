@@ -23,10 +23,24 @@ export interface EmergencyReport {
   description: string;
   location: string;
   timestamp: Date;
-  status: 'pending' | 'acknowledged' | 'resolved' | 'ongoing' | 'escalated';
+  status: 'pending' | 'acknowledged' | 'resolved';
   severity: 'low' | 'medium' | 'high' | 'critical';
   reportedBy?: string;
   source?: 'cctv' | 'sensor' | 'citizen' | 'official';
+  // Optional fields for citizen reports
+  images?: string[]; // Array of image URLs
+  audio?: string | null; // Audio URL for voice concerns
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  // Report type classification (manual vs voice)
+  reportType?: 'manual' | 'voice'; // 'voice' if has audio or category is 'voice_concern', 'manual' otherwise
+  // Original category from citizen side (preserved for display)
+  originalCategory?: string; // 'safety', 'security', 'infrastructure', 'environment', 'noise', 'other', 'voice_concern'
+  // Voice transcription fields (for voice concerns)
+  transcript?: string | null; // Full transcript text from backend (transcript_text / transcript)
+  transcriptionStatus?: 'queued' | 'processing' | 'completed' | 'failed'; // Realtime transcription status
 }
 
 // Feed Types

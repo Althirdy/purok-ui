@@ -8,16 +8,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.accent.orange,
+    backgroundColor: colors.primary.blue,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -80,11 +80,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.accent.orange,
+    backgroundColor: colors.primary.blue,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.primary.navy,
+    borderColor: colors.background.card,
   },
   formSection: {
     gap: spacing.lg,
@@ -104,25 +104,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     borderWidth: 1,
-    borderColor: colors.neutral.gray700,
+    borderColor: colors.border.default,
     fontSize: typography.fontSize.base,
     color: colors.text.primary,
     minHeight: 48,
   },
   updateButton: {
-    backgroundColor: colors.primary.navy,
+    backgroundColor: colors.primary.blue,
     borderRadius: borderRadius.lg,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.xl,
-    ...DesignSystem.shadows.sm,
   },
   updateButtonText: {
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
+    color: colors.text.inverse,
   },
 });
 
@@ -152,7 +151,7 @@ export default function ProfileSettingsScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+            <Ionicons name="arrow-back" size={24} color={colors.text.inverse} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Profile Settings</Text>
         </View>
@@ -170,7 +169,7 @@ export default function ProfileSettingsScreen() {
                 <Text style={styles.avatarText}>JB</Text>
               </View>
               <View style={styles.editIconButton}>
-                <Ionicons name="pencil" size={16} color={colors.text.primary} />
+                <Ionicons name="pencil" size={16} color={colors.text.inverse} />
               </View>
             </TouchableOpacity>
           </View>

@@ -84,7 +84,6 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
     color: colors.text.secondary,
-    whiteSpace: 'nowrap',
   },
   
   tabTextActive: {

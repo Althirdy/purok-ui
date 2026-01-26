@@ -6,6 +6,15 @@ import { Badge } from '@/components/common/badge';
 import { Card } from '@/components/common/card';
 import { DesignSystem } from '@/constants/design-system';
 import type { EmergencyReport } from '@/types';
+import {
+  formatReportId,
+  formatTimestamp,
+  getCategory,
+  getSeverityColor,
+  getStatusColor,
+  getStatusText,
+} from '@/utils/reportHelpers';
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -15,10 +24,11 @@ export interface ReportCardProps {
   report: EmergencyReport;
   onPress?: (reportId: string) => void;
   onAcknowledge?: (reportId: string) => void;
+  onResolve?: (reportId: string) => void;
   [key: string]: any;
 }
 
-function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps) {
+function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: ReportCardProps) {
   const getSourceIcon = (source?: string) => {
     switch (source) {
       case 'cctv':
@@ -32,138 +42,170 @@ function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps
     }
   };
 
-  const getCategory = (type: string) => {
+  const getCategoryIcon = (originalCategory?: string, type?: EmergencyReport['type']) => {
+    // Use original category from citizen side if available (matches citizen side icons)
+    if (originalCategory) {
+      const categoryIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
+        'safety': 'shield-outline',        // Matches citizen side
+        'security': 'eye-outline',         // Matches citizen side
+        'infrastructure': 'construct-outline', // Matches citizen side
+        'environment': 'leaf-outline',       // Matches citizen side
+        'noise': 'volume-high-outline',      // Matches citizen side
+        'other': 'alert-circle-outline',     // Matches citizen side (was ellipsis)
+        'voice_concern': 'mic-outline',
+      };
+      return categoryIcons[originalCategory.toLowerCase()] || 'alert-circle-outline';
+    }
+    
+    // Fallback to type-based icons
     switch (type) {
       case 'accident':
-        return 'Road Accident';
+        return 'car-outline';
       case 'crime':
-        return 'Crime';
+        return 'eye-outline'; // Security icon
       case 'fire':
-        return 'Fire';
+        return 'flame-outline';
       case 'medical':
-        return 'Medical Emergency';
+        return 'medical-outline';
       case 'suspicious':
-        return 'Suspicious Activity';
-      case 'other':
-        return 'Flood';
+        return 'shield-outline'; // Safety icon
       default:
-        return 'Other';
+        return 'alert-circle-outline';
     }
+  };
+
+  const getCategoryIconColor = (originalCategory?: string) => {
+    if (originalCategory) {
+      const categoryColors: Record<string, string> = {
+        'safety': '#f59e0b',      // Orange
+        'security': '#ef4444',     // Red
+        'infrastructure': '#3b82f6', // Blue
+        'environment': '#10b981',   // Green
+        'noise': '#8b5cf6',        // Purple
+        'other': '#64748b',        // Gray
+        'voice_concern': '#64748b', // Gray
+      };
+      return categoryColors[originalCategory.toLowerCase()] || colors.accent.orange;
+    }
+    return colors.accent.orange;
   };
 
   const getSeverityBadge = (severity: string) => {
-    // Use unified blue styling for all severities per design request
-    const baseStyle = { backgroundColor: colors.primary.blue } as const;
-    switch (severity) {
-      case 'critical':
-        return <Badge label="CRITICAL" style={baseStyle} />;
-      case 'high':
-        return <Badge label="HIGH" style={baseStyle} />;
-      case 'medium':
-        return <Badge label="MEDIUM" style={baseStyle} />;
-      case 'low':
-        return <Badge label="LOW" style={baseStyle} />;
-      default:
-        return null;
-    }
+    const badgeColor = getSeverityColor(severity as EmergencyReport['severity']);
+    return (
+      <View style={[styles.severityBadge, { backgroundColor: badgeColor + '20' }]}>
+        <Text style={[styles.severityBadgeText, { color: badgeColor }]}>
+          {severity.toUpperCase()}
+        </Text>
+      </View>
+    );
   };
 
-  const formatTimestamp = (date: Date) => {
-    const now = new Date();
-    const reportDate = new Date(date);
-    const diff = now.getTime() - reportDate.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days === 1) return 'yesterday';
-    
-    // Format date: MM/DD/YYYY
-    const month = reportDate.getMonth() + 1;
-    const day = reportDate.getDate();
-    const year = reportDate.getFullYear();
-    return `${month}/${day}/${year}`;
-  };
 
-  const getStatusBadge = () => {
-    if (report.status === 'acknowledged') {
-      return (
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>Acknowledged</Text>
-        </View>
-      );
-    }
-    if (report.status === 'resolved') {
-      return (
-        <View style={[styles.statusBadge, { backgroundColor: colors.semantic.success }]}>
-          <Text style={styles.statusText}>Resolved ✓</Text>
-        </View>
-      );
-    }
-    return null;
-  };
-
-  const canOpenDetails = !!onPress && report.status === 'pending';
+  // All cards are clickable if onPress is provided, regardless of status
+  const canOpenDetails = !!onPress;
+  const statusBadgeStyle = getStatusColor(report.status);
 
   return (
-    <Card onPress={canOpenDetails ? () => onPress!(report.id) : undefined} variant="elevated" style={styles.card}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{report.title}</Text>
-        {getSeverityBadge(report.severity)}
+    <Card onPress={canOpenDetails ? () => onPress!(report.id) : undefined} variant="default" style={styles.card}>
+      {/* ID Badge - Top Right */}
+      <View style={styles.topRow}>
+        <View style={styles.idBadge}>
+          <Text style={styles.idText}>{formatReportId(report.id)}</Text>
+        </View>
       </View>
-      {getStatusBadge()}
 
-      <View style={styles.descriptionContainer}>
-        <Text style={styles.descriptionText} numberOfLines={4}>
+      {/* Header: Icon, Title, Category, Severity */}
+      <View style={styles.header}>
+        {/* Icon on Left */}
+        <View style={styles.iconContainer}>
+          <Ionicons 
+            name={getCategoryIcon(report.originalCategory, report.type)} 
+            size={24} 
+            color={getCategoryIconColor(report.originalCategory)} 
+          />
+        </View>
+
+        {/* Content */}
+        <View style={styles.info}>
+          <Text style={styles.title} numberOfLines={2}>{report.title}</Text>
+          <Text style={styles.category}>{getCategory(report.type, report.originalCategory)}</Text>
+        </View>
+
+        {/* Severity Badge on Right */}
+        <View style={styles.meta}>
+          {getSeverityBadge(report.severity)}
+        </View>
+      </View>
+
+      {/* Description - Indented */}
+      {report.description && (
+        <Text style={styles.description} numberOfLines={2}>
           {report.description}
         </Text>
-      </View>
+      )}
 
+      {/* Location - Indented */}
+      <Text style={styles.location}>{report.location}</Text>
+
+      {/* Footer: Timestamp and Status - Indented */}
       <View style={styles.footer}>
-        <Text style={styles.detailsText}>
-          {report.location} • {formatTimestamp(report.timestamp)}
-        </Text>
+        <View style={styles.timestampRow}>
+          <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
+          <Text style={styles.timestampText}>{formatTimestamp(report.timestamp)}</Text>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
+          <Text style={[styles.statusText, { color: statusBadgeStyle.borderColor }]}>
+            {getStatusText(report.status)}
+          </Text>
+        </View>
       </View>
 
-
-      {report.status === 'pending' && onPress && (
-        <TouchableOpacity 
-          style={styles.seeMoreButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            onPress(report.id);
-          }}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.seeMoreText}>See More</Text>
-        </TouchableOpacity>
+      {/* Action Buttons */}
+      {report.status === 'pending' && (onPress || onAcknowledge) && (
+        <View style={styles.actionsContainer}>
+          {onPress && (
+            <TouchableOpacity 
+              style={styles.seeMoreButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                onPress(report.id);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.seeMoreText}>See More</Text>
+            </TouchableOpacity>
+          )}
+          {onAcknowledge && (
+            <TouchableOpacity 
+              style={styles.acknowledgeButton} 
+              onPress={(e) => {
+                e.stopPropagation();
+                onAcknowledge(report.id);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.acknowledgeText}>Acknowledge</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
 
-      {report.status === 'pending' && onAcknowledge && (
-        <TouchableOpacity 
-          style={styles.acknowledgeButton} 
-          onPress={(e) => {
-            e.stopPropagation();
-            onAcknowledge(report.id);
-          }}
-        >
-          <Text style={styles.acknowledgeText}>Acknowledge</Text>
-        </TouchableOpacity>
-      )}
-
-      {report.status === 'acknowledged' && onAcknowledge && (
-        <TouchableOpacity 
-          style={styles.acknowledgeButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            onAcknowledge(report.id);
-          }}
-        >
-          <Text style={styles.acknowledgeText}>Resolve</Text>
-        </TouchableOpacity>
+      {/* Resolve Button (shown after acknowledging) */}
+      {report.status === 'acknowledged' && onResolve && (
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity 
+            style={styles.resolveButton} 
+            onPress={(e) => {
+              e.stopPropagation();
+              onResolve(report.id);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="checkmark-done-circle" size={18} color={colors.text.inverse} style={{ marginRight: 6 }} />
+            <Text style={styles.resolveText}>Mark as Resolved</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </Card>
   );
@@ -171,167 +213,201 @@ function ReportCardComponent({ report, onPress, onAcknowledge }: ReportCardProps
 
 // Memoize component to prevent unnecessary re-renders
 // Only re-render if report data actually changed (not function references)
+// Optimized memo comparison - only re-render if report data or callbacks change
 export const ReportCard: React.MemoExoticComponent<React.NamedExoticComponent<ReportCardProps>> = React.memo(ReportCardComponent, (prevProps, nextProps) => {
-  // Return true if props are equal (skip re-render), false if different (re-render)
-  // Only check report properties, not function references (functions are stable in useCallback)
+  // Compare report by ID and key fields that affect rendering
   if (prevProps.report.id !== nextProps.report.id) return false;
   if (prevProps.report.status !== nextProps.report.status) return false;
   if (prevProps.report.title !== nextProps.report.title) return false;
-  if (prevProps.report.description !== nextProps.report.description) return false;
   if (prevProps.report.severity !== nextProps.report.severity) return false;
   if (prevProps.report.timestamp.getTime() !== nextProps.report.timestamp.getTime()) return false;
-  // onAcknowledge might be undefined, so handle that case
-  if (!!prevProps.onAcknowledge !== !!nextProps.onAcknowledge) return false;
-  if (!!prevProps.onPress !== !!nextProps.onPress) return false;
   
-  return true; // Props are equal, skip re-render
+  // Compare callbacks by reference (they should be stable with useCallback)
+  // Handle undefined callbacks properly
+  if (!!prevProps.onPress !== !!nextProps.onPress) return false;
+  if (prevProps.onPress && prevProps.onPress !== nextProps.onPress) return false;
+  if (!!prevProps.onAcknowledge !== !!nextProps.onAcknowledge) return false;
+  if (prevProps.onAcknowledge && prevProps.onAcknowledge !== nextProps.onAcknowledge) return false;
+  if (!!prevProps.onResolve !== !!nextProps.onResolve) return false;
+  if (prevProps.onResolve && prevProps.onResolve !== nextProps.onResolve) return false;
+  
+  // Props are equal, skip re-render
+  return true;
 });
 
 const styles = StyleSheet.create({
   card: {
-    marginBottom: spacing.md,
+    padding: 20,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+  },
+  
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 8,
+  },
+  
+  idBadge: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  
+  idText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '600',
+    fontFamily: 'monospace',
   },
   
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  
-  acknowledgedBadge: {
-    backgroundColor: colors.semantic.success,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 20,
-  },
-  
-  acknowledgedText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#1e3a8a20',
-    justifyContent: 'center',
+    width: 48,
+    height: 48,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 24,
     alignItems: 'center',
-    marginRight: spacing.sm,
+    justifyContent: 'center',
+    marginRight: 16,
   },
   
-  sourceText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.secondary,
-    letterSpacing: 0.5,
-  },
-  
-  idText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.tertiary,
-    marginTop: 2,
+  info: {
+    flex: 1,
   },
   
   title: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    flex: 1,
-  },
-
-  descriptionContainer: {
-    marginBottom: spacing.md,
-  },
-
-  descriptionText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    lineHeight: typography.fontSize.sm * 1.5,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 4,
   },
   
-  body: {
-    marginBottom: spacing.sm,
+  category: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  
+  meta: {
+    alignItems: 'flex-end',
+  },
+  
+  severityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  
+  severityBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  
+  description: {
+    fontSize: 14,
+    color: '#475569',
+    lineHeight: 20,
+    marginBottom: 12,
+    marginLeft: 64,
+  },
+  
+  location: {
+    fontSize: 14,
+    color: '#475569',
+    marginBottom: 12,
+    marginLeft: 64,
   },
   
   footer: {
-    marginBottom: spacing.xs,
-  },
-  
-  detailsText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginBottom: spacing.sm,
-  },
-
-  
-  acknowledgeButton: {
-    backgroundColor: colors.primary.blue,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: spacing.sm,
-    ...DesignSystem.shadows.sm,
+    marginLeft: 64,
   },
   
-  acknowledgeText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.inverse,
+  timestampRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  
+  timestampText: {
+    fontSize: 12,
+    color: '#64748b',
   },
   
   statusBadge: {
-    backgroundColor: colors.semantic.success,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     alignItems: 'center',
   },
   
   statusText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  actionsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
   },
 
   seeMoreButton: {
-    backgroundColor: colors.background.secondary,
+    flex: 1,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: colors.text.secondary,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
+    borderColor: '#cbd5e1',
+    paddingVertical: 10,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: spacing.sm,
   },
 
   seeMoreText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1e293b',
   },
-
-  // When acknowledged, we visually attach the green button to See More
-  seeMoreTopOnlyRadius: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-
-  acknowledgedButton: {
-    backgroundColor: colors.semantic.success,
-    paddingVertical: spacing.sm,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
+  
+  acknowledgeButton: {
+    flex: 1,
+    backgroundColor: colors.primary.blue,
+    paddingVertical: 10,
+    borderRadius: 8,
     alignItems: 'center',
   },
-
-  acknowledgedTextAlt: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
+  
+  acknowledgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.inverse,
+  },
+  resolveButton: {
+    flex: 1,
+    backgroundColor: colors.semantic.success,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  resolveText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.inverse,
   },
 });
 

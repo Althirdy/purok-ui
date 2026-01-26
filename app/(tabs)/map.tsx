@@ -1,147 +1,357 @@
 /**
- * Map Screen - View incidents on map with custom markers
+ * Map Screen - View of Verified/Ongoing Incidents
  * 
- * Uses OSM-based tiles (CartoDB) - Uses OpenStreetMap data
- * - No API key required
- * - More permissive than direct OSM tiles (no User-Agent header required)
- * - Still uses OpenStreetMap data, just rendered by CartoDB
- * - Proper attribution included
- * - Focused on Barangay 176E area only
- * - Uses GeoJSON boundary data from constants/geojson.json
+ * Shows TWO types of data on the map:
+ * 1. Citizen Concerns (acknowledged/resolved by Purok) - Markers
+ * 2. CCTV Accidents (In Progress - acknowledged by Operator) - Markers
  * 
- * Note: Direct OSM tiles require User-Agent header which react-native-maps
- * doesn't support. CartoDB uses OSM data but is more permissive.
+ * Data Sources:
+ * - Citizen Concerns: GET /api/v1/purok-leader/concerns
+ * - CCTV Accidents: GET /api/v1/active-accidents (markers) + GET /api/v1/active-accidents/{id} (details)
  * 
- * Attribution: © OpenStreetMap contributors (data source)
+ * PRIVACY LOGIC (unified for both citizen concerns and CCTV accidents):
+ * - Photos/images shown ONLY if incident is verified (acknowledged/resolved)
+ * - Only verified/acknowledged incidents appear as markers
+ * - InfoCard handles the privacy display logic for images
  */
 
-import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION, isPointInBoundary } from '@/constants/barangay-boundary';
+import { InfoCard } from '@/components/map/info-card';
+import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION } from '@/constants/barangay-boundary';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { MarkerData, markers } from '@/constants/heatmap.data';
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - Metro bundler supports JSON imports
-import GEOJSON from '@/constants/geojson.json';
-import { Fonts } from '@/constants/theme';
+import { mapStyles as styles } from '@/constants/map-screen.styles';
+import { useAuth } from '@/context/auth-context';
+import { useReportsFeed } from '@/hooks/use-reports-feed';
+import { fetchActiveAccidentDetail, fetchActiveAccidentMarkers, markerToEmergencyReport } from '@/services/active-accidents-service';
+import { subscribeToAccidentStatusUpdates } from '@/services/realtime-service';
+import type { EmergencyReport } from '@/types';
+import { getMarkerColor, processMarkersWithJitter, type SelectedMarker } from '@/utils/mapHelpers';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import MapView, { Callout, Marker, Polygon, UrlTile } from 'react-native-maps';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import MapView, { Marker, Polygon } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { colors, typography, spacing, borderRadius, shadows } = DesignSystem;
-
-// Fallback region kept for reference; using BARANGAY_176E_REGION below
-const BRGY_176A_REGION = {
-  latitude: 14.7804774,
-  longitude: 121.0374894,
-  latitudeDelta: 0.008,
-  longitudeDelta: 0.008,
-};
+const { colors } = DesignSystem;
 
 export default function MapScreen() {
-  const mapRef = React.useRef<MapView | null>(null);
-  type HeatMarker = (typeof markers)[number];
+  // Get auth token for authenticated requests
+  const { accessToken } = useAuth();
+  
+  // Citizen concerns from Pusher/API
+  const { reports, loading: loadingConcerns, fetchReports } = useReportsFeed();
+  
+  // CCTV accidents (ongoing)
+  const [cctvAccidents, setCctvAccidents] = useState<EmergencyReport[]>([]);
+  const [loadingAccidents, setLoadingAccidents] = useState(false);
+  
+  const mapRef = useRef<MapView | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const [selectedMarker, setSelectedMarker] = useState<SelectedMarker>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Convert GeoJSON polygon (lng, lat) to { latitude, longitude } if needed
-  const geojsonCoordinates = useMemo(() => {
+  // Fetch citizen concerns on mount
+  useEffect(() => {
+    fetchReports('all');
+  }, [fetchReports]);
+
+  // Fetch CCTV accidents on mount
+  const fetchAccidents = useCallback(async () => {
+    if (!accessToken) {
+      console.warn('[MapScreen] No auth token, skipping CCTV accidents fetch');
+      return;
+    }
+    setLoadingAccidents(true);
     try {
-      const rings: number[][][] = GEOJSON.features?.[0]?.geometry?.coordinates ?? [];
-      const firstRing = rings[0] || [];
-      return firstRing.map(([lng, lat]) => ({ latitude: lat, longitude: lng }));
-    } catch {
-      return [] as { latitude: number; longitude: number }[];
+      const markers = await fetchActiveAccidentMarkers(accessToken);
+      const converted = markers.map(markerToEmergencyReport);
+      setCctvAccidents(converted);
+      console.log('[MapScreen] ✅ Loaded', converted.length, 'CCTV accidents');
+    } catch (error) {
+      console.error('[MapScreen] Error fetching CCTV accidents:', error);
+    } finally {
+      setLoadingAccidents(false);
     }
+  }, [accessToken]);
+
+  useEffect(() => {
+    fetchAccidents();
+  }, [fetchAccidents]);
+
+  // Subscribe to real-time accident status updates
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+
+    const setupRealtimeSubscription = async () => {
+      try {
+        unsubscribe = await subscribeToAccidentStatusUpdates((accident) => {
+          console.log('[MapScreen] 🔔 Real-time accident update:', accident);
+          
+          // If status changed to "In Progress", add/update marker
+          if (accident.status === 'In Progress') {
+            setCctvAccidents(prev => {
+              const existing = prev.find(a => a.id === `accident-${accident.id}`);
+              if (existing) {
+                // Update existing
+                return prev.map(a => 
+                  a.id === `accident-${accident.id}` 
+                    ? {
+                        ...a,
+                        title: accident.title,
+                        coordinates: {
+                          latitude: typeof accident.latitude === 'string' ? parseFloat(accident.latitude) : accident.latitude,
+                          longitude: typeof accident.longitude === 'string' ? parseFloat(accident.longitude) : accident.longitude,
+                        },
+                      }
+                    : a
+                );
+              }
+              // Add new marker
+              const lat = typeof accident.latitude === 'string' ? parseFloat(accident.latitude) : accident.latitude;
+              const lng = typeof accident.longitude === 'string' ? parseFloat(accident.longitude) : accident.longitude;
+              return [...prev, {
+                id: `accident-${accident.id}`,
+                type: 'accident' as const,
+                title: accident.title,
+                description: 'CCTV detected incident',
+                location: 'Location pending...',
+                timestamp: new Date(),
+                status: 'acknowledged' as const,
+                severity: (accident.severity?.toLowerCase() || 'medium') as EmergencyReport['severity'],
+                source: 'cctv' as const,
+                coordinates: { latitude: lat, longitude: lng },
+              }];
+            });
+          }
+          
+          // If status changed to "Resolved", remove marker from active
+          if (accident.status === 'Resolved') {
+            setCctvAccidents(prev => prev.filter(a => a.id !== `accident-${accident.id}`));
+          }
+        });
+        console.log('[MapScreen] ✅ Subscribed to accident real-time updates');
+      } catch (error) {
+        console.error('[MapScreen] Failed to setup real-time subscription:', error);
+      }
+    };
+
+    setupRealtimeSubscription();
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
-  // Filter markers to only show those inside Barangay 176E boundary
-  const filteredMarkers = useMemo(() => {
-    return markers.filter((marker) =>
-      isPointInBoundary({ latitude: marker.latitude, longitude: marker.longitude })
-    );
-  }, []);
-
-  // Jitter markers that overlap (same/near coordinates) so bubbles don't stack
-  const displayedMarkers = useMemo(() => {
-    // Group by rounded coordinate (~7 decimals ≈ ~1cm; we'll use 5 ≈ ~1m)
-    const keyFor = (lat: number, lng: number) => `${lat.toFixed(5)}:${lng.toFixed(5)}`;
-    const groups = new Map<string, MarkerData[]>();
-    for (const m of filteredMarkers) {
-      const k = keyFor(m.latitude, m.longitude);
-      const arr = groups.get(k) || [];
-      arr.push(m);
-      groups.set(k, arr);
-    }
-
-    const result: (MarkerData & { _lat: number; _lng: number })[] = [];
-    const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~2.399
-
-    groups.forEach((group, _key) => {
-      // Base coordinate
-      const baseLat = group[0].latitude;
-      const baseLng = group[0].longitude;
-      const cosLat = Math.cos((baseLat * Math.PI) / 180);
-      const metersPerDegLat = 111_320; // approx
-      const metersPerDegLng = 111_320 * cosLat; // approx
-
-      group.forEach((m, idx) => {
-        if (group.length === 1) {
-          result.push({ ...m, _lat: baseLat, _lng: baseLng });
-          return;
-        }
-        // Spiral offset: radius grows slowly with idx; 4m step
-        const radiusMeters = 4 * Math.sqrt(idx); // 0, 4, 5.6, 6.9, ...
-        const angle = idx * GOLDEN_ANGLE;
-        const dx = (radiusMeters * Math.cos(angle)) / metersPerDegLng; // degrees lon
-        const dy = (radiusMeters * Math.sin(angle)) / metersPerDegLat; // degrees lat
-        result.push({ ...m, _lat: baseLat + dy, _lng: baseLng + dx });
-      });
-    });
-
-    return result;
-  }, [filteredMarkers]);
-
-  const getMarkerColor = (marker: HeatMarker): string => {
-    switch ((marker as any).type) {
-      case 'waste':
-        return marker.severity === 'high' ? '#DC2626' : marker.severity === 'medium' ? '#F59E0B' : '#10B981';
-      case 'garbage':
-        return marker.severity === 'high' ? '#B91C1C' : marker.severity === 'medium' ? '#DC2626' : '#EF4444';
-      case 'hazardous':
-        return marker.severity === 'high' ? '#7C3AED' : '#8B5CF6';
-      case 'recycling':
-        return marker.severity === 'high' ? '#059669' : '#10B981';
-      case 'littering':
-        return marker.severity === 'high' ? '#D97706' : marker.severity === 'medium' ? '#F59E0B' : '#FDE047';
-      default:
-        return '#6B7280';
-    }
-  };
-
-  const getMarkerIcon = (marker: HeatMarker): keyof typeof Ionicons.glyphMap => {
-    switch ((marker as any).type) {
-      case 'waste':
-        return 'trash-bin';
-      case 'garbage':
-        return 'trash';
-      case 'hazardous':
-        return 'warning';
-      case 'recycling':
-        return 'leaf';
-      case 'littering':
-        return 'sad';
-      default:
-        return 'location';
-    }
-  };
-
-  React.useEffect(() => {
+  // Animate to region on mount
+  useEffect(() => {
+    if (!mapRef.current) return;
     const timer = setTimeout(() => {
       mapRef.current?.animateToRegion(BARANGAY_176E_REGION, 1000);
     }, 500);
     return () => clearTimeout(timer);
   }, []);
+
+  // Handle pull-to-refresh
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchReports('all'),
+      fetchAccidents(),
+    ]);
+    setRefreshing(false);
+  }, [fetchReports, fetchAccidents]);
+
+  // PRIVACY FILTER: Only show verified/acknowledged citizen concerns
+  const verifiedConcerns = useMemo(() => {
+    return reports.filter((r: EmergencyReport) => 
+      r.status === 'acknowledged' || r.status === 'resolved'
+    );
+  }, [reports]);
+
+  // Combine both sources: verified citizen concerns + CCTV accidents
+  const allIncidents = useMemo(() => {
+    return [...verifiedConcerns, ...cctvAccidents];
+  }, [verifiedConcerns, cctvAccidents]);
+
+  // Convert to markers (only valid coordinates)
+  const incidentMarkers = useMemo(() => {
+    return allIncidents
+      .filter((r: EmergencyReport) => {
+        const { latitude: lat, longitude: lng } = r.coordinates ?? {};
+        return lat != null && lng != null && !isNaN(lat) && !isNaN(lng) &&
+          lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+      })
+      .map((r: EmergencyReport) => ({
+        id: r.id,
+        latitude: r.coordinates!.latitude,
+        longitude: r.coordinates!.longitude,
+        title: r.title,
+        description: r.description,
+        type: r.type,
+        severity: r.severity,
+        location: r.location,
+        timestamp: r.timestamp,
+        status: r.status,
+        source: r.source,
+        images: r.images, // Include images for verified incidents
+      }));
+  }, [allIncidents]);
+
+  // Process markers with jitter for overlapping coordinates
+  const displayedMarkers = useMemo(
+    () => processMarkersWithJitter(incidentMarkers),
+    [incidentMarkers]
+  );
+
+  // Loading state for fetching accident details
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const handleMarkerPress = async (marker: typeof displayedMarkers[0]) => {
+    const color = getMarkerColor(marker.type as EmergencyReport['type'], marker.severity as EmergencyReport['severity']);
+    
+    // Check if this is a CCTV accident (id starts with 'accident-')
+    const isCctvAccident = marker.id.startsWith('accident-');
+    
+    if (isCctvAccident && accessToken) {
+      // Fetch full details from backend for CCTV accidents
+      const accidentId = parseInt(marker.id.replace('accident-', ''), 10);
+      
+      // Show loading state with basic info first
+      setSelectedMarker({
+        id: marker.id,
+        title: marker.title || 'Loading...',
+        description: 'Fetching details...',
+        type: marker.type || 'unknown',
+        severity: marker.severity || 'low',
+        location: marker.location || 'Unknown location',
+        timestamp: marker.timestamp,
+        color,
+      });
+      
+      setLoadingDetails(true);
+      try {
+        const details = await fetchActiveAccidentDetail(accidentId, accessToken);
+        if (details) {
+          // Build location string from details
+          let locationStr = marker.location || 'Unknown location';
+          if (details.location) {
+            const parts = [
+              details.location.location_name,
+              details.location.barangay,
+              details.location.landmark,
+            ].filter(Boolean);
+            if (parts.length > 0) {
+              locationStr = parts.join(', ');
+            }
+          }
+          
+          // Extract images from details (same logic as citizen concerns)
+          // Images shown only if verified (handled by InfoCard privacy logic)
+          let images: string[] | undefined;
+          if (details.media && Array.isArray(details.media)) {
+            images = details.media.map(m => m.url).filter(Boolean);
+          } else if (details.images && Array.isArray(details.images)) {
+            images = details.images.filter(Boolean);
+          }
+
+          setSelectedMarker({
+            id: marker.id,
+            title: details.title || marker.title || 'CCTV Incident',
+            description: details.description || 'CCTV detected incident',
+            type: marker.type || 'accident',
+            severity: marker.severity || 'medium',
+            location: locationStr,
+            timestamp: marker.timestamp,
+            color,
+            status: 'acknowledged', // CCTV accidents are acknowledged by default
+            images: images && images.length > 0 ? images : undefined, // Same privacy logic as citizen concerns
+          });
+        }
+      } catch (error) {
+        console.error('[MapScreen] Error fetching accident details:', error);
+      } finally {
+        setLoadingDetails(false);
+      }
+    } else {
+      // For citizen concerns, use the existing data (includes images if verified)
+      setSelectedMarker({
+        id: marker.id,
+        title: marker.title || 'Incident Report',
+        description: marker.description || 'No description available',
+        type: marker.type || 'unknown',
+        severity: marker.severity || 'low',
+        location: marker.location || 'Unknown location',
+        timestamp: marker.timestamp,
+        color,
+        status: marker.status, // Include status for privacy logic
+        images: marker.images, // Include images for verified incidents
+      });
+    }
+  };
+
+  const loading = loadingConcerns || loadingAccidents;
+  const citizenCount = verifiedConcerns.length;
+  const cctvCount = cctvAccidents.length;
+
+  // Helper function to zoom to coordinates
+  const zoomToCoordinates = useCallback((coordinates: { latitude: number; longitude: number }[]) => {
+    if (coordinates.length === 0 || !mapRef.current) {
+      return;
+    }
+
+    // If only one point, zoom to it with a reasonable radius
+    if (coordinates.length === 1) {
+      mapRef.current.animateToRegion({
+        latitude: coordinates[0].latitude,
+        longitude: coordinates[0].longitude,
+        latitudeDelta: 0.01, // Zoom level
+        longitudeDelta: 0.01,
+      }, 1000);
+    } else {
+      // Fit all points in view
+      mapRef.current.fitToCoordinates(coordinates, {
+        edgePadding: {
+          top: 100,
+          right: 50,
+          bottom: 100,
+          left: 50,
+        },
+        animated: true,
+      });
+    }
+  }, []);
+
+  // Zoom to citizen concerns when badge is clicked
+  const handleCitizenBadgePress = useCallback(() => {
+    const coordinates = verifiedConcerns
+      .filter((r) => {
+        const { latitude: lat, longitude: lng } = r.coordinates ?? {};
+        return lat != null && lng != null && !isNaN(lat) && !isNaN(lng);
+      })
+      .map((r) => ({
+        latitude: r.coordinates!.latitude,
+        longitude: r.coordinates!.longitude,
+      }));
+
+    zoomToCoordinates(coordinates);
+  }, [verifiedConcerns, zoomToCoordinates]);
+
+  // Zoom to CCTV accidents when badge is clicked
+  const handleCctvBadgePress = useCallback(() => {
+    const coordinates = cctvAccidents
+      .filter((r) => {
+        const { latitude: lat, longitude: lng } = r.coordinates ?? {};
+        return lat != null && lng != null && !isNaN(lat) && !isNaN(lng);
+      })
+      .map((r) => ({
+        latitude: r.coordinates!.latitude,
+        longitude: r.coordinates!.longitude,
+      }));
+
+    zoomToCoordinates(coordinates);
+  }, [cctvAccidents, zoomToCoordinates]);
 
   return (
     <SafeAreaView style={globalStyles.container}>
@@ -149,65 +359,61 @@ export default function MapScreen() {
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <Text style={styles.headerTitle}>Incident Map</Text>
-          <View style={styles.headerActions}>
-            <Ionicons name="locate" size={20} color={colors.text.primary} />
+          <TouchableOpacity 
+            style={styles.refreshButton} 
+            onPress={handleRefresh}
+            disabled={loading || refreshing}
+          >
+            <Ionicons 
+              name="refresh" 
+              size={20} 
+              color={loading || refreshing ? colors.text.secondary : colors.primary.blue} 
+            />
+          </TouchableOpacity>
+        </View>
+        
+        {/* Stats Row */}
+        <View style={styles.statsRow}>
+          {/* Citizen Concerns Badge - Clickable to zoom */}
+          <TouchableOpacity 
+            style={styles.statBadge}
+            onPress={handleCitizenBadgePress}
+            activeOpacity={0.7}
+            disabled={citizenCount === 0}
+          >
+            <Ionicons name="people" size={14} color="#3B82F6" />
+            <Text style={styles.statBadgeText}>{citizenCount} Citizen</Text>
+          </TouchableOpacity>
+          
+          {/* CCTV Accidents Badge - Clickable to zoom */}
+          <TouchableOpacity 
+            style={[styles.statBadge, { backgroundColor: '#FEF3C7' }]}
+            onPress={handleCctvBadgePress}
+            activeOpacity={0.7}
+            disabled={cctvCount === 0}
+          >
+            <Ionicons name="videocam" size={14} color="#D97706" />
+            <Text style={[styles.statBadgeText, { color: '#D97706' }]}>{cctvCount} CCTV</Text>
+          </TouchableOpacity>
+          
+          {/* Verified Badge - Info only */}
+          <View style={styles.verifiedBadge}>
+            <Ionicons name="shield-checkmark" size={14} color="#10B981" />
+            <Text style={styles.verifiedBadgeText}>Verified Only</Text>
           </View>
         </View>
-        <Text style={styles.headerSubtitle}>View incidents near you</Text>
       </View>
 
-      {/* Map View */}
+      {/* Map */}
       <View style={{ flex: 1 }}>
-        {/* OSM Attribution - Required by OpenStreetMap */}
-        <View style={styles.attributionContainer}>
-          <Text style={styles.attributionText}>
-            © OpenStreetMap contributors
-          </Text>
-        </View>
         <MapView
           ref={mapRef}
-          style={{ ...StyleSheet.absoluteFillObject }}
+          style={StyleSheet.absoluteFillObject}
           initialRegion={BARANGAY_176E_REGION}
-          showsUserLocation={false}
-          showsMyLocationButton={false}
-          showsCompass={true}
-          // Focus on Barangay 176E - reasonable zoom levels for local area
-          minZoomLevel={14}
-          maxZoomLevel={18}
-          // Use custom OSM tiles instead of Google Maps
-          mapType="none"
+          showsCompass
+          onMapReady={() => setMapReady(true)}
         >
-          {/* CartoDB Positron - Uses OSM data, more permissive than direct OSM tiles */}
-          {/* This uses OpenStreetMap data but rendered by CartoDB (no User-Agent required) */}
-          <UrlTile
-            urlTemplate="https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
-            maximumZ={19}
-            minimumZ={10}
-            tileSize={256}
-            shouldReplaceMapContent={true}
-          />
-          
-          {/* Alternative OSM-based providers (uncomment if CartoDB doesn't work): */}
-          
-          {/* Option 1: Stamen Toner (OSM data, black & white style) */}
-          {/* <UrlTile
-            urlTemplate="https://stamen-tiles-{s}.a.ssl.fastly.net/toner/{z}/{x}/{y}{r}.png"
-            maximumZ={18}
-            minimumZ={0}
-            tileSize={256}
-            shouldReplaceMapContent={true}
-          /> */}
-          
-          {/* Option 2: Stamen Terrain (OSM data, terrain style) */}
-          {/* <UrlTile
-            urlTemplate="https://stamen-tiles-{s}.a.ssl.fastly.net/terrain/{z}/{x}/{y}{r}.png"
-            maximumZ={18}
-            minimumZ={0}
-            tileSize={256}
-            shouldReplaceMapContent={true}
-          /> */}
-
-          {/* Barangay 176E Boundary - from constants (fills + stroke) */}
+          {/* Barangay Boundary */}
           <Polygon
             coordinates={BARANGAY_176E_BOUNDARY.coordinates}
             fillColor={BARANGAY_176E_BOUNDARY.fillColor}
@@ -215,214 +421,33 @@ export default function MapScreen() {
             strokeWidth={BARANGAY_176E_BOUNDARY.strokeWidth}
           />
 
-          {/* GeoJSON overlay (same area) - using the geojson.json data */}
-          {geojsonCoordinates.length > 0 && (
-            <Polygon
-              coordinates={geojsonCoordinates}
-              fillColor="transparent"
-              strokeColor="rgba(30,58,138,0.4)"
-              strokeWidth={1}
-            />
-          )}
-          {displayedMarkers.map((marker) => (
+          {/* Incident Markers (Citizen Concerns + CCTV Accidents) */}
+          {mapReady && displayedMarkers.map((m) => (
             <Marker
-              key={marker.id}
-              coordinate={{
-                latitude: (marker as any)._lat ?? marker.latitude,
-                longitude: (marker as any)._lng ?? marker.longitude,
-              }}
-            >
-              {/* Custom Marker with Badge */}
-              <View style={styles.markerContainer}>
-                <View 
-                  style={[
-                    styles.markerBadge, 
-                    { backgroundColor: getMarkerColor(marker) }
-                  ]}
-                >
-                  <Ionicons 
-                    name={getMarkerIcon(marker)} 
-                    size={18} 
-                    color="white" 
-                  />
-                  {marker.severity === 'high' && (
-                    <View style={styles.alertDot} />
-                  )}
-                </View>
-                <View 
-                  style={[
-                    styles.markerArrow, 
-                    { borderTopColor: getMarkerColor(marker) }
-                  ]} 
-                />
-              </View>
-
-              {/* Custom Callout (info popup when marker is tapped) */}
-              <Callout
-                onPress={() =>
-                  router.push({
-                    pathname: 'report-details',
-                    params: { reportId: marker.id },
-                  } as any)
-                }
-              >
-                <View style={styles.calloutContainer}>
-                  <Text style={styles.calloutTitle}>{marker.title}</Text>
-                  <Text style={styles.calloutDescription}>{marker.description}</Text>
-                  <View style={styles.calloutFooter}>
-                    <Text style={styles.calloutType}>
-                      {marker.type.toUpperCase()}
-                    </Text>
-                    <Text 
-                      style={[
-                        styles.calloutSeverity,
-                        { color: getMarkerColor(marker) }
-                      ]}
-                    >
-                      {marker.severity.toUpperCase()}
-                    </Text>
-                  </View>
-                </View>
-              </Callout>
-            </Marker>
+              key={m.id}
+              coordinate={{ latitude: m._lat, longitude: m._lng }}
+              pinColor={getMarkerColor(m.type as EmergencyReport['type'], m.severity as EmergencyReport['severity'])}
+              title={m.title}
+              description={m.location}
+              onPress={() => handleMarkerPress(m)}
+            />
           ))}
         </MapView>
+
+        {/* Info Card - Privacy Safe (NO photos) */}
+        {selectedMarker && (
+          <InfoCard marker={selectedMarker} onClose={() => setSelectedMarker(null)} />
+        )}
+
+        {/* Loading Overlay */}
+        {loading && !refreshing && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="small" color={colors.primary.blue} />
+            <Text style={styles.loadingOverlayText}>Loading incidents...</Text>
+          </View>
+        )}
+
       </View>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.background.primary,
-  },
-  headerTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  
-  headerTitle: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    fontFamily: Fonts.rounded,
-  },
-  headerSubtitle: {
-    marginTop: 4,
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-  },
-  headerActions: {
-    padding: 10,
-    borderRadius: 16,
-    backgroundColor: colors.background.secondary,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    ...shadows.sm,
-  },
-  
-  // Custom Marker Styles
-  markerContainer: {
-    alignItems: 'center',
-  },
-  markerBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-  },
-  markerArrow: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 10,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    marginTop: -2,
-  },
-  alertDot: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#FBBF24',
-    borderWidth: 2,
-    borderColor: 'white',
-  },
-  
-  // Custom Callout Styles
-  calloutContainer: {
-    width: 200,
-    padding: 12,
-    backgroundColor: colors.background.card,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  calloutTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#1F2937',
-  },
-  calloutDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
-  },
-  calloutFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  calloutType: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#9CA3AF',
-    letterSpacing: 0.5,
-  },
-  calloutSeverity: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
-  
-  // OSM Attribution - Required (data source is OpenStreetMap)
-  attributionContainer: {
-    position: 'absolute',
-    bottom: 50,
-    right: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    zIndex: 1000,
-    ...shadows.sm,
-  },
-  attributionText: {
-    fontSize: 10,
-    color: colors.text.secondary,
-  },
-});

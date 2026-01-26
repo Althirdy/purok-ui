@@ -1,195 +1,348 @@
 /**
- * Profile Screen - User profile information
+ * Profile Screen - Purok profile, styled like citizen app profile
  */
 
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/context/auth-context';
+import { ProfileSkeleton } from '@/components/profile/profile-skeleton';
+import { getInitials } from '@/utils/userHelpers';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { router } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { colors, typography, spacing } = DesignSystem;
+const { colors } = DesignSystem;
 
-// Inline styles
+export default function ProfileScreen() {
+  const { user, logout, refreshUser } = useAuth();
+  const [loading, setLoading] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      refreshUser().finally(() => setLoading(false));
+    }, [refreshUser]),
+  );
+
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          router.replace('/(auth)/login');
+        },
+      },
+    ]);
+  };
+
+  if (loading && !user) {
+    return (
+      <SafeAreaView style={globalStyles.container} edges={['top']}>
+        <View style={styles.appBar}>
+          <View style={styles.appBarContent}>
+            <View>
+              <Text style={styles.appTitle}>UrbanWatch</Text>
+              <Text style={styles.appSubtitle}>Purok Profile</Text>
+            </View>
+            <View style={styles.appBarAvatar}>
+              <Ionicons name="person" size={20} color="#1e3a8a" />
+            </View>
+          </View>
+        </View>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          <ProfileSkeleton />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={globalStyles.container} edges={['top']}>
+      <View style={styles.appBar}>
+        <View style={styles.appBarContent}>
+          <View>
+            <Text style={styles.appTitle}>UrbanWatch</Text>
+            <Text style={styles.appSubtitle}>Purok Profile</Text>
+          </View>
+          <View style={styles.appBarAvatar}>
+            <Ionicons name="person" size={20} color="#1e3a8a" />
+          </View>
+        </View>
+      </View>
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Profile Header */}
+        <View style={styles.header}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
+            </View>
+            <View style={styles.verificationBadge}>
+              <Ionicons name="time-outline" size={24} color="#f59e0b" />
+            </View>
+          </View>
+          <Text style={styles.userName}>{user?.name || 'Purok Leader'}</Text>
+          <Text style={styles.userRole}>Purok Leader</Text>
+          <View style={styles.verificationStatus}>
+            <Text style={[styles.verificationText, { color: '#f59e0b' }]}>
+              Pending Verification
+            </Text>
+          </View>
+        </View>
+
+        {/* Contact Information */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Contact Information</Text>
+
+          <View style={styles.profileItem}>
+            <View style={styles.profileItemHeader}>
+              <Ionicons name="mail-outline" size={20} color="#1e3a8a" />
+              <Text style={styles.profileItemLabel}>Email Address</Text>
+            </View>
+            <Text style={styles.profileItemValue}>
+              {user?.email || 'No email provided'}
+            </Text>
+          </View>
+
+          <View style={styles.profileItem}>
+            <View style={styles.profileItemHeader}>
+              <Ionicons name="call-outline" size={20} color="#1e3a8a" />
+              <Text style={styles.profileItemLabel}>Phone Number</Text>
+            </View>
+            <Text style={styles.profileItemValue}>
+              {user?.phoneNumber || 'No phone number provided'}
+            </Text>
+          </View>
+
+        </View>
+
+        {/* Help & Support */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.settingItemNoBorder}
+            onPress={() =>
+              Alert.alert('Help & Support', 'This option will be available in a future update.')
+            }
+          >
+            <View style={styles.settingItemLeft}>
+              <Ionicons name="help-circle-outline" size={20} color="#1e3a8a" />
+              <Text style={styles.settingItemText}>Help & Support</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Logout */}
+        <View style={styles.logoutSection}>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+            <Text style={styles.logoutButtonText}>Logout</Text>
+          </TouchableOpacity>
+          <Text style={styles.versionText}>UrbanWatch Purok v1.0.0</Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
-  header: {
+  appBar: {
+    backgroundColor: '#1e3a8a',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  appTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  appSubtitle: {
+    marginTop: 2,
+    fontSize: 14,
+    color: '#bfdbfe',
+  },
+  appBarContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  appBarAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e5e7eb',
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
   },
-  headerTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
+  scrollView: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
   },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+  header: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    backgroundColor: '#ffffff',
+    marginBottom: 16,
   },
   avatarContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.lg,
+    position: 'relative',
+    marginBottom: 16,
   },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: colors.background.secondary,
+    backgroundColor: '#1e3a8a',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    borderWidth: 2,
+    borderColor: '#1e3a8a',
   },
   avatarText: {
     fontSize: 36,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  verificationBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
   },
   userName: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 4,
+    textAlign: 'center',
   },
-  userEmail: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
+  userRole: {
+    fontSize: 16,
+    color: '#64748b',
+    marginBottom: 8,
   },
-  profileSettingsButton: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+  verificationStatus: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: 12,
+    backgroundColor: '#f1f5f9',
+  },
+  verificationText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  section: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 20,
     borderWidth: 1,
-    borderColor: colors.text.primary,
-    alignItems: 'center',
+    borderColor: '#e2e8f0',
   },
-  profileSettingsText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 16,
   },
-  actionButtons: {
-    marginTop: spacing['2xl'],
-    gap: spacing.md,
+  profileItem: {
+    marginBottom: 16,
   },
-  actionButton: {
+  profileItemHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.text.primary,
-    gap: spacing.sm,
+    marginBottom: 4,
   },
-  actionButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
+  profileItemLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#64748b',
+    marginLeft: 8,
+    flex: 1,
+  },
+  profileItemValue: {
+    fontSize: 16,
+    color: '#1e293b',
+    marginLeft: 28,
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  settingItemNoBorder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  settingItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingItemText: {
+    fontSize: 16,
+    color: '#1e293b',
+    marginLeft: 12,
+  },
+  logoutSection: {
+    paddingHorizontal: 16,
+    marginBottom: 24,
+    alignItems: 'center',
+    width: '100%',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    paddingVertical: 16,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+    width: '80%',
+  },
+  logoutButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ef4444',
+    marginLeft: 8,
+  },
+  versionText: {
+    marginTop: 16,
+    fontSize: 14,
+    color: '#94a3b8',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#666',
   },
 });
-
-export default function ProfileScreen() {
-  const { user, logout, refreshUser } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  
-  // Refresh user data whenever the profile screen gains focus
-  useFocusEffect(
-    useCallback(() => {
-      setIsLoading(true);
-      refreshUser().finally(() => setIsLoading(false));
-    }, [refreshUser])
-  );
-  const initials = (user?.name || 'User')
-    .split(' ')
-    .map((p) => p[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-
-  const handleProfileSettings = () => {
-    router.push('./profile-settings');
-  };
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
-          style: 'destructive',
-          onPress: async () => { await logout(); router.replace('/(auth)/login'); }
-        },
-      ]
-    );
-  };
-
-  return (
-    <SafeAreaView style={globalStyles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
-      </View>
-
-      {/* Content */}
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Avatar */}
-        <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
-          <Text style={styles.userName}>{user?.name || 'Purok Leader'}</Text>
-          <Text style={styles.userEmail}>{user?.purokName || ''}</Text>
-          {/* Personal info when available */}
-          {(user?.email || user?.phoneNumber || user?.address) && (
-            <View style={{ width: '100%', marginTop: spacing.lg }}>
-              <View style={{ backgroundColor: colors.background.card, borderWidth: 1, borderColor: colors.border.light, borderRadius: 20, padding: spacing.lg, ...DesignSystem.shadows.sm }}>
-                <Text style={{ fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.semibold, color: colors.text.primary, marginBottom: spacing.md }}>Personal Information</Text>
-                {user?.email && (
-                  <View style={{ marginBottom: spacing.sm }}>
-                    <Text style={{ color: colors.text.secondary, fontSize: typography.fontSize.xs }}>Email Address</Text>
-                    <Text style={{ color: colors.text.primary, fontSize: typography.fontSize.sm }}>{user.email}</Text>
-                  </View>
-                )}
-                {user?.phoneNumber && (
-                  <View style={{ marginBottom: spacing.sm }}>
-                    <Text style={{ color: colors.text.secondary, fontSize: typography.fontSize.xs }}>Phone Number</Text>
-                    <Text style={{ color: colors.text.primary, fontSize: typography.fontSize.sm }}>{user.phoneNumber}</Text>
-                  </View>
-                )}
-                {user?.address && (
-                  <View>
-                    <Text style={{ color: colors.text.secondary, fontSize: typography.fontSize.xs }}>Purok Area</Text>
-                    <Text style={{ color: colors.text.primary, fontSize: typography.fontSize.sm }}>{user.address}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          )}
-          
-          {/* Profile Settings removed for purok leader profile */}
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={24} color={colors.text.primary} />
-            <Text style={styles.actionButtonText}>Logout</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-      {isLoading && <LoadingSpinner />}
-    </SafeAreaView>
-  );
-}
-

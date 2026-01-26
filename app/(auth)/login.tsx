@@ -5,7 +5,7 @@
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
-import { useAuth } from '@/contexts/auth-context';
+import { useAuth } from '@/context/auth-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -37,11 +37,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0f2fe',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.primary.navy,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
   },
   appName: {
     fontSize: typography.fontSize['3xl'],

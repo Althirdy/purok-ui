@@ -76,7 +76,6 @@ const styles = StyleSheet.create({
   // Variants
   primary: {
     backgroundColor: colors.accent.orange,
-    ...shadows.sm,
   },
   
   secondary: {
