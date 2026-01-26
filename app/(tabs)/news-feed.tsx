@@ -2,6 +2,7 @@
  * News Feed Screen - Main Dashboard for Purok Officials
  */
 
+import { DraggableNotificationBell } from '@/components/common/draggable-notification-bell';
 import { Toast, type ToastData } from '@/components/common/toast';
 import { EmptyState } from '@/components/news/empty-state';
 import { IncidentHeader } from '@/components/news/incident-header';
@@ -13,12 +14,10 @@ import { useAuth } from '@/context/auth-context';
 import { useNotifications } from '@/context/notification-context';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
 import type { EmergencyReport } from '@/types';
-import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { Dimensions, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 // Lazy load heavy modals/sheets - only load when needed
 const AcknowledgeSheet = lazy(() => import('@/components/news/acknowledge-sheet').then(m => ({ default: m.AcknowledgeSheet })));
@@ -33,38 +32,6 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
     paddingBottom: spacing.xl,
-  },
-  floatingButton: {
-    position: 'absolute',
-    bottom: spacing.lg,
-    right: spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.primary.blue,
-  },
-  floatingBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.semantic.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-    borderWidth: 2,
-    borderColor: '#ffffff',
-  },
-  floatingBadgeText: {
-    color: colors.text.inverse,
-    fontSize: 10,
-    fontWeight: '700',
   },
 });
 
@@ -321,7 +288,7 @@ export default function NewsFeedScreen() {
   }, [pendingCount, ongoingCount, resolvedCount, statusFilter, reportTypeFilter, searchQuery, committedQuery]);
 
   return (
-    <SafeAreaView style={globalStyles.container}>
+    <View style={globalStyles.container}>
       {/* Reports List */}
       <FlatList
         data={displayedReports}
@@ -350,21 +317,8 @@ export default function NewsFeedScreen() {
         // Note: getItemLayout removed - items have variable heights based on content
       />
 
-      {/* Floating notification bell (fixed on screen, follows scroll like uw-citizen) */}
-      <TouchableOpacity
-        style={styles.floatingButton}
-        activeOpacity={0.8}
-        onPress={() => router.push('/(tabs)/notifications' as any)}
-      >
-        <Ionicons name="notifications" size={24} color={colors.text.inverse} />
-        {unreadCount > 0 && (
-          <View style={styles.floatingBadge}>
-            <Text style={styles.floatingBadgeText}>
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </Text>
-            </View>
-        )}
-      </TouchableOpacity>
+      {/* Draggable Notification Bell - users can position it anywhere */}
+      <DraggableNotificationBell unreadCount={unreadCount} />
 
       {/* Filter Modal - Lazy loaded */}
       {isFilterModalVisible && (
@@ -427,6 +381,6 @@ export default function NewsFeedScreen() {
 
       {/* Modern Toast Notification - Key prop ensures re-render on new toast */}
       <Toast key={toast?.id || 'no-toast'} toast={toast} onDismiss={() => setToast(null)} duration={5000} />
-    </SafeAreaView>
+    </View>
   );
 }

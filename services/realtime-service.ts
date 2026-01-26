@@ -1,9 +1,18 @@
 import { realtimeConfig } from '@/constants/realtime';
-import type { EmergencyReport } from '@/types';
+import type { EmergencyReport, RelatedReport } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Pusher from 'pusher-js/react-native';
 
 const AUTH_TOKEN_KEY = '@urbanwatch:auth_token';
+
+// Related report from Pusher payload (follow-up/duplicate)
+type PusherRelatedReport = {
+  id: number;
+  description: string;
+  citizen_name?: string; // May be encrypted
+  created_at: string;
+  images?: string[];
+};
 
 // Payload structure from API documentation
 type ConcernAssignedPayload = {
@@ -28,6 +37,9 @@ type ConcernAssignedPayload = {
       lng?: string | number | null;
     } | null;
     address?: string | null; // Full address from geocoding
+    // Related reports (follow-ups/duplicates merged into this concern)
+    relatedReportsCount?: number;
+    relatedReports?: PusherRelatedReport[];
   };
   citizen: {
     name: string;
@@ -353,6 +365,15 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
 
   const category = concern.category?.toLowerCase() || 'other';
   
+  // Parse related reports (follow-ups/duplicates)
+  const relatedReports: RelatedReport[] | undefined = concern.relatedReports?.map((r) => ({
+    id: r.id,
+    description: r.description,
+    citizen_name: r.citizen_name,
+    created_at: r.created_at,
+    images: r.images,
+  }));
+  
   return {
     id: `PUROK-${concern.id}`, // Format: PUROK-{id} to match API format and enable status updates
     title: concern.title,
@@ -370,6 +391,9 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
     // Voice transcription details (for voice concerns)
     transcript: concern.transcript ?? concern.summary ?? null,
     transcriptionStatus: concern.transcription_status ?? undefined,
+    // Related reports (follow-ups/duplicates)
+    relatedReportsCount: concern.relatedReportsCount ?? 0,
+    relatedReports: relatedReports,
   };
 }
 

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ImageViewer } from '@/components/ui/image-viewer';
 import MapView, { Marker } from 'react-native-maps';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import type { EmergencyReport } from '@/types';
+import type { EmergencyReport, RelatedReport } from '@/types';
 import { DesignSystem } from '@/constants/design-system';
 import {
   cleanTitle,
@@ -36,12 +36,14 @@ interface ReportDetailsBodyProps {
         longitudeDelta: number;
       }
     | null;
-  onAcknowledge: () => Promise<void>;
-  onResolve: () => Promise<void>;
+  onAcknowledge: (remarks?: string) => void;
+  onResolve: (remarks?: string) => void;
   onMapPress: () => void;
   onPlayAudio: () => Promise<void>;
   onStopAudio: () => Promise<void>;
 }
+
+const FOLLOW_UP_LIMIT = 3;
 
 export function ReportDetailsBody({
   report,
@@ -58,11 +60,42 @@ export function ReportDetailsBody({
 }: ReportDetailsBodyProps) {
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [showAllUpdates, setShowAllUpdates] = useState(false);
+  const [remarks, setRemarks] = useState('');
 
   const handleImagePress = (index: number) => {
     setSelectedImageIndex(index);
     setImageViewerVisible(true);
   };
+
+  // Format relative time for follow-up reports
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString();
+  };
+
+  // Filter only actual image files (exclude audio files like .m4a, .mp3, .wav)
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic', '.heif'];
+  const validImages = report.images?.filter((url) => {
+    if (!url || typeof url !== 'string') return false;
+    const lowerUrl = url.toLowerCase();
+    return imageExtensions.some((ext) => lowerUrl.includes(ext));
+  }) || [];
+
+  // Check if transcript is a valid transcript (not an error message)
+  const isTranscriptError = report.transcript?.toLowerCase().includes('unavailable') || 
+                            report.transcript?.toLowerCase().includes('error') ||
+                            report.transcript?.toLowerCase().includes('failed');
 
   return (
     <ScrollView
@@ -149,11 +182,11 @@ export function ReportDetailsBody({
               <Ionicons name="document-text-outline" size={18} color={colors.primary.blue} />
               <Text style={styles.sectionLabel}>Voice Transcript</Text>
             </View>
-            {report.transcript ? (
+            {report.transcript && !isTranscriptError ? (
               <View style={styles.transcriptBox}>
                 <Text style={styles.transcriptText}>{report.transcript}</Text>
               </View>
-            ) : report.transcriptionStatus === 'failed' ? (
+            ) : report.transcriptionStatus === 'failed' || isTranscriptError ? (
               <View style={styles.transcriptErrorBox}>
                 <Ionicons name="alert-circle-outline" size={24} color={colors.semantic.error} />
                 <Text style={styles.transcriptErrorText}>
@@ -180,14 +213,14 @@ export function ReportDetailsBody({
       {/* Images Gallery */}
       <Animated.View entering={FadeInDown.delay(350).duration(500)} style={styles.section}>
         <Text style={styles.sectionLabel}>Photos from citizen</Text>
-        {report.images && report.images.length > 0 ? (
+        {validImages.length > 0 ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.imageGallery}
             contentContainerStyle={styles.imageGalleryContent}
           >
-            {report.images.map((imageUrl, index) => (
+            {validImages.map((imageUrl, index) => (
               <Pressable 
                 key={index} 
                 style={styles.imageContainer}
@@ -210,9 +243,9 @@ export function ReportDetailsBody({
       </Animated.View>
 
       {/* Image Viewer Modal */}
-      {report.images && report.images.length > 0 && (
+      {validImages.length > 0 && (
         <ImageViewer
-          images={report.images}
+          images={validImages}
           initialIndex={selectedImageIndex}
           visible={imageViewerVisible}
           onClose={() => setImageViewerVisible(false)}
@@ -288,8 +321,75 @@ export function ReportDetailsBody({
         </View>
       </Animated.View>
 
+      {/* Follow-up Activity (Related Reports / Merged Duplicates) */}
+      {report.relatedReports && report.relatedReports.length > 0 && (
+        <Animated.View entering={FadeInDown.delay(500).duration(500)} style={styles.section}>
+          <View style={followUpStyles.sectionHeader}>
+            <Ionicons name="git-merge-outline" size={18} color={colors.primary.blue} />
+            <Text style={styles.sectionLabel}>Follow-up Activity ({report.relatedReports.length})</Text>
+          </View>
+          <View style={followUpStyles.updatesContainer}>
+            {(showAllUpdates 
+              ? report.relatedReports 
+              : report.relatedReports.slice(0, FOLLOW_UP_LIMIT)
+            ).map((update, index) => (
+              <View 
+                key={update.id} 
+                style={[
+                  followUpStyles.updateCard,
+                  (showAllUpdates 
+                    ? index < report.relatedReports!.length - 1 
+                    : index < FOLLOW_UP_LIMIT - 1 && index < report.relatedReports!.length - 1
+                  ) && followUpStyles.updateCardWithBorder
+                ]}
+              >
+                <View style={followUpStyles.updateHeader}>
+                  <View style={followUpStyles.updateBadge}>
+                    <Ionicons name="add-circle" size={16} color="#10b981" />
+                    <Text style={followUpStyles.updateBadgeText}>Follow-up #{index + 1}</Text>
+                  </View>
+                  <Text style={followUpStyles.updateTimestamp}>
+                    {formatRelativeTime(update.created_at)}
+                  </Text>
+                </View>
+                <Text style={followUpStyles.updateDescription}>{update.description}</Text>
+                {/* Update Media (images from follow-up) */}
+                {update.images && update.images.length > 0 && (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={followUpStyles.updateMediaContainer}
+                  >
+                    {update.images.map((imageUrl, mediaIndex) => (
+                      <Image
+                        key={mediaIndex}
+                        source={{ uri: imageUrl }}
+                        style={followUpStyles.updateMediaImage}
+                        resizeMode="cover"
+                      />
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            ))}
+
+            {!showAllUpdates && report.relatedReports.length > FOLLOW_UP_LIMIT && (
+              <TouchableOpacity
+                style={followUpStyles.seeMoreUpdatesButton}
+                onPress={() => setShowAllUpdates(true)}
+              >
+                <Text style={followUpStyles.seeMoreUpdatesText}>
+                  See {report.relatedReports.length - FOLLOW_UP_LIMIT} more updates
+                </Text>
+                <Ionicons name="chevron-down" size={18} color={colors.primary.blue} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
+      )}
+
       {/* Reported Date Card */}
-      <Animated.View entering={FadeInUp.delay(500).duration(500)} style={styles.dateSection}>
+      <Animated.View entering={FadeInUp.delay(550).duration(500)} style={styles.dateSection}>
         <View style={styles.dateInfo}>
           <Ionicons
             name="calendar-outline"
@@ -351,31 +451,198 @@ export function ReportDetailsBody({
         </View>
       </Animated.View>
 
-      {/* Action Buttons at very bottom */}
-      <Animated.View
-        entering={FadeInUp.delay(580).duration(500)}
-        style={[styles.section, { marginBottom: spacing.lg }]}
-      >
-        {report.status === 'pending' && (
-          <TouchableOpacity style={styles.actionButton} activeOpacity={0.8} onPress={onAcknowledge}>
-            <Text style={styles.actionButtonText}>Acknowledge</Text>
-          </TouchableOpacity>
-        )}
-        {report.status === 'acknowledged' && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.actionButtonResolve]}
-            activeOpacity={0.8}
-            onPress={onResolve}
-          >
-            <Text style={styles.actionButtonText}>Mark as Resolved</Text>
-          </TouchableOpacity>
-        )}
-        {report.status === 'resolved' && (
+      {/* Remarks Input + Action Buttons */}
+      {(report.status === 'pending' || report.status === 'acknowledged') && (
+        <Animated.View
+          entering={FadeInUp.delay(580).duration(500)}
+          style={[styles.section, { marginBottom: spacing.lg }]}
+        >
+          {/* Remarks Input */}
+          <View style={remarksStyles.remarksSection}>
+            <Text style={remarksStyles.remarksLabel}>
+              {report.status === 'pending' ? 'Remarks (Optional)' : 'Resolution Notes (Optional)'}
+            </Text>
+            <View style={remarksStyles.remarksInputContainer}>
+              <TextInput
+                style={remarksStyles.remarksInput}
+                placeholder={
+                  report.status === 'pending' 
+                    ? "Add any notes or observations about this report..." 
+                    : "Describe how the concern was resolved..."
+                }
+                placeholderTextColor={colors.text.tertiary}
+                value={remarks}
+                onChangeText={setRemarks}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+                maxLength={500}
+              />
+              <Text style={remarksStyles.characterCount}>
+                {remarks.length}/500
+              </Text>
+            </View>
+          </View>
+
+          {/* Action Button */}
+          {report.status === 'pending' && (
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              activeOpacity={0.8} 
+              onPress={() => {
+                onAcknowledge(remarks.trim() || undefined);
+                setRemarks('');
+              }}
+            >
+              <Text style={styles.actionButtonText}>Acknowledge</Text>
+            </TouchableOpacity>
+          )}
+          {report.status === 'acknowledged' && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.actionButtonResolve]}
+              activeOpacity={0.8}
+              onPress={() => {
+                onResolve(remarks.trim() || undefined);
+                setRemarks('');
+              }}
+            >
+              <Text style={styles.actionButtonText}>Mark as Resolved</Text>
+            </TouchableOpacity>
+          )}
+        </Animated.View>
+      )}
+
+      {/* Resolved Status */}
+      {report.status === 'resolved' && (
+        <Animated.View
+          entering={FadeInUp.delay(580).duration(500)}
+          style={[styles.section, { marginBottom: spacing.lg }]}
+        >
           <Text style={styles.resolvedText}>Report resolved</Text>
-        )}
-      </Animated.View>
+        </Animated.View>
+      )}
     </ScrollView>
   );
 }
+
+// Styles for Remarks Input section
+const remarksStyles = StyleSheet.create({
+  remarksSection: {
+    marginBottom: spacing.md,
+  },
+  remarksLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.secondary,
+    marginBottom: spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  remarksInputContainer: {
+    backgroundColor: colors.background.secondary,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    padding: spacing.sm,
+  },
+  remarksInput: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.primary,
+    minHeight: 80,
+    maxHeight: 120,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  characterCount: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    textAlign: 'right',
+    marginTop: spacing.xs,
+    paddingRight: spacing.sm,
+  },
+});
+
+// Styles for Follow-up Activity section
+const followUpStyles = StyleSheet.create({
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  updatesContainer: {
+    gap: spacing.sm,
+  },
+  updateCard: {
+    backgroundColor: colors.background.secondary,
+    padding: spacing.md,
+    borderRadius: 12,
+  },
+  updateCardWithBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+    borderRadius: 0,
+    marginBottom: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  updateHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  updateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#d1fae5',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  updateBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: '#059669',
+  },
+  updateTimestamp: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+  },
+  updateDescription: {
+    fontSize: typography.fontSize.sm,
+    lineHeight: 20,
+    color: colors.text.primary,
+  },
+  updateMediaContainer: {
+    marginTop: spacing.sm,
+  },
+  updateMediaImage: {
+    width: 120,
+    height: 90,
+    borderRadius: 8,
+    marginRight: spacing.sm,
+    backgroundColor: colors.border.light,
+  },
+  seeMoreUpdatesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.primary.blue + '10',
+    borderRadius: 12,
+    marginTop: spacing.xs,
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.primary.blue + '30',
+  },
+  seeMoreUpdatesText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary.blue,
+  },
+});
 
 

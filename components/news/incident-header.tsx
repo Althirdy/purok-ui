@@ -61,22 +61,6 @@ export function IncidentHeader(props: IncidentHeaderProps) {
 
   return (
     <View style={styles.headerWrapper}>
-      {/* App Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerLeft}>
-            <View style={styles.logoSmall}>
-              <Ionicons name="shield" size={isTablet ? 24 : 18} color={colors.primary.blue} />
-            </View>
-            <View>
-              <Text style={styles.headerTitle}>UrbanWatch</Text>
-              <Text style={styles.headerSubtitle}>Purok Feed</Text>
-            </View>
-          </View>
-          <View style={styles.headerRight} />
-        </View>
-      </View>
-
       {/* Utilities: Search + Stats */}
       <View style={styles.utilities}>
         {/* Welcome Card */}
@@ -186,47 +170,6 @@ export function IncidentHeader(props: IncidentHeaderProps) {
 const styles = StyleSheet.create({
   headerWrapper: {
     marginHorizontal: -(spacing.lg * (isTablet ? 1.5 : 1)),
-  },
-  header: {
-    backgroundColor: colors.primary.blue,
-    paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
-    paddingBottom: spacing.sm,
-    paddingTop: spacing.sm,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    maxWidth: isTablet ? '70%' : '80%',
-  },
-  logoSmall: {
-    width: isTablet ? 56 : 36,
-    height: isTablet ? 56 : 36,
-    borderRadius: isTablet ? 28 : 18,
-    backgroundColor: colors.neutral.gray300,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.xs,
-  },
-  headerTitle: {
-    fontSize: isTablet ? typography.fontSize.xl : typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.inverse,
-  },
-  headerSubtitle: {
-    fontSize: isTablet ? typography.fontSize.base : typography.fontSize.xs,
-    color: colors.text.inverse,
-    opacity: 0.9,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
   },
   utilities: {
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),

@@ -54,13 +54,17 @@ export default function ProfileScreen() {
       <SafeAreaView style={globalStyles.container} edges={['top']}>
         <View style={styles.appBar}>
           <View style={styles.appBarContent}>
-            <View>
-              <Text style={styles.appTitle}>UrbanWatch</Text>
-              <Text style={styles.appSubtitle}>Purok Profile</Text>
+            <TouchableOpacity 
+              style={styles.backButton} 
+              onPress={() => router.back()}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={24} color="#ffffff" />
+            </TouchableOpacity>
+            <View style={styles.appBarTitleContainer}>
+              <Text style={styles.appTitle}>Profile</Text>
             </View>
-            <View style={styles.appBarAvatar}>
-              <Ionicons name="person" size={20} color="#1e3a8a" />
-            </View>
+            <View style={styles.appBarPlaceholder} />
           </View>
         </View>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -74,13 +78,17 @@ export default function ProfileScreen() {
     <SafeAreaView style={globalStyles.container} edges={['top']}>
       <View style={styles.appBar}>
         <View style={styles.appBarContent}>
-          <View>
-            <Text style={styles.appTitle}>UrbanWatch</Text>
-            <Text style={styles.appSubtitle}>Purok Profile</Text>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          </TouchableOpacity>
+          <View style={styles.appBarTitleContainer}>
+            <Text style={styles.appTitle}>Profile</Text>
           </View>
-          <View style={styles.appBarAvatar}>
-            <Ionicons name="person" size={20} color="#1e3a8a" />
-          </View>
+          <View style={styles.appBarPlaceholder} />
         </View>
       </View>
 
@@ -162,31 +170,32 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   appBar: {
     backgroundColor: '#1e3a8a',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   appTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#ffffff',
-  },
-  appSubtitle: {
-    marginTop: 2,
-    fontSize: 14,
-    color: '#bfdbfe',
   },
   appBarContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  appBarAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#e5e7eb',
+  appBarTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  appBarPlaceholder: {
+    width: 40,
   },
   scrollView: {
     flex: 1,

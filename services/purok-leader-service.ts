@@ -1,11 +1,20 @@
 import { httpGet, httpPut } from '@/lib/axios';
-import type { EmergencyReport } from '@/types';
+import type { EmergencyReport, RelatedReport } from '@/types';
 
 interface AssignedConcernsResponse {
   success: boolean;
   data: {
     concerns: AssignedConcern[];
   };
+}
+
+// Related report from API (follow-up/duplicate merged into parent)
+export interface ApiRelatedReport {
+  id: number;
+  description: string;
+  citizen_name?: string; // May be encrypted
+  created_at: string;
+  images?: string[];
 }
 
 export interface AssignedConcern {
@@ -42,6 +51,9 @@ export interface AssignedConcern {
     status?: string; // Status from distribution object
     assigned_at?: string;
   };
+  // Related reports (follow-ups/duplicates merged into this concern)
+  relatedReportsCount?: number;
+  relatedReports?: ApiRelatedReport[];
 }
 
 export async function fetchAssignedConcerns(token: string): Promise<EmergencyReport[]> {
@@ -310,6 +322,15 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
     locationDisplay = `Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}`;
   }
 
+  // Parse related reports (follow-ups/duplicates)
+  const relatedReports: RelatedReport[] | undefined = concern.relatedReports?.map((r) => ({
+    id: r.id,
+    description: r.description,
+    citizen_name: r.citizen_name,
+    created_at: r.created_at,
+    images: r.images,
+  }));
+
   return {
     id: `PUROK-${concern.id}`,
     title: concern.title,
@@ -328,5 +349,8 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
     // Voice transcription details (for voice concerns)
     transcript: concern.transcript ?? concern.summary ?? null,
     transcriptionStatus: concern.transcription_status ?? undefined,
+    // Related reports (follow-ups/duplicates)
+    relatedReportsCount: concern.relatedReportsCount ?? 0,
+    relatedReports: relatedReports,
   };
 }

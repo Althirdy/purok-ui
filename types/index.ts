@@ -15,6 +15,15 @@ export interface User {
   address?: string;
 }
 
+// Related Report (follow-up/duplicate merged into parent concern)
+export interface RelatedReport {
+  id: number;
+  description: string;
+  citizen_name?: string; // May be encrypted
+  created_at: string;
+  images?: string[];
+}
+
 // Report Types
 export interface EmergencyReport {
   id: string;
@@ -41,6 +50,9 @@ export interface EmergencyReport {
   // Voice transcription fields (for voice concerns)
   transcript?: string | null; // Full transcript text from backend (transcript_text / transcript)
   transcriptionStatus?: 'queued' | 'processing' | 'completed' | 'failed'; // Realtime transcription status
+  // Related reports (follow-ups/duplicates merged into this concern)
+  relatedReportsCount?: number;
+  relatedReports?: RelatedReport[];
 }
 
 // Feed Types

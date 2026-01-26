@@ -148,18 +148,33 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
       {/* Location - Indented */}
       <Text style={styles.location}>{report.location}</Text>
 
-      {/* Footer: Timestamp and Status - Indented */}
+      {/* Footer Row 1: Timestamp and Status */}
       <View style={styles.footer}>
         <View style={styles.timestampRow}>
           <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
           <Text style={styles.timestampText}>{formatTimestamp(report.timestamp)}</Text>
         </View>
+        
         <View style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
           <Text style={[styles.statusText, { color: statusBadgeStyle.borderColor }]}>
             {getStatusText(report.status)}
           </Text>
         </View>
       </View>
+
+      {/* Follow-up Activity Banner - shown separately when there are related reports */}
+      {report.relatedReportsCount !== undefined && report.relatedReportsCount > 0 && (
+        <View style={styles.followUpBanner}>
+          <View style={styles.followUpIconContainer}>
+            <Ionicons name="git-merge-outline" size={16} color="#1e40af" />
+          </View>
+          <Text style={styles.followUpBannerText}>
+            <Text style={styles.followUpCount}>{report.relatedReportsCount}</Text>
+            {' '}related report{report.relatedReportsCount > 1 ? 's' : ''} merged
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color="#64748b" />
+        </View>
+      )}
 
       {/* Action Buttons */}
       {report.status === 'pending' && (onPress || onAcknowledge) && (
@@ -221,6 +236,8 @@ export const ReportCard: React.MemoExoticComponent<React.NamedExoticComponent<Re
   if (prevProps.report.title !== nextProps.report.title) return false;
   if (prevProps.report.severity !== nextProps.report.severity) return false;
   if (prevProps.report.timestamp.getTime() !== nextProps.report.timestamp.getTime()) return false;
+  // Compare related reports count (new field)
+  if (prevProps.report.relatedReportsCount !== nextProps.report.relatedReportsCount) return false;
   
   // Compare callbacks by reference (they should be stable with useCallback)
   // Handle undefined callbacks properly
@@ -237,8 +254,8 @@ export const ReportCard: React.MemoExoticComponent<React.NamedExoticComponent<Re
 
 const styles = StyleSheet.create({
   card: {
-    padding: 20,
-    marginBottom: 12,
+    padding: spacing.lg, // 16px same as citizen
+    marginBottom: spacing.sm, // 8px same as citizen
     borderWidth: 2,
     borderColor: '#e2e8f0',
     backgroundColor: '#ffffff',
@@ -248,7 +265,9 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 4, // Same as citizen
+    gap: 8,
   },
   
   idBadge: {
@@ -268,17 +287,17 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8, // Same as citizen
   },
   
   iconContainer: {
-    width: 48,
-    height: 48,
+    width: 40, // Same as citizen (was 48)
+    height: 40, // Same as citizen (was 48)
     backgroundColor: '#f1f5f9',
-    borderRadius: 24,
+    borderRadius: 20, // Same as citizen (was 24)
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 12, // Same as citizen (was 16)
   },
   
   info: {
@@ -286,7 +305,7 @@ const styles = StyleSheet.create({
   },
   
   title: {
-    fontSize: 16,
+    fontSize: 18, // Same as citizen (was 16)
     fontWeight: '700',
     color: '#1e293b',
     marginBottom: 4,
@@ -316,36 +335,73 @@ const styles = StyleSheet.create({
   },
   
   description: {
-    fontSize: 14,
+    fontSize: 15, // Same as citizen (was 14)
     color: '#475569',
-    lineHeight: 20,
+    lineHeight: 24, // Same as citizen (was 20)
     marginBottom: 12,
-    marginLeft: 64,
+    marginLeft: 52, // Same as citizen (was 64) - icon 40px + margin 12px
   },
   
   location: {
     fontSize: 14,
     color: '#475569',
     marginBottom: 12,
-    marginLeft: 64,
+    marginLeft: 52, // Same as citizen (was 64)
   },
   
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginLeft: 64,
+    marginLeft: 52, // Same as citizen (was 64)
   },
   
   timestampRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6, // Same as citizen (was 4)
   },
   
   timestampText: {
-    fontSize: 12,
+    fontSize: 13, // Same as citizen (was 12)
     color: '#64748b',
+  },
+  
+  // Follow-up Banner - Full width, below footer
+  followUpBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    marginLeft: 52,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#f0f9ff', // sky-50
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e0f2fe', // sky-100
+    borderLeftWidth: 3,
+    borderLeftColor: '#0284c7', // sky-600
+  },
+  
+  followUpIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#dbeafe', // blue-100
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  
+  followUpBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#475569', // slate-600
+  },
+  
+  followUpCount: {
+    fontWeight: '700',
+    color: '#1e40af', // blue-800
   },
   
   statusBadge: {

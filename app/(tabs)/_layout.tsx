@@ -1,3 +1,4 @@
+import { CustomHeader } from '@/components/common/custom-header';
 import { useAuth } from '@/context/auth-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
@@ -39,7 +40,7 @@ export default function TabLayout() {
         screenOptions={{
           tabBarActiveTintColor: '#ffffff',
           tabBarInactiveTintColor: '#94a3b8',
-          headerShown: false,
+          header: () => <CustomHeader />,
           tabBarStyle: {
             backgroundColor: '#1e3a8a',
             borderTopWidth: 0,
@@ -84,10 +85,13 @@ export default function TabLayout() {
             ),
           }}
         />
+        
+        {/* Profile - hidden from tabs, accessible via header avatar */}
         <Tabs.Screen
           name="profile"
           options={{
-            title: 'Profile',
+            href: null,
+            headerShown: false,
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="person-outline" size={size} color={color} />
             ),

@@ -11,7 +11,7 @@ import { getSeverityColor } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Linking, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,10 +25,11 @@ export default function ReportDetailsScreen() {
 
   // Get reports from feed hook
   const { reports, updateReportStatus, fetchReports } = useReportsFeed();
-  const [report, setReport] = React.useState<EmergencyReport | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [sound, setSound] = React.useState<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = React.useState(false);
+  const [report, setReport] = useState<EmergencyReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  
 
   // Fetch reports on mount to ensure we have the latest data
   useEffect(() => {
@@ -39,13 +40,15 @@ export default function ReportDetailsScreen() {
     // Find report from feed
     const foundReport = reports.find(r => r.id === reportId);
     if (foundReport) {
-      console.log('[ReportDetails] Found report:', {
+      console.log('[ReportDetails] Found/updated report:', {
         id: foundReport.id,
         title: foundReport.title,
+        status: foundReport.status,
         audio: foundReport.audio,
         reportType: foundReport.reportType,
         hasAudio: !!foundReport.audio,
       });
+      // Always sync with the latest data from feed (keeps UI in sync with newsfeed)
       setReport(foundReport);
       setLoading(false);
       return;
@@ -59,6 +62,7 @@ export default function ReportDetailsScreen() {
           console.log('[ReportDetails] Found report (retry):', {
             id: retryReport.id,
             title: retryReport.title,
+            status: retryReport.status,
             audio: retryReport.audio,
             reportType: retryReport.reportType,
             hasAudio: !!retryReport.audio,
@@ -82,7 +86,7 @@ export default function ReportDetailsScreen() {
     }, 4000);
 
     return () => clearTimeout(emptyTimer);
-  }, [reports, reportId, report]);
+  }, [reports, reportId]); // Removed 'report' from deps to avoid loop but still sync from feed
 
   // Parse coordinates from location string if available
   const parseCoordinates = (location: string) => {
@@ -130,27 +134,29 @@ export default function ReportDetailsScreen() {
     },
   ];
 
-  const handleAcknowledge = async () => {
-    if (report) {
+  // Handle acknowledge with remarks (called from body)
+  const handleAcknowledge = useCallback(async (remarks?: string) => {
+    if (report && report.status === 'pending') {
       try {
-        await updateReportStatus(report.id, 'acknowledged');
+        await updateReportStatus(report.id, 'acknowledged', remarks);
         setReport(prev => (prev ? { ...prev, status: 'acknowledged' } : prev));
       } catch (error) {
         console.error('Failed to acknowledge report:', error);
       }
     }
-  };
+  }, [report, updateReportStatus]);
 
-  const handleResolve = async () => {
-    if (report) {
+  // Handle resolve with remarks (called from body)
+  const handleResolve = useCallback(async (remarks?: string) => {
+    if (report && report.status === 'acknowledged') {
       try {
-        await updateReportStatus(report.id, 'resolved');
+        await updateReportStatus(report.id, 'resolved', remarks);
         setReport(prev => (prev ? { ...prev, status: 'resolved' } : prev));
       } catch (error) {
         console.error('Failed to resolve report:', error);
       }
     }
-  };
+  }, [report, updateReportStatus]);
 
   const handleMapPress = () => {
     if (report && coords) {

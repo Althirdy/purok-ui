@@ -124,11 +124,20 @@ export default function NotificationsScreen() {
       
       {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color="#ffffff" />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        {notifications.length > 0 && (
+        {notifications.length > 0 ? (
           <TouchableOpacity onPress={handleClearAll} style={styles.clearButton}>
             <Text style={styles.clearButtonText}>Clear all</Text>
           </TouchableOpacity>
+        ) : (
+          <View style={styles.clearButton} />
         )}
       </View>
 
@@ -164,16 +173,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#1e3a8a',
   },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#ffffff',
+    flex: 1,
+    textAlign: 'center',
   },
   clearButton: {
+    minWidth: 70,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
