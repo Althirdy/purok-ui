@@ -1,7 +1,9 @@
 import { realtimeConfig } from '@/constants/realtime';
+import { API_BASE } from '@/lib/axios';
 import type { EmergencyReport } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Pusher from 'pusher-js/react-native';
+import { scheduleNotification } from '@/services/notifications';
 
 const AUTH_TOKEN_KEY = '@urbanwatch:auth_token';
 
@@ -72,6 +74,41 @@ type ConcernStatusUpdatedPayload = {
   };
 };
 
+// Payload structure for AI category updates (silent UI update)
+type ConcernAiCategoryUpdatedPayload = {
+  id: number;
+  category: string;
+  severity: string;
+  aiCategory: string | null;
+  aiSeverity: string | null;
+  aiConfidence: number | null;
+  aiProcessedAt: string | null;
+  updatedAt: string | null;
+};
+
+// Payload structure for transcription updates (silent UI update)
+type ConcernTranscribedPayload = {
+  id: number;
+  title: string;
+  description: string;
+  transcriptText: string | null;
+  status: string;
+  updatedAt: string;
+};
+
+// Payload structure for concern merged events
+type ConcernMergedPayload = {
+  duplicateConcernId: number;
+  parentConcern: {
+    id: number;
+    trackingCode: string;
+    title: string;
+    category: string;
+    status: string;
+  };
+  message: string;
+};
+
 let pusherClient: Pusher | null = null;
 let connectionHandlersBound = false;
 let lastToken: string | null = null;
@@ -111,7 +148,7 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
     pusherClient.disconnect();
     pusherClient = null;
   }
-  
+
   // Store current token
   lastToken = authToken || null;
 
@@ -139,16 +176,16 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
           try {
             // Get fresh token from storage
             let currentToken = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-            
+
             if (!currentToken) {
               console.error('[Pusher] ❌ No access token available');
               callback(new Error('No access token available'), null);
               return;
             }
-            
+
             const authEndpoint = realtimeConfig.authEndpoint;
             console.log('[Pusher] 🔐 Authorizing channel:', channel.name);
-            
+
             // First attempt with current token
             let response = await fetch(authEndpoint, {
               method: 'POST',
@@ -167,11 +204,11 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
             // Get response text
             let responseText = await response.text();
             const isEmpty = !responseText || responseText.trim().length === 0;
-            
+
             // Handle empty response or 401 - token expired
             if (isEmpty || response.status === 401) {
               console.log('[Pusher] 🔄 Token expired or empty response, refreshing token...');
-              
+
               // Try to refresh token
               const refreshToken = await AsyncStorage.getItem('@urbanwatch:refresh_token');
               if (!refreshToken) {
@@ -179,8 +216,8 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
                 callback(new Error('No refresh token available'), null);
                 return;
               }
-              
-              const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
+
+
               const refreshResponse = await fetch(`${API_BASE}/api/v1/refresh-token`, {
                 method: 'POST',
                 headers: {
@@ -214,7 +251,7 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
               }
               currentToken = newAccessToken;
               console.log('[Pusher] ✅ Token refreshed, retrying auth...');
-              
+
               // Retry auth with new token
               response = await fetch(authEndpoint, {
                 method: 'POST',
@@ -264,7 +301,7 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
         },
       };
     };
-    
+
     console.log('[Pusher] ✅ Custom authorizer configured for endpoint:', realtimeConfig.authEndpoint);
   } else {
     console.warn('[Pusher] ⚠️ No auth token provided - private channel subscription will fail');
@@ -321,7 +358,7 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
   // 1. Nested: concern.location.lat / concern.location.lng
   // 2. Flat: concern.latitude / concern.longitude
   let coordinates: { latitude: number; longitude: number } | undefined;
-  
+
   // Try nested location first
   if (concern.location?.lat && concern.location?.lng) {
     const lat = typeof concern.location.lat === 'string' ? parseFloat(concern.location.lat) : concern.location.lat;
@@ -352,7 +389,7 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
   }
 
   const category = concern.category?.toLowerCase() || 'other';
-  
+
   return {
     id: `PUROK-${concern.id}`, // Format: PUROK-{id} to match API format and enable status updates
     title: concern.title,
@@ -393,12 +430,12 @@ export async function subscribeToCitizenReports(
 ): Promise<() => void> {
   try {
     const client = await getPusherClient(authToken);
-    
+
     // Channel name: private-purok-leader.{userId}
     // Laravel automatically prepends 'private-' for private channels
     const channelName = `private-purok-leader.${userId}`;
     console.log('[Pusher] Subscribing to channel:', channelName);
-    
+
     const channel = client.subscribe(channelName);
 
     // Wait for subscription to be successful
@@ -416,7 +453,7 @@ export async function subscribeToCitizenReports(
         channel: channelName,
         userId: userId,
       });
-      
+
       // Status 403 means endpoint is reachable but authorization failed
       if (err?.status === 403) {
         console.error('[Pusher] 403 Forbidden - Authorization failed');
@@ -428,7 +465,7 @@ export async function subscribeToCitizenReports(
         console.error(`  Channel: ${channelName}`);
         console.error(`  User ID: ${userId}`);
       }
-      
+
       // Status 0 usually means network/CORS issue
       if (err?.status === 0) {
         console.error('[Pusher] Status 0 error - Network/CORS issue');
@@ -442,7 +479,7 @@ export async function subscribeToCitizenReports(
     // Event name: concern.assigned
     // Per documentation: Use .concern.assigned (with leading dot) for client-named events
     const eventName = '.concern.assigned'; // Note the leading dot for client-named events
-    
+
     const handler = (data: ConcernAssignedPayload) => {
       try {
         console.log('[Pusher] 🔔 New Concern Received from uw-citizen:', {
@@ -455,7 +492,14 @@ export async function subscribeToCitizenReports(
         const normalized = normalizeConcernAssigned(data);
         console.log('[Pusher] ✅ Normalized report:', normalized.id);
         onReport(normalized);
-        
+
+        // Explicitly trigger native notification with sound
+        scheduleNotification(
+          `New ${normalized.originalCategory || 'Incident'} Assigned`,
+          `${normalized.title}\n📍 ${normalized.location}`,
+          { reportId: normalized.id }
+        );
+
         // Per documentation: Example usage
         // if (data.concern.audio) {
         //   playAudio(data.concern.audio);
@@ -477,7 +521,7 @@ export async function subscribeToCitizenReports(
   } catch (error) {
     console.error('[Pusher] Error setting up subscription:', error);
     // Return a no-op cleanup function
-    return () => {};
+    return () => { };
   }
 }
 
@@ -513,11 +557,11 @@ export async function subscribeToAccidentStatusUpdates(
 ): Promise<() => void> {
   try {
     const client = await getPusherClient();
-    
+
     // Public channel - no authentication needed
     const channelName = 'active-accidents';
     console.log('[Pusher] Subscribing to accident updates on channel:', channelName);
-    
+
     const channel = client.subscribe(channelName);
 
     channel.bind('pusher:subscription_succeeded', () => {
@@ -557,7 +601,7 @@ export async function subscribeToAccidentStatusUpdates(
     };
   } catch (error) {
     console.error('[Pusher] Error setting up accident subscription:', error);
-    return () => {};
+    return () => { };
   }
 }
 
@@ -582,10 +626,10 @@ export async function subscribeToStatusUpdates(
 ): Promise<() => void> {
   try {
     const client = await getPusherClient(authToken);
-    
+
     const channelName = `private-purok-leader.${userId}`;
     console.log('[Pusher] Subscribing to status updates on channel:', channelName);
-    
+
     const channel = client.subscribe(channelName);
 
     // Debug: Listen to ALL events on this channel to see what backend is broadcasting
@@ -597,12 +641,12 @@ export async function subscribeToStatusUpdates(
           data: data ? JSON.stringify(data, null, 2) : 'null',
         });
       };
-      
+
       // Bind to all events (Pusher doesn't have a wildcard, so we'll log subscription events)
       channel.bind('pusher:subscription_succeeded', () => {
         console.log('[Pusher] ✅ Status update subscription succeeded on', channelName);
       });
-      
+
       channel.bind('pusher:subscription_error', (err: any) => {
         console.error('[Pusher] ❌ Status update subscription error:', err);
       });
@@ -628,7 +672,7 @@ export async function subscribeToStatusUpdates(
         // Priority: distribution.status > concern.status (backend updates distribution_status)
         const backendStatus = data.distribution?.status || data.concern.status || 'pending';
         const frontendStatus = statusMap[backendStatus.toLowerCase()] || 'pending';
-        
+
         console.log('[Pusher] 🔄 Status Update Processed:', {
           concernId,
           backendStatus,
@@ -637,7 +681,7 @@ export async function subscribeToStatusUpdates(
           distributionStatus: data.distribution?.status,
           concernStatus: data.concern.status,
         });
-        
+
         // Call callback with report ID (format: PUROK-{id}) and frontend status
         onStatusUpdate(`PUROK-${concernId}`, frontendStatus);
       } catch (error) {
@@ -667,8 +711,222 @@ export async function subscribeToStatusUpdates(
     };
   } catch (error) {
     console.error('[Pusher] Error setting up status update subscription:', error);
-    return () => {};
+    return () => { };
   }
 }
 
 
+/**
+ * Subscribe to AI category update events (silent UI update)
+ * 
+ * Channel: private-purok-leader.{userId}
+ * Event: concern.ai.category.updated
+ * 
+ * This event fires when the AI finishes categorizing a concern.
+ * The UI should update the category/severity without showing a toast.
+ * 
+ * @param userId - The purok leader's user ID
+ * @param authToken - The authentication token
+ * @param onAiCategoryUpdate - Callback with concern ID and updated AI data
+ */
+export async function subscribeToAiCategoryUpdates(
+  userId: number | string,
+  authToken: string,
+  onAiCategoryUpdate: (
+    reportId: string,
+    data: {
+      category: string;
+      severity: string;
+      aiCategory: string | null;
+      aiSeverity: string | null;
+      aiConfidence: number | null;
+    }
+  ) => void
+): Promise<() => void> {
+  try {
+    const client = await getPusherClient(authToken);
+    const channelName = `private-purok-leader.${userId}`;
+
+    console.log('[Pusher] Subscribing to AI category updates on channel:', channelName);
+    const channel = client.subscribe(channelName);
+
+    const aiCategoryHandler = (data: ConcernAiCategoryUpdatedPayload) => {
+      try {
+        console.log('[Pusher] 🤖 AI Category Update received (silent):', {
+          concernId: data.id,
+          category: data.category,
+          aiCategory: data.aiCategory,
+          aiSeverity: data.aiSeverity,
+        });
+
+        onAiCategoryUpdate(`PUROK-${data.id}`, {
+          category: data.category,
+          severity: data.severity,
+          aiCategory: data.aiCategory,
+          aiSeverity: data.aiSeverity,
+          aiConfidence: data.aiConfidence,
+        });
+      } catch (error) {
+        console.error('[Pusher] ❌ Failed to process AI category update:', error);
+      }
+    };
+
+    // Bind to both event name formats
+    channel.bind('.concern.ai.category.updated', aiCategoryHandler);
+    channel.bind('concern.ai.category.updated', aiCategoryHandler);
+
+    console.log('[Pusher] ✅ Listening for AI category updates');
+
+    return () => {
+      console.log('[Pusher] Unsubscribing from AI category updates');
+      channel.unbind('.concern.ai.category.updated', aiCategoryHandler);
+      channel.unbind('concern.ai.category.updated', aiCategoryHandler);
+    };
+  } catch (error) {
+    console.error('[Pusher] Error setting up AI category subscription:', error);
+    return () => { };
+  }
+}
+
+
+/**
+ * Subscribe to transcription update events (silent UI update)
+ * 
+ * Channel: private-purok-leader.{userId}
+ * Event: concern.transcribed
+ * 
+ * This event fires when the AI finishes transcribing a voice concern.
+ * The UI should update the transcript text without showing a toast.
+ * 
+ * @param userId - The purok leader's user ID
+ * @param authToken - The authentication token
+ * @param onTranscriptionUpdate - Callback with concern ID and transcript data
+ */
+export async function subscribeToTranscriptionUpdates(
+  userId: number | string,
+  authToken: string,
+  onTranscriptionUpdate: (
+    reportId: string,
+    data: {
+      title: string;
+      description: string;
+      transcriptText: string | null;
+    }
+  ) => void
+): Promise<() => void> {
+  try {
+    const client = await getPusherClient(authToken);
+    const channelName = `private-purok-leader.${userId}`;
+
+    console.log('[Pusher] Subscribing to transcription updates on channel:', channelName);
+    const channel = client.subscribe(channelName);
+
+    const transcriptionHandler = (data: ConcernTranscribedPayload) => {
+      try {
+        console.log('[Pusher] 🎤 Transcription Update received (silent):', {
+          concernId: data.id,
+          title: data.title,
+          hasTranscript: !!data.transcriptText,
+        });
+
+        onTranscriptionUpdate(`PUROK-${data.id}`, {
+          title: data.title,
+          description: data.description,
+          transcriptText: data.transcriptText,
+        });
+      } catch (error) {
+        console.error('[Pusher] ❌ Failed to process transcription update:', error);
+      }
+    };
+
+    // Bind to both event name formats
+    channel.bind('.concern.transcribed', transcriptionHandler);
+    channel.bind('concern.transcribed', transcriptionHandler);
+
+    console.log('[Pusher] ✅ Listening for transcription updates');
+
+    return () => {
+      console.log('[Pusher] Unsubscribing from transcription updates');
+      channel.unbind('.concern.transcribed', transcriptionHandler);
+      channel.unbind('concern.transcribed', transcriptionHandler);
+    };
+  } catch (error) {
+    console.error('[Pusher] Error setting up transcription subscription:', error);
+    return () => { };
+  }
+}
+
+
+/**
+ * Subscribe to concern merged events
+ * 
+ * Channel: private-purok-leader.{userId}
+ * Event: concern.merged
+ * 
+ * This event fires when a new concern is identified as a duplicate 
+ * and merged into an existing parent concern.
+ * 
+ * NOTE: This broadcasts to the CITIZEN's channel, not the purok leader's.
+ * For purok leaders, this would be handled internally (no duplicate reports shown).
+ * We include this for completeness in case the channel routing changes.
+ * 
+ * @param userId - The purok leader's user ID
+ * @param authToken - The authentication token
+ * @param onConcernMerged - Callback with duplicate ID and parent concern info
+ */
+export async function subscribeToConcernMerged(
+  userId: number | string,
+  authToken: string,
+  onConcernMerged: (
+    duplicateId: string,
+    parentConcern: {
+      id: number;
+      trackingCode: string;
+      title: string;
+      category: string;
+      status: string;
+    },
+    message: string
+  ) => void
+): Promise<() => void> {
+  try {
+    const client = await getPusherClient(authToken);
+    const channelName = `private-purok-leader.${userId}`;
+
+    console.log('[Pusher] Subscribing to concern merged events on channel:', channelName);
+    const channel = client.subscribe(channelName);
+
+    const mergedHandler = (data: ConcernMergedPayload) => {
+      try {
+        console.log('[Pusher] 🔀 Concern Merged event received:', {
+          duplicateId: data.duplicateConcernId,
+          parentId: data.parentConcern.id,
+          parentTrackingCode: data.parentConcern.trackingCode,
+        });
+
+        onConcernMerged(
+          `PUROK-${data.duplicateConcernId}`,
+          data.parentConcern,
+          data.message
+        );
+      } catch (error) {
+        console.error('[Pusher] ❌ Failed to process concern merged event:', error);
+      }
+    };
+
+    // Bind to both event name formats
+    channel.bind('.concern.merged', mergedHandler);
+    channel.bind('concern.merged', mergedHandler);
+
+    console.log('[Pusher] ✅ Listening for concern merged events');
+
+    return () => {
+      console.log('[Pusher] Unsubscribing from concern merged events');
+      channel.unbind('.concern.merged', mergedHandler);
+      channel.unbind('concern.merged', mergedHandler);
+    };
+  } catch (error) {
+    console.error('[Pusher] Error setting up concern merged subscription:', error);
+    return () => { };
+  }
+}

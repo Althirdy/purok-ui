@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "strict": false,
-    "jsx": "react-native",
+    "jsx": "react-jsx",
     "jsxImportSource": "react",
     "allowJs": true,
     "esModuleInterop": true,
@@ -14,7 +14,8 @@
     "target": "ESNext",
     "lib": [
       "DOM",
-      "ESNext"
+      "ESNext",
+      "ES2020"
     ],
     "customConditions": [
       "react-native"

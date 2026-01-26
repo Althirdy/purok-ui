@@ -9,7 +9,6 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -22,9 +21,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing, borderRadius } = DesignSystem;
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const isTablet = SCREEN_WIDTH >= 768;
-const isIOS = Platform.OS === 'ios';
 
 // Inline styles
 const styles = StyleSheet.create({
@@ -157,8 +153,8 @@ export default function ProfileSettingsScreen() {
         </View>
 
         {/* Content */}
-        <ScrollView 
-          contentContainerStyle={styles.content} 
+        <ScrollView
+          contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -229,8 +225,8 @@ export default function ProfileSettingsScreen() {
           </View>
 
           {/* Update Button */}
-          <TouchableOpacity 
-            style={styles.updateButton} 
+          <TouchableOpacity
+            style={styles.updateButton}
             onPress={handleUpdateProfile}
             activeOpacity={0.8}
           >

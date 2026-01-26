@@ -11,13 +11,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing, borderRadius } = DesignSystem;
 
-// Helper function to convert hex to rgba
-const hexToRgba = (hex: string, alpha: number): string => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
 
 export interface ToastData {
   id: string;
@@ -39,7 +32,7 @@ export function Toast({ toast, onDismiss, duration = 5000 }: ToastProps) {
   const slideAnim = useRef(new Animated.Value(-120)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
-  
+
   // Calculate position: below header (safe area + header ~100px + small padding)
   const toastTopPosition = insets.top + 100;
 
@@ -103,7 +96,7 @@ export function Toast({ toast, onDismiss, duration = 5000 }: ToastProps) {
   const getSeverityStyles = () => {
     // Determine icon based on report type first, then severity
     let icon: string;
-    
+
     if (toast.reportType) {
       switch (toast.reportType) {
         case 'fire':
@@ -122,17 +115,17 @@ export function Toast({ toast, onDismiss, duration = 5000 }: ToastProps) {
           icon = 'shield';
           break;
         default:
-          icon = toast.severity === 'critical' ? 'alert-circle' : 
-                 toast.severity === 'high' ? 'warning' : 
-                 toast.severity === 'medium' ? 'information-circle' : 
-                 'notifications';
+          icon = toast.severity === 'critical' ? 'alert-circle' :
+            toast.severity === 'high' ? 'warning' :
+              toast.severity === 'medium' ? 'information-circle' :
+                'notifications';
       }
     } else {
       // Fallback to severity-based icons
-      icon = toast.severity === 'critical' ? 'alert-circle' : 
-             toast.severity === 'high' ? 'warning' : 
-             toast.severity === 'medium' ? 'information-circle' : 
-             'notifications';
+      icon = toast.severity === 'critical' ? 'alert-circle' :
+        toast.severity === 'high' ? 'warning' :
+          toast.severity === 'medium' ? 'information-circle' :
+            'notifications';
     }
 
     // Determine colors based on severity

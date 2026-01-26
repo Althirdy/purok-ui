@@ -26,7 +26,7 @@ export default function RootLayout() {
 }
 
 function AuthAwareStack() {
-  const { isAuthenticated } = useAuth();
+  useAuth();
   return (
     <Stack
       screenOptions={{

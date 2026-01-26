@@ -2,9 +2,8 @@
  * Emergency Report Card Component
  */
 
-import { Badge } from '@/components/common/badge';
 import { Card } from '@/components/common/card';
-import { DesignSystem } from '@/constants/design-system';
+import { DesignSystem, scale, moderateScale } from '@/constants/design-system';
 import type { EmergencyReport } from '@/types';
 import {
   formatReportId,
@@ -14,11 +13,12 @@ import {
   getStatusColor,
   getStatusText,
 } from '@/utils/reportHelpers';
+
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const { colors, typography, spacing } = DesignSystem;
+const { colors, typography, spacing, borderRadius } = DesignSystem;
 
 export interface ReportCardProps {
   report: EmergencyReport;
@@ -29,18 +29,7 @@ export interface ReportCardProps {
 }
 
 function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: ReportCardProps) {
-  const getSourceIcon = (source?: string) => {
-    switch (source) {
-      case 'cctv':
-        return 'videocam';
-      case 'sensor':
-        return 'hardware-chip';
-      case 'citizen':
-        return 'people';
-      default:
-        return 'information-circle';
-    }
-  };
+
 
   const getCategoryIcon = (originalCategory?: string, type?: EmergencyReport['type']) => {
     // Use original category from citizen side if available (matches citizen side icons)
@@ -56,7 +45,7 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
       };
       return categoryIcons[originalCategory.toLowerCase()] || 'alert-circle-outline';
     }
-    
+
     // Fallback to type-based icons
     switch (type) {
       case 'accident':
@@ -108,8 +97,16 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
 
   return (
     <Card onPress={canOpenDetails ? () => onPress!(report.id) : undefined} variant="default" style={styles.card}>
-      {/* ID Badge - Top Right */}
+      {/* ID Badge and Aggregation Badge - Top Right */}
       <View style={styles.topRow}>
+        {report.relatedReportsCount && report.relatedReportsCount > 0 ? (
+          <View style={styles.aggregationBadge}>
+            <Ionicons name="people" size={12} color={colors.primary.blue} style={{ marginRight: 4 }} />
+            <Text style={styles.aggregationText}>
+              {report.relatedReportsCount + 1} Reports
+            </Text>
+          </View>
+        ) : null}
         <View style={styles.idBadge}>
           <Text style={styles.idText}>{formatReportId(report.id)}</Text>
         </View>
@@ -119,10 +116,10 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
       <View style={styles.header}>
         {/* Icon on Left */}
         <View style={styles.iconContainer}>
-          <Ionicons 
-            name={getCategoryIcon(report.originalCategory, report.type)} 
-            size={24} 
-            color={getCategoryIconColor(report.originalCategory)} 
+          <Ionicons
+            name={getCategoryIcon(report.originalCategory, report.type)}
+            size={24}
+            color={getCategoryIconColor(report.originalCategory)}
           />
         </View>
 
@@ -165,27 +162,27 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
       {report.status === 'pending' && (onPress || onAcknowledge) && (
         <View style={styles.actionsContainer}>
           {onPress && (
-            <TouchableOpacity 
-              style={styles.seeMoreButton}
+            <TouchableOpacity
+              style={[styles.seeMoreButton, { height: scale(48) }]}
               onPress={(e) => {
                 e.stopPropagation();
                 onPress(report.id);
               }}
               activeOpacity={0.7}
             >
-              <Text style={styles.seeMoreText}>See More</Text>
+              <Text style={[styles.seeMoreText, { fontSize: typography.fontSize.base }]}>See More</Text>
             </TouchableOpacity>
           )}
           {onAcknowledge && (
-            <TouchableOpacity 
-              style={styles.acknowledgeButton} 
+            <TouchableOpacity
+              style={[styles.acknowledgeButton, { height: scale(48) }]}
               onPress={(e) => {
                 e.stopPropagation();
                 onAcknowledge(report.id);
               }}
               activeOpacity={0.7}
             >
-              <Text style={styles.acknowledgeText}>Acknowledge</Text>
+              <Text style={[styles.acknowledgeText, { fontSize: typography.fontSize.base }]}>Acknowledge</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -194,34 +191,36 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
       {/* Resolve Button (shown after acknowledging) */}
       {report.status === 'acknowledged' && onResolve && (
         <View style={styles.actionsContainer}>
-          <TouchableOpacity 
-            style={styles.resolveButton} 
+          <TouchableOpacity
+            style={[styles.resolveButton, { height: scale(48) }]}
             onPress={(e) => {
               e.stopPropagation();
               onResolve(report.id);
             }}
             activeOpacity={0.7}
           >
-            <Ionicons name="checkmark-done-circle" size={18} color={colors.text.inverse} style={{ marginRight: 6 }} />
-            <Text style={styles.resolveText}>Mark as Resolved</Text>
+            <Ionicons name="checkmark-done-circle" size={scale(20)} color={colors.text.inverse} style={{ marginRight: spacing.xs }} />
+            <Text style={[styles.resolveText, { fontSize: typography.fontSize.base }]}>Mark as Resolved</Text>
           </TouchableOpacity>
         </View>
       )}
     </Card>
+
   );
 }
 
 // Memoize component to prevent unnecessary re-renders
 // Only re-render if report data actually changed (not function references)
 // Optimized memo comparison - only re-render if report data or callbacks change
-export const ReportCard: React.MemoExoticComponent<React.NamedExoticComponent<ReportCardProps>> = React.memo(ReportCardComponent, (prevProps, nextProps) => {
+export const ReportCard = React.memo(ReportCardComponent, (prevProps, nextProps) => {
   // Compare report by ID and key fields that affect rendering
   if (prevProps.report.id !== nextProps.report.id) return false;
   if (prevProps.report.status !== nextProps.report.status) return false;
   if (prevProps.report.title !== nextProps.report.title) return false;
   if (prevProps.report.severity !== nextProps.report.severity) return false;
+  if (prevProps.report.relatedReportsCount !== nextProps.report.relatedReportsCount) return false;
   if (prevProps.report.timestamp.getTime() !== nextProps.report.timestamp.getTime()) return false;
-  
+
   // Compare callbacks by reference (they should be stable with useCallback)
   // Handle undefined callbacks properly
   if (!!prevProps.onPress !== !!nextProps.onPress) return false;
@@ -230,182 +229,198 @@ export const ReportCard: React.MemoExoticComponent<React.NamedExoticComponent<Re
   if (prevProps.onAcknowledge && prevProps.onAcknowledge !== nextProps.onAcknowledge) return false;
   if (!!prevProps.onResolve !== !!nextProps.onResolve) return false;
   if (prevProps.onResolve && prevProps.onResolve !== nextProps.onResolve) return false;
-  
+
   // Props are equal, skip re-render
   return true;
 });
 
 const styles = StyleSheet.create({
   card: {
-    padding: 20,
-    marginBottom: 12,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
     borderWidth: 2,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderColor: colors.border.default,
+    backgroundColor: colors.background.card,
+    borderRadius: borderRadius.lg,
   },
-  
+
   topRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
   },
-  
-  idBadge: {
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 8,
+
+  aggregationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff', // Light blue
+    paddingHorizontal: spacing.sm,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
   },
-  
+
+  aggregationText: {
+    fontSize: typography.fontSize.xs,
+    color: '#1e40af', // Dark blue
+    fontWeight: '700',
+  },
+
+  idBadge: {
+    backgroundColor: colors.background.secondary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: moderateScale(4),
+  },
+
   idText: {
-    fontSize: 12,
-    color: '#94a3b8',
+    fontSize: typography.fontSize.xs,
+    color: colors.text.light,
     fontWeight: '600',
     fontFamily: 'monospace',
   },
-  
+
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
-  
+
   iconContainer: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 24,
+    width: moderateScale(48),
+    height: moderateScale(48),
+    backgroundColor: colors.background.secondary,
+    borderRadius: moderateScale(24),
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: spacing.md,
   },
-  
+
   info: {
     flex: 1,
   },
-  
+
   title: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 4,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
   },
-  
+
   category: {
-    fontSize: 14,
-    color: '#64748b',
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
     fontWeight: '500',
   },
-  
+
   meta: {
     alignItems: 'flex-end',
   },
-  
+
   severityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 60,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
+    minWidth: moderateScale(60),
     alignItems: 'center',
   },
-  
+
   severityBadgeText: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     fontWeight: '600',
   },
-  
+
   description: {
-    fontSize: 14,
-    color: '#475569',
-    lineHeight: 20,
-    marginBottom: 12,
-    marginLeft: 64,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    lineHeight: typography.fontSize.sm * 1.5,
+    marginBottom: spacing.md,
+    marginLeft: moderateScale(64),
   },
-  
+
   location: {
-    fontSize: 14,
-    color: '#475569',
-    marginBottom: 12,
-    marginLeft: 64,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.md,
+    marginLeft: moderateScale(64),
   },
-  
+
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginLeft: 64,
+    marginLeft: moderateScale(64),
   },
-  
+
   timestampRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.xs,
   },
-  
+
   timestampText: {
-    fontSize: 12,
-    color: '#64748b',
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
   },
-  
+
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
   },
-  
+
   statusText: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     fontWeight: '600',
   },
 
   actionsContainer: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
 
   seeMoreButton: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.background.secondary,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    paddingVertical: 10,
-    borderRadius: 8,
+    borderColor: colors.border.dark,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
     alignItems: 'center',
   },
 
   seeMoreText: {
-    fontSize: 14,
     fontWeight: '600',
-    color: '#1e293b',
+    color: colors.text.primary,
   },
-  
+
   acknowledgeButton: {
     flex: 1,
     backgroundColor: colors.primary.blue,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
     alignItems: 'center',
   },
-  
+
   acknowledgeText: {
-    fontSize: 14,
     fontWeight: '600',
     color: colors.text.inverse,
   },
   resolveButton: {
     flex: 1,
     backgroundColor: colors.semantic.success,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'center',
   },
   resolveText: {
-    fontSize: 14,
     fontWeight: '600',
     color: colors.text.inverse,
   },

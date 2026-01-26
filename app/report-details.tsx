@@ -108,11 +108,11 @@ export default function ReportDetailsScreen() {
   const severityColor = report ? getSeverityColor(report.severity) : colors.accent.orange;
 
   // Simple status timeline steps (Pending -> Acknowledged -> Resolved)
-  const statusSteps: Array<{
+  const statusSteps: {
     key: EmergencyReport['status'];
     label: string;
     description: string;
-  }> = [
+  }[] = [
     {
       key: 'pending',
       label: 'Pending',

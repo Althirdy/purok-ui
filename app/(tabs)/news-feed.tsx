@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/news/empty-state';
 import { IncidentHeader } from '@/components/news/incident-header';
 import { ReportCard } from '@/components/news/report-card';
 import { ReportCardSkeleton } from '@/components/news/report-card-skeleton';
-import { DesignSystem } from '@/constants/design-system';
+import { DesignSystem, moderateScale } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
 import { useNotifications } from '@/context/notification-context';
@@ -25,7 +25,7 @@ const AcknowledgeSheet = lazy(() => import('@/components/news/acknowledge-sheet'
 const ResolveSheet = lazy(() => import('@/components/news/resolve-sheet').then(m => ({ default: m.ResolveSheet })));
 const FilterModal = lazy(() => import('@/components/news/filter-modal').then(m => ({ default: m.FilterModal })));
 
-const { colors, spacing } = DesignSystem;
+const { colors, spacing, typography } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 768;
 
@@ -36,40 +36,41 @@ const styles = StyleSheet.create({
   },
   floatingButton: {
     position: 'absolute',
-    bottom: spacing.lg,
-    right: spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    bottom: moderateScale(24),
+    right: moderateScale(24),
+    width: moderateScale(56),
+    height: moderateScale(56),
+    borderRadius: moderateScale(28),
     backgroundColor: colors.primary.blue,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: colors.primary.blue,
+    ...DesignSystem.shadows.md,
   },
   floatingBadge: {
     position: 'absolute',
     top: -4,
     right: -4,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+    minWidth: moderateScale(20),
+    height: moderateScale(20),
+    borderRadius: moderateScale(10),
     backgroundColor: colors.semantic.error,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: moderateScale(6),
     borderWidth: 2,
     borderColor: '#ffffff',
   },
   floatingBadgeText: {
     color: colors.text.inverse,
-    fontSize: 10,
+    fontSize: typography.fontSize.xs,
     fontWeight: '700',
   },
 });
 
 export default function NewsFeedScreen() {
-  const { user } = useAuth();
+  useAuth();
   const [toast, setToast] = useState<ToastData | null>(null);
   const { addNotification, unreadCount } = useNotifications();
   const [searchQuery, setSearchQuery] = useState('');
@@ -106,7 +107,7 @@ export default function NewsFeedScreen() {
       try {
         const { impactAsync, ImpactFeedbackStyle } = await import('expo-haptics');
         const category = report.originalCategory || 'other';
-        
+
         // Map categories to haptic feedback intensity
         let feedbackStyle = ImpactFeedbackStyle.Light; // Default
         if (category === 'safety' || category === 'security') {
@@ -117,7 +118,7 @@ export default function NewsFeedScreen() {
           // 'noise', 'other', 'voice_concern' or unknown -> Light
           feedbackStyle = ImpactFeedbackStyle.Light;
         }
-        
+
         impactAsync(feedbackStyle);
         console.log('[NewsFeed] ✅ Haptic feedback triggered for category:', category);
       } catch (error) {
@@ -127,7 +128,7 @@ export default function NewsFeedScreen() {
       // Show toast with report title/header - always show for any new report
       const toastId = `toast-${report.id}-${Date.now()}`;
       const reportId = report.id; // Capture report ID for navigation
-      
+
       setToast({
         id: toastId,
         title: '📢 New Report',
@@ -139,7 +140,7 @@ export default function NewsFeedScreen() {
           handleReportPress(reportId);
         },
       });
-      
+
       // Note: Notification is added in the useReportsFeed hook
       console.log('[NewsFeed] ✅ Toast displayed for new report');
     },
@@ -243,7 +244,7 @@ export default function NewsFeedScreen() {
     // Create stable callback references based on item status
     const acknowledgeCallback = item.status === 'pending' ? handleAcknowledgeAction : undefined;
     const resolveCallback = item.status === 'acknowledged' ? handleResolveAction : undefined;
-    
+
     return (
       <Animated.View
         entering={FadeInDown.delay(120 + index * 40).duration(450)}
@@ -268,18 +269,18 @@ export default function NewsFeedScreen() {
   const manualCount = useMemo(() => reports.filter(r => r.reportType === 'manual' || (!r.reportType && !r.audio)).length, [reports]);
   const voiceCount = useMemo(() => reports.filter(r => r.reportType === 'voice' || !!r.audio).length, [reports]);
   const totalCount = reports.length;
-  
+
   // Derived: reports filtered by search query, status, and report type
   const displayedReports = useMemo(() => {
     const q = committedQuery.trim().toLowerCase();
     let base = reports;
-    
+
     // Apply status filter
     if (statusFilter !== 'all') {
       const targetStatus = statusFilter === 'ongoing' ? 'acknowledged' : statusFilter;
       base = base.filter(r => r.status === targetStatus);
     }
-    
+
     // Apply report type filter (manual vs voice)
     if (reportTypeFilter !== 'all') {
       if (reportTypeFilter === 'voice') {
@@ -290,7 +291,7 @@ export default function NewsFeedScreen() {
         base = base.filter(r => r.reportType === 'manual' || (!r.reportType && !r.audio));
       }
     }
-    
+
     // Apply search query filter
     if (!q) return base;
     return base.filter(r => {
@@ -299,7 +300,7 @@ export default function NewsFeedScreen() {
       return title.includes(q) || location.includes(q);
     });
   }, [reports, committedQuery, statusFilter, reportTypeFilter]);
-  
+
   // Memoize header component - only recompute when dependencies change
   const memoizedHeader = useMemo(() => {
     return (
@@ -347,7 +348,7 @@ export default function NewsFeedScreen() {
         updateCellsBatchingPeriod={100}
         initialNumToRender={15}
         windowSize={21}
-        // Note: getItemLayout removed - items have variable heights based on content
+      // Note: getItemLayout removed - items have variable heights based on content
       />
 
       {/* Floating notification bell (fixed on screen, follows scroll like uw-citizen) */}
@@ -362,7 +363,7 @@ export default function NewsFeedScreen() {
             <Text style={styles.floatingBadgeText}>
               {unreadCount > 99 ? '99+' : unreadCount}
             </Text>
-            </View>
+          </View>
         )}
       </TouchableOpacity>
 

@@ -21,7 +21,7 @@ export default function TabLayout() {
         configureNotifications();
         await requestNotificationPermissions();
         console.log('[TabLayout] ✅ Notifications configured');
-      } catch (error) {
+      } catch {
         // Gracefully handle - notifications just won't work in Expo Go
         console.log('[TabLayout] ⚠️ Push notifications not available (using Expo Go)');
       }
@@ -93,7 +93,7 @@ export default function TabLayout() {
             ),
           }}
         />
-        
+
         {/* Hide notifications from tabs */}
         <Tabs.Screen
           name="notifications"
@@ -102,7 +102,7 @@ export default function TabLayout() {
             headerShown: false,
           }}
         />
-        
+
         {/* Hide profile settings from tabs */}
         <Tabs.Screen
           name="profile-settings"

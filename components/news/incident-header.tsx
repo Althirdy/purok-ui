@@ -1,4 +1,4 @@
-import { DesignSystem } from '@/constants/design-system';
+import { DesignSystem, scale, moderateScale } from '@/constants/design-system';
 import { useAuth } from '@/context/auth-context';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 
-const { colors, typography, spacing, shadows } = DesignSystem;
+const { colors, typography, spacing, shadows, borderRadius } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 768;
 const isIOS = Platform.OS === 'ios';
@@ -42,7 +42,6 @@ export function IncidentHeader(props: IncidentHeaderProps) {
     resolvedCount,
     searchQuery,
     setSearchQuery,
-    committedQuery,
     setCommittedQuery,
     onFilterPress,
     setStatusFilter,
@@ -88,7 +87,7 @@ export function IncidentHeader(props: IncidentHeaderProps) {
             <View style={styles.welcomeTextContainer}>
               <Text style={styles.welcomeText}>Welcome back, {displayName}!</Text>
               <Text style={styles.welcomeSubtext}>
-                {pendingCount > 0 
+                {pendingCount > 0
                   ? `You have ${pendingCount} pending concern${pendingCount > 1 ? 's' : ''}`
                   : acknowledgedCount > 0
                     ? `${acknowledgedCount} concern${acknowledgedCount > 1 ? 's' : ''} in progress`
@@ -205,9 +204,9 @@ const styles = StyleSheet.create({
     maxWidth: isTablet ? '70%' : '80%',
   },
   logoSmall: {
-    width: isTablet ? 56 : 36,
-    height: isTablet ? 56 : 36,
-    borderRadius: isTablet ? 28 : 18,
+    width: isTablet ? scale(56) : scale(36),
+    height: isTablet ? scale(56) : scale(36),
+    borderRadius: isTablet ? scale(28) : scale(18),
     backgroundColor: colors.neutral.gray300,
     justifyContent: 'center',
     alignItems: 'center',
@@ -236,11 +235,12 @@ const styles = StyleSheet.create({
   },
   welcomeContainer: {
     backgroundColor: colors.background.card,
-    borderRadius: 16,
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border.light,
+    ...shadows.sm,
   },
   welcomeRow: {
     flexDirection: 'row',
@@ -274,9 +274,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.card,
     borderWidth: 1,
     borderColor: colors.border.light,
-    borderRadius: 20,
+    borderRadius: borderRadius.xl,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: moderateScale(8),
   },
   searchText: {
     marginLeft: spacing.sm,
@@ -285,22 +285,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   filterButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: scale(40),
+    height: scale(40),
+    borderRadius: scale(12),
     backgroundColor: colors.primary.blue,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    ...shadows.sm,
   },
   filterButtonDot: {
     position: 'absolute',
     top: 6,
     right: 6,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
     backgroundColor: colors.semantic.error,
+    borderWidth: 1.5,
+    borderColor: colors.text.inverse,
   },
   activeFiltersContainer: {
     marginBottom: spacing.sm,
@@ -313,7 +316,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#dbeafe',
-    borderRadius: 20,
+    borderRadius: borderRadius.full,
     paddingVertical: 6,
     paddingHorizontal: 12,
     gap: 6,
@@ -332,8 +335,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.card,
     borderWidth: 1,
     borderColor: colors.border.light,
-    borderRadius: 20,
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
+    ...shadows.sm,
   },
   statLabel: {
     color: colors.text.secondary,

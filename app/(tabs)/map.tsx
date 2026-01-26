@@ -37,14 +37,14 @@ const { colors } = DesignSystem;
 export default function MapScreen() {
   // Get auth token for authenticated requests
   const { accessToken } = useAuth();
-  
+
   // Citizen concerns from Pusher/API
   const { reports, loading: loadingConcerns, fetchReports } = useReportsFeed();
-  
+
   // CCTV accidents (ongoing)
   const [cctvAccidents, setCctvAccidents] = useState<EmergencyReport[]>([]);
   const [loadingAccidents, setLoadingAccidents] = useState(false);
-  
+
   const mapRef = useRef<MapView | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [selectedMarker, setSelectedMarker] = useState<SelectedMarker>(null);
@@ -86,23 +86,23 @@ export default function MapScreen() {
       try {
         unsubscribe = await subscribeToAccidentStatusUpdates((accident) => {
           console.log('[MapScreen] 🔔 Real-time accident update:', accident);
-          
+
           // If status changed to "In Progress", add/update marker
           if (accident.status === 'In Progress') {
             setCctvAccidents(prev => {
               const existing = prev.find(a => a.id === `accident-${accident.id}`);
               if (existing) {
                 // Update existing
-                return prev.map(a => 
-                  a.id === `accident-${accident.id}` 
+                return prev.map(a =>
+                  a.id === `accident-${accident.id}`
                     ? {
-                        ...a,
-                        title: accident.title,
-                        coordinates: {
-                          latitude: typeof accident.latitude === 'string' ? parseFloat(accident.latitude) : accident.latitude,
-                          longitude: typeof accident.longitude === 'string' ? parseFloat(accident.longitude) : accident.longitude,
-                        },
-                      }
+                      ...a,
+                      title: accident.title,
+                      coordinates: {
+                        latitude: typeof accident.latitude === 'string' ? parseFloat(accident.latitude) : accident.latitude,
+                        longitude: typeof accident.longitude === 'string' ? parseFloat(accident.longitude) : accident.longitude,
+                      },
+                    }
                     : a
                 );
               }
@@ -123,7 +123,7 @@ export default function MapScreen() {
               }];
             });
           }
-          
+
           // If status changed to "Resolved", remove marker from active
           if (accident.status === 'Resolved') {
             setCctvAccidents(prev => prev.filter(a => a.id !== `accident-${accident.id}`));
@@ -165,7 +165,7 @@ export default function MapScreen() {
 
   // PRIVACY FILTER: Only show verified/acknowledged citizen concerns
   const verifiedConcerns = useMemo(() => {
-    return reports.filter((r: EmergencyReport) => 
+    return reports.filter((r: EmergencyReport) =>
       r.status === 'acknowledged' || r.status === 'resolved'
     );
   }, [reports]);
@@ -205,19 +205,14 @@ export default function MapScreen() {
     [incidentMarkers]
   );
 
-  // Loading state for fetching accident details
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  // Handle marker press with detail fetching
+  const handleMarkerPress = useCallback(async (marker: any) => {
+    const color = getMarkerColor(marker.type as EmergencyReport["type"], marker.severity as EmergencyReport["severity"]);
 
-  const handleMarkerPress = async (marker: typeof displayedMarkers[0]) => {
-    const color = getMarkerColor(marker.type as EmergencyReport['type'], marker.severity as EmergencyReport['severity']);
-    
-    // Check if this is a CCTV accident (id starts with 'accident-')
-    const isCctvAccident = marker.id.startsWith('accident-');
-    
-    if (isCctvAccident && accessToken) {
-      // Fetch full details from backend for CCTV accidents
-      const accidentId = parseInt(marker.id.replace('accident-', ''), 10);
-      
+    // For CCTV accidents, fetch extra details
+    if (marker.type === 'accident' && marker.id.startsWith('accident-')) {
+      const accidentId = marker.id.replace('accident-', '');
+
       // Show loading state with basic info first
       setSelectedMarker({
         id: marker.id,
@@ -229,8 +224,7 @@ export default function MapScreen() {
         timestamp: marker.timestamp,
         color,
       });
-      
-      setLoadingDetails(true);
+
       try {
         const details = await fetchActiveAccidentDetail(accidentId, accessToken);
         if (details) {
@@ -246,14 +240,13 @@ export default function MapScreen() {
               locationStr = parts.join(', ');
             }
           }
-          
+
           // Extract images from details (same logic as citizen concerns)
-          // Images shown only if verified (handled by InfoCard privacy logic)
           let images: string[] | undefined;
           if (details.media && Array.isArray(details.media)) {
-            images = details.media.map(m => m.url).filter(Boolean);
+            images = (details.media as any[]).map(m => m.url).filter(Boolean);
           } else if (details.images && Array.isArray(details.images)) {
-            images = details.images.filter(Boolean);
+            images = (details.images as any[]).filter(Boolean);
           }
 
           setSelectedMarker({
@@ -266,16 +259,14 @@ export default function MapScreen() {
             timestamp: marker.timestamp,
             color,
             status: 'acknowledged', // CCTV accidents are acknowledged by default
-            images: images && images.length > 0 ? images : undefined, // Same privacy logic as citizen concerns
+            images: images && images.length > 0 ? images : undefined,
           });
         }
       } catch (error) {
         console.error('[MapScreen] Error fetching accident details:', error);
-      } finally {
-        setLoadingDetails(false);
       }
     } else {
-      // For citizen concerns, use the existing data (includes images if verified)
+      // For citizen concerns, use the existing data
       setSelectedMarker({
         id: marker.id,
         title: marker.title || 'Incident Report',
@@ -285,11 +276,11 @@ export default function MapScreen() {
         location: marker.location || 'Unknown location',
         timestamp: marker.timestamp,
         color,
-        status: marker.status, // Include status for privacy logic
-        images: marker.images, // Include images for verified incidents
+        status: marker.status,
+        images: marker.images,
       });
     }
-  };
+  }, [accessToken]);
 
   const loading = loadingConcerns || loadingAccidents;
   const citizenCount = verifiedConcerns.length;
@@ -359,23 +350,23 @@ export default function MapScreen() {
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <Text style={styles.headerTitle}>Incident Map</Text>
-          <TouchableOpacity 
-            style={styles.refreshButton} 
+          <TouchableOpacity
+            style={styles.refreshButton}
             onPress={handleRefresh}
             disabled={loading || refreshing}
           >
-            <Ionicons 
-              name="refresh" 
-              size={20} 
-              color={loading || refreshing ? colors.text.secondary : colors.primary.blue} 
+            <Ionicons
+              name="refresh"
+              size={20}
+              color={loading || refreshing ? colors.text.secondary : colors.primary.blue}
             />
           </TouchableOpacity>
         </View>
-        
+
         {/* Stats Row */}
         <View style={styles.statsRow}>
           {/* Citizen Concerns Badge - Clickable to zoom */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.statBadge}
             onPress={handleCitizenBadgePress}
             activeOpacity={0.7}
@@ -384,9 +375,9 @@ export default function MapScreen() {
             <Ionicons name="people" size={14} color="#3B82F6" />
             <Text style={styles.statBadgeText}>{citizenCount} Citizen</Text>
           </TouchableOpacity>
-          
+
           {/* CCTV Accidents Badge - Clickable to zoom */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.statBadge, { backgroundColor: '#FEF3C7' }]}
             onPress={handleCctvBadgePress}
             activeOpacity={0.7}
@@ -395,7 +386,7 @@ export default function MapScreen() {
             <Ionicons name="videocam" size={14} color="#D97706" />
             <Text style={[styles.statBadgeText, { color: '#D97706' }]}>{cctvCount} CCTV</Text>
           </TouchableOpacity>
-          
+
           {/* Verified Badge - Info only */}
           <View style={styles.verifiedBadge}>
             <Ionicons name="shield-checkmark" size={14} color="#10B981" />

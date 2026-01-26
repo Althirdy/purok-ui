@@ -111,7 +111,7 @@ export default function NotificationsScreen() {
       <Ionicons name="notifications-off-outline" size={64} color="#cbd5e1" />
       <Text style={styles.emptyText}>No notifications yet</Text>
       <Text style={styles.emptySubtext}>
-        You'll see updates about concerns here
+        You&apos;ll see updates about concerns here
       </Text>
     </View>
   );
@@ -121,7 +121,7 @@ export default function NotificationsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar style="light" backgroundColor="#1e3a8a" />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Notifications</Text>

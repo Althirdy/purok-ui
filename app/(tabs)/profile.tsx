@@ -2,9 +2,10 @@
  * Profile Screen - Purok profile, styled like citizen app profile
  */
 
-import { DesignSystem } from '@/constants/design-system';
+import { DesignSystem, scale, moderateScale } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
+import { useNotifications } from '@/context/notification-context';
 import { ProfileSkeleton } from '@/components/profile/profile-skeleton';
 import { getInitials } from '@/utils/userHelpers';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,20 +13,20 @@ import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const { colors } = DesignSystem;
+const { spacing, typography } = DesignSystem;
 
 export default function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
+  const { showToast } = useNotifications();
   const [loading, setLoading] = useState(false);
 
   useFocusEffect(
@@ -47,6 +48,15 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const handleHelpSupport = () => {
+    showToast({
+      id: 'help-support',
+      title: 'Help & Support',
+      message: 'This option will be available in a future update.',
+      severity: 'medium',
+    });
   };
 
   if (loading && !user) {
@@ -130,13 +140,10 @@ export default function ProfileScreen() {
 
         </View>
 
-        {/* Help & Support */}
         <View style={styles.section}>
           <TouchableOpacity
             style={styles.settingItemNoBorder}
-            onPress={() =>
-              Alert.alert('Help & Support', 'This option will be available in a future update.')
-            }
+            onPress={handleHelpSupport}
           >
             <View style={styles.settingItemLeft}>
               <Ionicons name="help-circle-outline" size={20} color="#1e3a8a" />
@@ -162,17 +169,17 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   appBar: {
     backgroundColor: '#1e3a8a',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingHorizontal: moderateScale(24),
+    paddingVertical: moderateScale(16),
   },
   appTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
     color: '#ffffff',
   },
   appSubtitle: {
     marginTop: 2,
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     color: '#bfdbfe',
   },
   appBarContent: {
@@ -181,9 +188,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   appBarAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: moderateScale(16),
     backgroundColor: '#e5e7eb',
     alignItems: 'center',
     justifyContent: 'center',
@@ -194,19 +201,19 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 24,
+    paddingVertical: moderateScale(32),
+    paddingHorizontal: moderateScale(24),
     backgroundColor: '#ffffff',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: scale(100),
+    height: scale(100),
+    borderRadius: scale(50),
     backgroundColor: '#1e3a8a',
     justifyContent: 'center',
     alignItems: 'center',
@@ -214,8 +221,8 @@ const styles = StyleSheet.create({
     borderColor: '#1e3a8a',
   },
   avatarText: {
-    fontSize: 36,
-    fontWeight: 'bold',
+    fontSize: typography.fontSize['5xl'],
+    fontWeight: typography.fontWeight.bold,
     color: '#ffffff',
   },
   verificationBadge: {
@@ -223,7 +230,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: scale(12),
     padding: 2,
     borderWidth: 1,
     borderColor: '#e2e8f0',

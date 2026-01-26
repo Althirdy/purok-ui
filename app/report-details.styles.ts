@@ -449,6 +449,49 @@ export const reportDetailsStyles = StyleSheet.create({
     marginTop: spacing.xs,
     textAlign: 'center',
   },
+  citizenFeedSection: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: colors.background.card,
+    borderRadius: 20,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  citizenFeedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  feedItem: {
+    backgroundColor: colors.background.secondary,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  feedCitizenName: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.primary.blue,
+    marginBottom: 2,
+  },
+  feedTimeMeta: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    marginBottom: spacing.sm,
+  },
+  feedDescription: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.primary,
+    lineHeight: 20,
+    marginBottom: spacing.sm,
+  },
+  feedImageGallery: {
+    marginTop: spacing.xs,
+  },
 });
 
 // Default export to prevent Expo Router from treating this as a route

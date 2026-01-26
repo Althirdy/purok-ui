@@ -3,14 +3,15 @@
  */
 
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { DesignSystem } from '@/constants/design-system';
+import { DesignSystem, scale, moderateScale } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNotifications } from '@/context/notification-context';
 
 const { colors, typography, spacing } = DesignSystem;
 
@@ -31,9 +32,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   logo: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: moderateScale(96),
+    height: moderateScale(96),
+    borderRadius: moderateScale(48),
     backgroundColor: '#e0f2fe',
     justifyContent: 'center',
     alignItems: 'center',
@@ -66,9 +67,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   pinBox: {
-    width: 45,
-    height: 45,
-    borderRadius: 12,
+    width: scale(45),
+    height: scale(45),
+    borderRadius: scale(12),
     backgroundColor: colors.background.secondary,
     borderWidth: 1,
     borderColor: colors.border.default,
@@ -104,6 +105,7 @@ const styles = StyleSheet.create({
 export default function LoginScreen() {
   const router = useRouter();
   const { loginWithPin, isSubmitting } = useAuth();
+  const { showToast } = useNotifications();
   const [pin, setPin] = useState<string[]>(['', '', '', '']);
   const [activeIndex, setActiveIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -158,67 +160,72 @@ export default function LoginScreen() {
   };
 
   const handleForgotPin = () => {
-    Alert.alert('Forgot PIN', 'Please contact your administrator to reset your PIN.');
+    showToast({
+      id: 'forgot-pin',
+      title: 'Forgot PIN',
+      message: 'Please contact your administrator to reset your PIN.',
+      severity: 'medium',
+    });
   };
 
   return (
     <>
-    <SafeAreaView style={globalStyles.container}>
-      <View style={styles.content}>
-        {/* Logo Section */}
-        <View style={styles.logoSection}>
-          <View style={styles.logoContainer}>
-            <View style={styles.logo}>
-              <Ionicons name="shield-checkmark" size={48} color={colors.primary.navy} />
+      <SafeAreaView style={globalStyles.container}>
+        <View style={styles.content}>
+          {/* Logo Section */}
+          <View style={styles.logoSection}>
+            <View style={styles.logoContainer}>
+              <View style={styles.logo}>
+                <Ionicons name="shield-checkmark" size={48} color={colors.primary.navy} />
+              </View>
             </View>
-          </View>
-          <Text style={styles.appName}>UrbanWatch</Text>
-          <Text style={styles.subtitle}>Purok Officials Portal</Text>
-        </View>
-
-        {/* PIN Input Section */}
-        <View style={styles.pinSection}>
-          <Text style={styles.pinLabel}>Enter your 4 digit PIN:</Text>
-          <View style={styles.pinDots}>
-            {pin.map((digit, index) => (
-              <TextInput
-                key={index}
-                ref={inputRefs[index]}
-                style={[
-                  styles.pinBox,
-                  index === activeIndex && styles.pinBoxActive,
-                  !!errorMessage && styles.pinBoxError,
-                ]}
-                value={digit}
-                onChangeText={(text) => handleChange(text, index)}
-                onFocus={() => setActiveIndex(index)}
-                onKeyPress={(e) => handleKeyPress(e, index)}
-                keyboardType="number-pad"
-                maxLength={1}
-                secureTextEntry
-                autoCorrect={false}
-                textContentType="oneTimeCode"
-                importantForAutofill="yes"
-                editable={!isSubmitting}
-              />
-            ))}
+            <Text style={styles.appName}>UrbanWatch</Text>
+            <Text style={styles.subtitle}>Purok Officials Portal</Text>
           </View>
 
-          {!!errorMessage && (
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          )}
+          {/* PIN Input Section */}
+          <View style={styles.pinSection}>
+            <Text style={styles.pinLabel}>Enter your 4 digit PIN:</Text>
+            <View style={styles.pinDots}>
+              {pin.map((digit, index) => (
+                <TextInput
+                  key={index}
+                  ref={inputRefs[index]}
+                  style={[
+                    styles.pinBox,
+                    index === activeIndex && styles.pinBoxActive,
+                    !!errorMessage && styles.pinBoxError,
+                  ]}
+                  value={digit}
+                  onChangeText={(text) => handleChange(text, index)}
+                  onFocus={() => setActiveIndex(index)}
+                  onKeyPress={(e) => handleKeyPress(e, index)}
+                  keyboardType="number-pad"
+                  maxLength={1}
+                  secureTextEntry
+                  autoCorrect={false}
+                  textContentType="oneTimeCode"
+                  importantForAutofill="yes"
+                  editable={!isSubmitting}
+                />
+              ))}
+            </View>
 
-          <TouchableOpacity onPress={handleForgotPin}>
-            <Text style={styles.forgotPin}>Forgot PIN?</Text>
-          </TouchableOpacity>
+            {!!errorMessage && (
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            )}
+
+            <TouchableOpacity onPress={handleForgotPin}>
+              <Text style={styles.forgotPin}>Forgot PIN?</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Spacer to retain original layout where numpad used to be */}
+          <View style={styles.numberPad} />
+
         </View>
-
-        {/* Spacer to retain original layout where numpad used to be */}
-        <View style={styles.numberPad} />
-
-      </View>
-    </SafeAreaView>
-    {isSubmitting && <LoadingSpinner />}
+      </SafeAreaView>
+      {isSubmitting && <LoadingSpinner />}
     </>
   );
 }

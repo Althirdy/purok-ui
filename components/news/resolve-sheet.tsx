@@ -4,9 +4,7 @@ import {
   formatReportId,
   formatDateReadable,
   formatTime12Hour,
-  getCategory,
   getSeverityColor,
-  getStatusText,
   cleanTitle,
 } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
@@ -91,7 +89,7 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
           </View>
 
           {/* Report Insights */}
-          <ScrollView 
+          <ScrollView
             style={styles.insightsContainer}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled={true}
@@ -125,16 +123,16 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
             {report.images && report.images.length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>Photos from citizen</Text>
-                <ScrollView 
-                  horizontal 
+                <ScrollView
+                  horizontal
                   showsHorizontalScrollIndicator={false}
                   style={styles.imageGallery}
                   contentContainerStyle={styles.imageGalleryContent}
                 >
                   {report.images.map((imageUrl, index) => (
                     <View key={index} style={styles.imageContainer}>
-                      <Image 
-                        source={{ uri: imageUrl }} 
+                      <Image
+                        source={{ uri: imageUrl }}
                         style={styles.image}
                         resizeMode="cover"
                       />
@@ -197,17 +195,17 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
               </View>
               {report.source && (
                 <View style={styles.infoItem}>
-                  <Ionicons 
-                    name={report.source === 'citizen' ? 'people' : report.source === 'sensor' ? 'hardware-chip' : 'videocam'} 
-                    size={18} 
-                    color={colors.text.secondary} 
+                  <Ionicons
+                    name={report.source === 'citizen' ? 'people' : report.source === 'sensor' ? 'hardware-chip' : 'videocam'}
+                    size={18}
+                    color={colors.text.secondary}
                   />
                   <Text style={styles.infoLabel}>Source</Text>
                   <Text style={styles.infoValue}>
-                    {report.source === 'sensor' ? 'Sensor Box' : 
-                     report.source === 'cctv' ? 'CCTV' : 
-                     report.source === 'citizen' ? 'Citizen' : 
-                     report.source}
+                    {report.source === 'sensor' ? 'Sensor Box' :
+                      report.source === 'cctv' ? 'CCTV' :
+                        report.source === 'citizen' ? 'Citizen' :
+                          report.source}
                   </Text>
                 </View>
               )}

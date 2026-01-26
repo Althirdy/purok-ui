@@ -6,7 +6,7 @@ import { DesignSystem } from '@/constants/design-system';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
 
-const { colors, typography, spacing, borderRadius, shadows } = DesignSystem;
+const { colors, typography, spacing, borderRadius } = DesignSystem;
 
 interface ButtonProps {
   title: string;
@@ -72,85 +72,85 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: borderRadius.md,
   },
-  
+
   // Variants
   primary: {
     backgroundColor: colors.accent.orange,
   },
-  
+
   secondary: {
     backgroundColor: colors.background.secondary,
     borderWidth: 1,
     borderColor: colors.neutral.gray600,
   },
-  
+
   outline: {
     backgroundColor: 'transparent',
     borderWidth: 2,
     borderColor: colors.accent.orange,
   },
-  
+
   // Sizes
   size_small: {
     height: 36,
     paddingHorizontal: spacing.md,
   },
-  
+
   size_medium: {
     height: 48,
     paddingHorizontal: spacing.lg,
   },
-  
+
   size_large: {
     height: 56,
     paddingHorizontal: spacing.xl,
   },
-  
+
   // States
   disabled: {
     opacity: 0.5,
   },
-  
+
   fullWidth: {
     width: '100%',
   },
-  
+
   // Content
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  
+
   iconContainer: {
     marginRight: spacing.sm,
   },
-  
+
   // Text Styles
   text: {
     fontWeight: typography.fontWeight.semibold,
   },
-  
+
   text_primary: {
     color: colors.text.inverse,
   },
-  
+
   text_secondary: {
     color: colors.text.primary,
   },
-  
+
   text_outline: {
     color: colors.accent.orange,
   },
-  
+
   text_size_small: {
     fontSize: typography.fontSize.sm,
   },
-  
+
   text_size_medium: {
     fontSize: typography.fontSize.base,
   },
-  
+
   text_size_large: {
     fontSize: typography.fontSize.lg,
   },

@@ -1,12 +1,6 @@
-/**
- * Reusable Card Component
- */
-
-import { DesignSystem } from '@/constants/design-system';
+// Reusable Card Component
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
-
-const { colors, spacing, borderRadius, shadows } = DesignSystem;
 
 interface CardProps {
   children: React.ReactNode;
@@ -39,7 +33,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
-  
+
   elevated: {
     borderWidth: 2,
     borderColor: '#e2e8f0',

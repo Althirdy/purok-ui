@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { ImageViewer } from '@/components/ui/image-viewer';
 import MapView, { Marker } from 'react-native-maps';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -14,7 +14,7 @@ import {
 } from '@/utils/reportHelpers';
 import { reportDetailsStyles as styles } from '@/app/report-details.styles';
 
-const { colors, spacing, typography } = DesignSystem;
+const { colors, spacing } = DesignSystem;
 
 type StatusStep = {
   key: EmergencyReport['status'];
@@ -29,13 +29,13 @@ interface ReportDetailsBodyProps {
   isPlaying: boolean;
   coords: { latitude: number; longitude: number } | null;
   mapRegion:
-    | {
-        latitude: number;
-        longitude: number;
-        latitudeDelta: number;
-        longitudeDelta: number;
-      }
-    | null;
+  | {
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  }
+  | null;
   onAcknowledge: () => Promise<void>;
   onResolve: () => Promise<void>;
   onMapPress: () => void;
@@ -100,81 +100,118 @@ export function ReportDetailsBody({
         report.reportType === 'voice' ||
         report.title?.toLowerCase().includes('voice concern') ||
         report.description?.toLowerCase().includes('audio recording')) && (
-        <>
-          {/* Voice Recording */}
-          <Animated.View entering={FadeInDown.delay(250).duration(500)} style={styles.section}>
-            <Text style={styles.sectionLabel}>Voice Recording</Text>
-            <View style={styles.audioSection}>
-              <View style={styles.audioPlayer}>
-                {report.audio ? (
-                  <>
-                    <TouchableOpacity
-                      style={styles.audioButton}
-                      onPress={isPlaying ? onStopAudio : onPlayAudio}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={isPlaying ? 'pause' : 'play'}
-                        size={24}
-                        color={colors.text.inverse}
-                      />
-                    </TouchableOpacity>
-                    <View style={styles.audioInfo}>
-                      <Text style={styles.audioLabel}>Voice Recording</Text>
-                      <Text style={styles.audioUrl} numberOfLines={1}>
-                        {report.audio}
-                      </Text>
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    <View
-                      style={[styles.audioButton, { backgroundColor: colors.neutral.gray600 }]}
-                    >
-                      <Ionicons name="mic" size={24} color={colors.text.inverse} />
-                    </View>
-                    <View style={styles.audioInfo}>
-                      <Text style={styles.audioLabel}>Voice Recording</Text>
-                      <Text style={styles.audioUrl}>Audio file not available yet</Text>
-                    </View>
-                  </>
-                )}
-              </View>
-            </View>
-          </Animated.View>
-
-          {/* Voice Transcript */}
-          <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.section}>
-            <View style={styles.transcriptHeader}>
-              <Ionicons name="document-text-outline" size={18} color={colors.primary.blue} />
-              <Text style={styles.sectionLabel}>Voice Transcript</Text>
-            </View>
-            {report.transcript ? (
-              <View style={styles.transcriptBox}>
-                <Text style={styles.transcriptText}>{report.transcript}</Text>
-              </View>
-            ) : report.transcriptionStatus === 'failed' ? (
-              <View style={styles.transcriptErrorBox}>
-                <Ionicons name="alert-circle-outline" size={24} color={colors.semantic.error} />
-                <Text style={styles.transcriptErrorText}>
-                  We were unable to transcribe this audio recording.
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.transcriptProcessingBox}>
-                <View style={styles.transcriptProcessingIcon}>
-                  <ActivityIndicator size="small" color={colors.primary.blue} />
+          <>
+            {/* Voice Recording */}
+            <Animated.View entering={FadeInDown.delay(250).duration(500)} style={styles.section}>
+              <Text style={styles.sectionLabel}>Voice Recording</Text>
+              <View style={styles.audioSection}>
+                <View style={styles.audioPlayer}>
+                  {report.audio ? (
+                    <>
+                      <TouchableOpacity
+                        style={styles.audioButton}
+                        onPress={isPlaying ? onStopAudio : onPlayAudio}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name={isPlaying ? 'pause' : 'play'}
+                          size={24}
+                          color={colors.text.inverse}
+                        />
+                      </TouchableOpacity>
+                      <View style={styles.audioInfo}>
+                        <Text style={styles.audioLabel}>Voice Recording</Text>
+                        <Text style={styles.audioUrl} numberOfLines={1}>
+                          {report.audio}
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View
+                        style={[styles.audioButton, { backgroundColor: colors.neutral.gray600 }]}
+                      >
+                        <Ionicons name="mic" size={24} color={colors.text.inverse} />
+                      </View>
+                      <View style={styles.audioInfo}>
+                        <Text style={styles.audioLabel}>Voice Recording</Text>
+                        <Text style={styles.audioUrl}>Audio file not available yet</Text>
+                      </View>
+                    </>
+                  )}
                 </View>
-                <View style={styles.transcriptProcessingContent}>
-                  <Text style={styles.transcriptProcessingTitle}>Processing Transcript</Text>
-                  <Text style={styles.transcriptProcessingText}>
-                    Your voice recording is being transcribed. This usually takes a few moments...
+              </View>
+            </Animated.View>
+
+            {/* Voice Transcript */}
+            <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.section}>
+              <View style={styles.transcriptHeader}>
+                <Ionicons name="document-text-outline" size={18} color={colors.primary.blue} />
+                <Text style={styles.sectionLabel}>Voice Transcript</Text>
+              </View>
+              {report.transcript ? (
+                <View style={styles.transcriptBox}>
+                  <Text style={styles.transcriptText}>{report.transcript}</Text>
+                </View>
+              ) : report.transcriptionStatus === 'failed' ? (
+                <View style={styles.transcriptErrorBox}>
+                  <Ionicons name="alert-circle-outline" size={24} color={colors.semantic.error} />
+                  <Text style={styles.transcriptErrorText}>
+                    We were unable to transcribe this audio recording.
                   </Text>
                 </View>
-              </View>
-            )}
-          </Animated.View>
-        </>
+              ) : (
+                <View style={styles.transcriptProcessingBox}>
+                  <View style={styles.transcriptProcessingIcon}>
+                    <ActivityIndicator size="small" color={colors.primary.blue} />
+                  </View>
+                  <View style={styles.transcriptProcessingContent}>
+                    <Text style={styles.transcriptProcessingTitle}>Processing Transcript</Text>
+                    <Text style={styles.transcriptProcessingText}>
+                      Your voice recording is being transcribed. This usually takes a few moments...
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </Animated.View>
+          </>
+        )}
+
+      {/* Citizen Feed (Merged Reports) */}
+      {report.relatedReports && report.relatedReports.length > 0 && (
+        <Animated.View entering={FadeInDown.delay(320).duration(500)} style={styles.citizenFeedSection}>
+          <View style={styles.citizenFeedHeader}>
+            <Ionicons name="people" size={20} color={colors.primary.blue} />
+            <Text style={styles.sectionLabel}>More reports for this incident</Text>
+          </View>
+
+          {report.relatedReports.map((item, index) => (
+            <View key={item.id.toString()} style={styles.feedItem}>
+              <Text style={styles.feedCitizenName}>{item.citizen_name || 'Anonymous citizen'}</Text>
+              <Text style={styles.feedTimeMeta}>
+                Reported {formatDateReadable(new Date(item.created_at))} {formatTime12Hour(new Date(item.created_at))}
+              </Text>
+              <Text style={styles.feedDescription}>{item.description}</Text>
+
+              {item.images && item.images.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.feedImageGallery}>
+                  {item.images.map((img, imgIdx) => (
+                    <TouchableOpacity
+                      key={imgIdx}
+                      onPress={() => {
+                        // For simplicity, we just use the first image for now or append to viewer
+                        // In a real app, we'd handle this better
+                      }}
+                      style={[styles.imageContainer, { width: 80, height: 80 }]}
+                    >
+                      <Image source={{ uri: img }} style={styles.image} resizeMode="cover" />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          ))}
+        </Animated.View>
       )}
 
       {/* Images Gallery */}
@@ -188,8 +225,8 @@ export function ReportDetailsBody({
             contentContainerStyle={styles.imageGalleryContent}
           >
             {report.images.map((imageUrl, index) => (
-              <Pressable 
-                key={index} 
+              <Pressable
+                key={index}
                 style={styles.imageContainer}
                 onPress={() => handleImagePress(index)}
               >

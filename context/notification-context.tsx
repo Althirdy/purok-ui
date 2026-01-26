@@ -2,6 +2,7 @@
  * Notification Context - Manages in-app notifications from alerts and reports
  */
 
+import { Toast, type ToastData } from '@/components/common/toast';
 import { createNotificationFromReport } from '@/services/notification-service';
 import type { EmergencyReport } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,6 +29,9 @@ interface NotificationContextType {
   deleteNotification: (notificationId: string) => void;
   unreadCount: number;
   clearAll: () => void;
+  // Toast
+  showToast: (toast: ToastData) => void;
+  activeToast: ToastData | null;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -36,6 +40,7 @@ const NOTIFICATIONS_STORAGE_KEY = '@urbanwatch:notifications';
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [activeToast, setActiveToast] = useState<ToastData | null>(null);
 
   // Load notifications from storage on mount
   useEffect(() => {
@@ -129,6 +134,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  const showToast = useCallback((toast: ToastData) => {
+    setActiveToast(toast);
+  }, []);
+
+  const dismissToast = useCallback(() => {
+    setActiveToast(null);
+  }, []);
+
   return (
     <NotificationContext.Provider
       value={{
@@ -140,9 +153,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         deleteNotification,
         unreadCount,
         clearAll,
+        showToast,
+        activeToast,
       }}
     >
       {children}
+      <Toast toast={activeToast} onDismiss={dismissToast} />
     </NotificationContext.Provider>
   );
 }

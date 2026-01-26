@@ -42,7 +42,7 @@ interface ImageViewerProps {
 
 export function ImageViewer({ images, initialIndex = 0, visible, onClose }: ImageViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  
+
   // Animation values
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -64,7 +64,7 @@ export function ImageViewer({ images, initialIndex = 0, visible, onClose }: Imag
       savedTranslateY.value = 0;
       opacity.value = 1;
     }
-  }, [visible, initialIndex]);
+  }, [visible, initialIndex, opacity, savedScale, savedTranslateX, savedTranslateY, scale, translateX, translateY]);
 
   const resetTransforms = useCallback(() => {
     'worklet';
@@ -74,7 +74,7 @@ export function ImageViewer({ images, initialIndex = 0, visible, onClose }: Imag
     translateY.value = withSpring(0);
     savedTranslateX.value = 0;
     savedTranslateY.value = 0;
-  }, []);
+  }, [savedScale, savedTranslateX, savedTranslateY, scale, translateX, translateY]);
 
   const handleClose = useCallback(() => {
     onClose();
@@ -122,7 +122,7 @@ export function ImageViewer({ images, initialIndex = 0, visible, onClose }: Imag
       if (savedScale.value <= 1) {
         translateY.value = event.translationY;
         opacity.value = 1 - Math.abs(event.translationY) / 400;
-        
+
         // Horizontal swipe for navigation
         translateX.value = event.translationX;
       } else {
@@ -145,7 +145,7 @@ export function ImageViewer({ images, initialIndex = 0, visible, onClose }: Imag
           );
           return;
         }
-        
+
         // Navigate on horizontal swipe
         if (Math.abs(event.translationX) > 100 && Math.abs(event.velocityX) > 500) {
           if (event.translationX > 0) {
@@ -154,7 +154,7 @@ export function ImageViewer({ images, initialIndex = 0, visible, onClose }: Imag
             runOnJS(goToNextImage)();
           }
         }
-        
+
         // Reset position
         translateY.value = withSpring(0);
         translateX.value = withSpring(0);

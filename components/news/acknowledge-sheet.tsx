@@ -10,7 +10,6 @@ import {
   formatReportId,
   formatDateReadable,
   formatTime12Hour,
-  getCategory,
   getSeverityColor,
   cleanTitle,
 } from '@/utils/reportHelpers';
@@ -96,7 +95,7 @@ export function AcknowledgeSheet({ visible, report, onConfirm, onCancel }: Ackno
           </View>
 
           {/* Report Insights */}
-          <ScrollView 
+          <ScrollView
             style={styles.insightsContainer}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled={true}
@@ -130,16 +129,16 @@ export function AcknowledgeSheet({ visible, report, onConfirm, onCancel }: Ackno
             {report.images && report.images.length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>Photos from citizen</Text>
-                <ScrollView 
-                  horizontal 
+                <ScrollView
+                  horizontal
                   showsHorizontalScrollIndicator={false}
                   style={styles.imageGallery}
                   contentContainerStyle={styles.imageGalleryContent}
                 >
                   {report.images.map((imageUrl, index) => (
                     <View key={index} style={styles.imageContainer}>
-                      <Image 
-                        source={{ uri: imageUrl }} 
+                      <Image
+                        source={{ uri: imageUrl }}
                         style={styles.image}
                         resizeMode="cover"
                       />
