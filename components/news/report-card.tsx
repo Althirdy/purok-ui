@@ -170,7 +170,7 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
           </View>
           <Text style={styles.followUpBannerText}>
             <Text style={styles.followUpCount}>{report.relatedReportsCount}</Text>
-            {' '}related report{report.relatedReportsCount > 1 ? 's' : ''} merged
+            {' '}related concern{report.relatedReportsCount > 1 ? 's' : ''}
           </Text>
           <Ionicons name="chevron-forward" size={16} color="#64748b" />
         </View>

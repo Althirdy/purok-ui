@@ -130,20 +130,19 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
-    marginBottom: 6,
-    color: '#1e293b',
-    letterSpacing: -0.5,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+    color: '#64748b',
   },
   subtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 20,
+    fontSize: 13,
+    color: '#94a3b8',
+    lineHeight: 18,
   },
   // Center Container States
   centerContainer: {

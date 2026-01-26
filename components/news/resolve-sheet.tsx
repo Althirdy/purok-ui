@@ -65,6 +65,14 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
     longitudeDelta: 0.01,
   } : null;
 
+  // Filter only actual image files (exclude audio files like .m4a, .mp3, .wav)
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic', '.heif'];
+  const validImages = report.images?.filter((url) => {
+    if (!url || typeof url !== 'string') return false;
+    const lowerUrl = url.toLowerCase();
+    return imageExtensions.some((ext) => lowerUrl.includes(ext));
+  }) || [];
+
   return (
     <Modal
       visible={visible}
@@ -122,16 +130,16 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
             )}
 
             {/* Images Gallery */}
-            {report.images && report.images.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Photos from citizen</Text>
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Photos from citizen</Text>
+              {validImages.length > 0 ? (
                 <ScrollView 
                   horizontal 
                   showsHorizontalScrollIndicator={false}
                   style={styles.imageGallery}
                   contentContainerStyle={styles.imageGalleryContent}
                 >
-                  {report.images.map((imageUrl, index) => (
+                  {validImages.map((imageUrl, index) => (
                     <View key={index} style={styles.imageContainer}>
                       <Image 
                         source={{ uri: imageUrl }} 
@@ -141,8 +149,14 @@ export function ResolveSheet({ visible, report, onConfirm, onCancel }: ResolveSh
                     </View>
                   ))}
                 </ScrollView>
-              </View>
-            )}
+              ) : (
+                <View style={styles.noImageContainer}>
+                  <Ionicons name="image-outline" size={32} color={colors.neutral.gray400} />
+                  <Text style={styles.noImageText}>No photos attached</Text>
+                  <Text style={styles.noImageSubtext}>The citizen did not include any photos</Text>
+                </View>
+              )}
+            </View>
 
             {/* Location with Map */}
             <View style={styles.section}>
@@ -399,6 +413,28 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
+  },
+  noImageContainer: {
+    backgroundColor: colors.background.secondary,
+    borderRadius: 12,
+    padding: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    borderStyle: 'dashed',
+  },
+  noImageText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.secondary,
+    marginTop: spacing.sm,
+  },
+  noImageSubtext: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
+    marginTop: spacing.xs,
+    textAlign: 'center',
   },
   locationCard: {
     backgroundColor: colors.background.secondary,
