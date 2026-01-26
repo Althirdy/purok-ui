@@ -10,76 +10,83 @@ import { StyleSheet } from 'react-native';
 const { colors, typography, spacing, borderRadius } = DesignSystem;
 
 export const mapStyles = StyleSheet.create({
-  header: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.background.primary,
-  },
-  headerTopRow: {
+  // Floating Stats Card - Glass-like card at top of map
+  floatingStatsCard: {
+    position: 'absolute',
+    top: spacing.md,
+    left: spacing.md,
+    right: spacing.md + 52, // Leave space for refresh button
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.secondary,
-    fontFamily: Fonts.rounded,
-  },
-  headerSubtitle: {
-    marginTop: 4,
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-  },
-  headerActions: {
-    padding: 10,
-    borderRadius: 16,
-    backgroundColor: colors.background.secondary,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 5,
     borderWidth: 1,
-    borderColor: colors.border.light,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
   },
-  refreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f1f5f9',
+  floatingStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  floatingStatIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 8,
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 6,
-    flexWrap: 'wrap',
+  floatingStatContent: {
+    flexDirection: 'column',
   },
-  statBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#dbeafe',
-    gap: 4,
+  floatingStatNumber: {
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 18,
   },
-  statBadgeText: {
-    fontSize: 12,
+  floatingStatLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#64748b',
+    letterSpacing: 0.2,
+  },
+  floatingStatDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#e2e8f0',
+    marginHorizontal: 10,
+  },
+  floatingVerifiedText: {
+    fontSize: 11,
     fontWeight: '600',
-    color: '#3B82F6',
+    color: '#059669',
   },
-  verifiedBadge: {
-    flexDirection: 'row',
+  floatingRefreshButton: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#d1fae5',
-    gap: 4,
-  },
-  verifiedBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#10B981',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
   },
 
   // Info Card

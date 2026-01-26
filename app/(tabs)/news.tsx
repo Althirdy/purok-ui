@@ -11,7 +11,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import React, { useEffect, useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { PostCard } from '@/components/news/PostCard';
 
 export default function NewsScreen() {
@@ -41,12 +40,16 @@ export default function NewsScreen() {
     }
   }, [posts, setPosts]);
 
+  // Subtle branded header
   const renderHeader = () => (
-    <View style={styles.headerContainer}>
-      <Text style={styles.title}>Safety News</Text>
-      <Text style={styles.subtitle}>
-        Stay informed about safety updates and alerts
-      </Text>
+    <View style={styles.headerSection}>
+      <View style={styles.headerIconContainer}>
+        <Ionicons name="newspaper" size={18} color="#1e3a8a" />
+      </View>
+      <View style={styles.headerTextContainer}>
+        <Text style={styles.headerTitle}>Safety News</Text>
+        <Text style={styles.headerSubtitle}>Updates & alerts from your community</Text>
+      </View>
     </View>
   );
 
@@ -96,7 +99,7 @@ export default function NewsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
       <FlashList
         data={posts}
         renderItem={({ item }) => <PostCard post={item} />}
@@ -116,7 +119,7 @@ export default function NewsScreen() {
         onEndReachedThreshold={0.5}
         estimatedItemSize={150}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -126,23 +129,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   listContent: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
     paddingBottom: 20,
   },
-  headerContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 12,
+  // Subtle Header Section
+  headerSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
   },
-  title: {
+  headerIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#dbeafe',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  headerTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 2,
-    color: '#64748b',
+    fontWeight: '700',
+    color: '#1e293b',
+    letterSpacing: -0.3,
   },
-  subtitle: {
-    fontSize: 13,
-    color: '#94a3b8',
-    lineHeight: 18,
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
   },
   // Center Container States
   centerContainer: {

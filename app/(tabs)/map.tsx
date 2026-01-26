@@ -30,7 +30,6 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polygon } from 'react-native-maps';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors } = DesignSystem;
 
@@ -354,57 +353,8 @@ export default function MapScreen() {
   }, [cctvAccidents, zoomToCoordinates]);
 
   return (
-    <SafeAreaView style={globalStyles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerTopRow}>
-          <Text style={styles.headerTitle}>Incident Map</Text>
-          <TouchableOpacity 
-            style={styles.refreshButton} 
-            onPress={handleRefresh}
-            disabled={loading || refreshing}
-          >
-            <Ionicons 
-              name="refresh" 
-              size={20} 
-              color={loading || refreshing ? colors.text.secondary : colors.primary.blue} 
-            />
-          </TouchableOpacity>
-        </View>
-        
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          {/* Citizen Concerns Badge - Clickable to zoom */}
-          <TouchableOpacity 
-            style={styles.statBadge}
-            onPress={handleCitizenBadgePress}
-            activeOpacity={0.7}
-            disabled={citizenCount === 0}
-          >
-            <Ionicons name="people" size={14} color="#3B82F6" />
-            <Text style={styles.statBadgeText}>{citizenCount} Citizen</Text>
-          </TouchableOpacity>
-          
-          {/* CCTV Accidents Badge - Clickable to zoom */}
-          <TouchableOpacity 
-            style={[styles.statBadge, { backgroundColor: '#FEF3C7' }]}
-            onPress={handleCctvBadgePress}
-            activeOpacity={0.7}
-            disabled={cctvCount === 0}
-          >
-            <Ionicons name="videocam" size={14} color="#D97706" />
-            <Text style={[styles.statBadgeText, { color: '#D97706' }]}>{cctvCount} CCTV</Text>
-          </TouchableOpacity>
-          
-          {/* Verified Badge - Info only */}
-          <View style={styles.verifiedBadge}>
-            <Ionicons name="shield-checkmark" size={14} color="#10B981" />
-            <Text style={styles.verifiedBadgeText}>Verified Only</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Map */}
+    <View style={globalStyles.container}>
+      {/* Full Screen Map */}
       <View style={{ flex: 1 }}>
         <MapView
           ref={mapRef}
@@ -447,7 +397,65 @@ export default function MapScreen() {
           </View>
         )}
 
+        {/* Floating Stats Card */}
+        <View style={styles.floatingStatsCard}>
+          <TouchableOpacity 
+            style={styles.floatingStatItem}
+            onPress={handleCitizenBadgePress}
+            activeOpacity={0.7}
+            disabled={citizenCount === 0}
+          >
+            <View style={[styles.floatingStatIcon, { backgroundColor: '#DBEAFE' }]}>
+              <Ionicons name="people" size={14} color="#2563EB" />
+            </View>
+            <View style={styles.floatingStatContent}>
+              <Text style={[styles.floatingStatNumber, { color: '#2563EB' }]}>{citizenCount}</Text>
+              <Text style={styles.floatingStatLabel}>Citizen</Text>
+            </View>
+          </TouchableOpacity>
+          
+          <View style={styles.floatingStatDivider} />
+          
+          <TouchableOpacity 
+            style={styles.floatingStatItem}
+            onPress={handleCctvBadgePress}
+            activeOpacity={0.7}
+            disabled={cctvCount === 0}
+          >
+            <View style={[styles.floatingStatIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="videocam" size={14} color="#D97706" />
+            </View>
+            <View style={styles.floatingStatContent}>
+              <Text style={[styles.floatingStatNumber, { color: '#D97706' }]}>{cctvCount}</Text>
+              <Text style={styles.floatingStatLabel}>CCTV</Text>
+            </View>
+          </TouchableOpacity>
+          
+          <View style={styles.floatingStatDivider} />
+          
+          <View style={styles.floatingStatItem}>
+            <View style={[styles.floatingStatIcon, { backgroundColor: '#D1FAE5' }]}>
+              <Ionicons name="shield-checkmark" size={12} color="#059669" />
+            </View>
+            <Text style={styles.floatingVerifiedText}>Verified</Text>
+          </View>
+        </View>
+
+        {/* Floating Refresh Button */}
+        <TouchableOpacity 
+          style={styles.floatingRefreshButton}
+          onPress={handleRefresh}
+          disabled={loading || refreshing}
+          activeOpacity={0.8}
+        >
+          <Ionicons 
+            name="refresh" 
+            size={20} 
+            color={loading || refreshing ? '#94a3b8' : '#1e3a8a'} 
+          />
+        </TouchableOpacity>
+
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
