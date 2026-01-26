@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ImageViewer } from '@/components/ui/image-viewer';
+import { RejectSheet } from '@/components/news/reject-sheet';
 import MapView, { Marker } from 'react-native-maps';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,6 +39,7 @@ interface ReportDetailsBodyProps {
     | null;
   onAcknowledge: (remarks?: string) => void;
   onResolve: (remarks?: string) => void;
+  onReject: (reason: string) => void;
   onMapPress: () => void;
   onPlayAudio: () => Promise<void>;
   onStopAudio: () => Promise<void>;
@@ -54,6 +56,7 @@ export function ReportDetailsBody({
   mapRegion,
   onAcknowledge,
   onResolve,
+  onReject,
   onMapPress,
   onPlayAudio,
   onStopAudio,
@@ -62,6 +65,7 @@ export function ReportDetailsBody({
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [showAllUpdates, setShowAllUpdates] = useState(false);
   const [remarks, setRemarks] = useState('');
+  const [rejectSheetVisible, setRejectSheetVisible] = useState(false);
 
   const handleImagePress = (index: number) => {
     setSelectedImageIndex(index);
@@ -484,31 +488,46 @@ export function ReportDetailsBody({
             </View>
           </View>
 
-          {/* Action Button */}
-          {report.status === 'pending' && (
-            <TouchableOpacity 
-              style={styles.actionButton} 
-              activeOpacity={0.8} 
-              onPress={() => {
-                onAcknowledge(remarks.trim() || undefined);
-                setRemarks('');
-              }}
-            >
-              <Text style={styles.actionButtonText}>Acknowledge</Text>
-            </TouchableOpacity>
-          )}
-          {report.status === 'acknowledged' && (
+          {/* Action Buttons */}
+          <View style={actionButtonStyles.buttonRow}>
+            {/* Reject Button */}
             <TouchableOpacity
-              style={[styles.actionButton, styles.actionButtonResolve]}
+              style={actionButtonStyles.rejectButton}
               activeOpacity={0.8}
-              onPress={() => {
-                onResolve(remarks.trim() || undefined);
-                setRemarks('');
-              }}
+              onPress={() => setRejectSheetVisible(true)}
             >
-              <Text style={styles.actionButtonText}>Mark as Resolved</Text>
+              <Ionicons name="close-circle" size={18} color={colors.semantic.error} />
+              <Text style={actionButtonStyles.rejectButtonText}>Reject</Text>
             </TouchableOpacity>
-          )}
+
+            {/* Primary Action Button */}
+            {report.status === 'pending' && (
+              <TouchableOpacity 
+                style={actionButtonStyles.primaryButton} 
+                activeOpacity={0.8} 
+                onPress={() => {
+                  onAcknowledge(remarks.trim() || undefined);
+                  setRemarks('');
+                }}
+              >
+                <Ionicons name="checkmark-circle" size={18} color={colors.text.inverse} />
+                <Text style={actionButtonStyles.primaryButtonText}>Acknowledge</Text>
+              </TouchableOpacity>
+            )}
+            {report.status === 'acknowledged' && (
+              <TouchableOpacity
+                style={[actionButtonStyles.primaryButton, actionButtonStyles.resolveButton]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  onResolve(remarks.trim() || undefined);
+                  setRemarks('');
+                }}
+              >
+                <Ionicons name="checkmark-done-circle" size={18} color={colors.text.inverse} />
+                <Text style={actionButtonStyles.primaryButtonText}>Mark as Resolved</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </Animated.View>
       )}
 
@@ -518,9 +537,39 @@ export function ReportDetailsBody({
           entering={FadeInUp.delay(580).duration(500)}
           style={[styles.section, { marginBottom: spacing.lg }]}
         >
-          <Text style={styles.resolvedText}>Report resolved</Text>
+          <View style={statusBannerStyles.resolvedBanner}>
+            <Ionicons name="checkmark-circle" size={24} color={colors.semantic.success} />
+            <Text style={statusBannerStyles.resolvedText}>Report resolved</Text>
+          </View>
         </Animated.View>
       )}
+
+      {/* Rejected Status */}
+      {report.status === 'rejected' && (
+        <Animated.View
+          entering={FadeInUp.delay(580).duration(500)}
+          style={[styles.section, { marginBottom: spacing.lg }]}
+        >
+          <View style={statusBannerStyles.rejectedBanner}>
+            <Ionicons name="close-circle" size={24} color={colors.semantic.error} />
+            <View style={statusBannerStyles.rejectedTextContainer}>
+              <Text style={statusBannerStyles.rejectedText}>Report rejected</Text>
+              <Text style={statusBannerStyles.rejectedSubtext}>This concern was marked as invalid</Text>
+            </View>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Reject Sheet Modal */}
+      <RejectSheet
+        visible={rejectSheetVisible}
+        report={report}
+        onConfirm={(reason) => {
+          onReject(reason);
+          setRejectSheetVisible(false);
+        }}
+        onCancel={() => setRejectSheetVisible(false)}
+      />
     </ScrollView>
   );
 }
@@ -645,4 +694,88 @@ const followUpStyles = StyleSheet.create({
   },
 });
 
+// Styles for Action Buttons (new layout with reject)
+const actionButtonStyles = StyleSheet.create({
+  buttonRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  rejectButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: 16,
+    backgroundColor: colors.semantic.error + '10',
+    borderWidth: 1,
+    borderColor: colors.semantic.error + '30',
+    gap: spacing.xs,
+  },
+  rejectButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.semantic.error,
+  },
+  primaryButton: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: 16,
+    backgroundColor: colors.primary.blue,
+    gap: spacing.xs,
+  },
+  resolveButton: {
+    backgroundColor: colors.semantic.success,
+  },
+  primaryButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.inverse,
+  },
+});
+
+// Styles for Status Banners
+const statusBannerStyles = StyleSheet.create({
+  resolvedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.semantic.success + '15',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 12,
+    gap: spacing.sm,
+  },
+  resolvedText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.semantic.success,
+  },
+  rejectedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.semantic.error + '10',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 12,
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.semantic.error + '20',
+  },
+  rejectedTextContainer: {
+    flex: 1,
+  },
+  rejectedText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.semantic.error,
+  },
+  rejectedSubtext: {
+    fontSize: typography.fontSize.sm,
+    color: colors.semantic.error + 'CC',
+    marginTop: 2,
+  },
+});
 

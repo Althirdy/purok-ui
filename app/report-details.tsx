@@ -158,6 +158,18 @@ export default function ReportDetailsScreen() {
     }
   }, [report, updateReportStatus]);
 
+  // Handle reject with reason (called from body)
+  const handleReject = useCallback(async (rejectionReason: string) => {
+    if (report && (report.status === 'pending' || report.status === 'acknowledged')) {
+      try {
+        await updateReportStatus(report.id, 'rejected', undefined, rejectionReason);
+        setReport(prev => (prev ? { ...prev, status: 'rejected' } : prev));
+      } catch (error) {
+        console.error('Failed to reject report:', error);
+      }
+    }
+  }, [report, updateReportStatus]);
+
   const handleMapPress = () => {
     if (report && coords) {
       router.push({
@@ -304,6 +316,7 @@ export default function ReportDetailsScreen() {
         mapRegion={mapRegion}
         onAcknowledge={handleAcknowledge}
         onResolve={handleResolve}
+        onReject={handleReject}
         onMapPress={handleMapPress}
         onPlayAudio={playAudio}
         onStopAudio={stopAudio}

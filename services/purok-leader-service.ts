@@ -112,8 +112,9 @@ export async function fetchAssignedConcernDetail(token: string, id: number | str
 }
 
 interface UpdateStatusRequest {
-  status: 'pending' | 'ongoing' | 'escalated' | 'resolved';
+  status: 'pending' | 'ongoing' | 'escalated' | 'resolved' | 'rejected';
   remarks?: string; // Optional remarks/notes about the status update
+  rejection_reason?: string; // Required when status is 'rejected'
 }
 
 interface UpdateStatusResponse {
@@ -129,10 +130,11 @@ export async function updateAssignedConcernStatus(
   id: number | string,
   status: UpdateStatusRequest['status'],
   remarks?: string,
+  rejectionReason?: string,
 ): Promise<UpdateStatusResponse> {
   try {
     // Validate status value (must be one of the allowed values)
-    const allowedStatuses: Array<UpdateStatusRequest['status']> = ['pending', 'ongoing', 'escalated', 'resolved'];
+    const allowedStatuses: Array<UpdateStatusRequest['status']> = ['pending', 'ongoing', 'escalated', 'resolved', 'rejected'];
     if (!allowedStatuses.includes(status)) {
       throw new Error(`Invalid status: ${status}. Must be one of: ${allowedStatuses.join(', ')}`);
     }
@@ -143,12 +145,32 @@ export async function updateAssignedConcernStatus(
       'resolved': 'The concern has been resolved',
       'escalated': 'The concern has been escalated',
       'pending': 'The concern is pending',
+      'rejected': 'The concern has been rejected',
     };
     
     const requestBody: UpdateStatusRequest = {
       status,
       remarks: remarks || defaultRemarks[status] || `Status updated to ${status}`,
     };
+    
+    // Add rejection_reason if status is rejected (required by backend validation)
+    if (status === 'rejected') {
+      // Ensure rejection_reason is always a non-empty string
+      const finalRejectionReason = rejectionReason?.trim() || 'Rejected by Purok Leader';
+      if (!finalRejectionReason || finalRejectionReason.length === 0) {
+        throw new Error('Rejection reason is required when rejecting a concern');
+      }
+      // Only add rejection_reason if it's a valid non-empty string
+      if (finalRejectionReason && finalRejectionReason.length > 0) {
+        requestBody.rejection_reason = finalRejectionReason;
+      }
+      console.log('[PurokLeaderService] Rejection reason set:', {
+        provided: rejectionReason,
+        final: finalRejectionReason,
+        length: finalRejectionReason.length,
+        willBeSent: !!requestBody.rejection_reason,
+      });
+    }
     
     // Validate token format (should be like "43|49p1hlHznzJlbnq0M67IIVH5JGht6ituU3QSYEI97e4e4a12")
     if (!token || token.trim().length === 0) {
@@ -172,6 +194,11 @@ export async function updateAssignedConcernStatus(
     console.log('📍 Endpoint:', fullUrl);
     console.log('🔑 Method: PUT');
     console.log('📦 Request Body:', JSON.stringify(requestBody, null, 2));
+    console.log('📋 Request Body Keys:', Object.keys(requestBody));
+    if (status === 'rejected') {
+      console.log('⚠️  Rejection Status - rejection_reason present:', !!requestBody.rejection_reason);
+      console.log('⚠️  Rejection Status - rejection_reason value:', requestBody.rejection_reason);
+    }
     console.log('🔐 Token Info:', {
       tokenLength: cleanToken.length,
       tokenFormat: cleanToken.includes('|') ? 'valid (has pipe)' : 'invalid (no pipe)',
@@ -203,11 +230,24 @@ export async function updateAssignedConcernStatus(
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return response;
   } catch (error: any) {
-    console.error('[PurokLeaderService] Error updating concern status:', {
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.error('❌ [PurokLeaderService] ERROR UPDATING CONCERN STATUS');
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.error('📋 Request Details:', {
       id,
       status,
-      error: error?.message || error,
+      hasRemarks: !!remarks,
+      hasRejectionReason: !!rejectionReason,
+      rejectionReason: rejectionReason?.substring(0, 50) + '...',
     });
+    console.error('❌ Error:', error?.message || error);
+    if (error?.response) {
+      console.error('📦 Error Response:', JSON.stringify(error.response, null, 2));
+    }
+    if (error?.data) {
+      console.error('📦 Error Data:', JSON.stringify(error.data, null, 2));
+    }
+    console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     throw error;
   }
 }
@@ -231,13 +271,14 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
   }
   
   // Map backend status to frontend status (same mapping as in realtime-service.ts)
-  // Backend uses: 'pending' | 'ongoing' | 'escalated' | 'resolved'
-  // Frontend uses: 'pending' | 'acknowledged' | 'resolved'
+  // Backend uses: 'pending' | 'ongoing' | 'escalated' | 'resolved' | 'rejected'
+  // Frontend uses: 'pending' | 'acknowledged' | 'resolved' | 'rejected'
   const statusMap: Record<string, EmergencyReport['status']> = {
     'pending': 'pending',
     'ongoing': 'acknowledged',
     'escalated': 'acknowledged',
     'resolved': 'resolved',
+    'rejected': 'rejected',
   };
   
   // Map backend category to frontend type (same mapping as in realtime-service.ts)
@@ -260,12 +301,13 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
   let backendStatus: string = 'pending';
   
   // Priority 1: distribution_status (this is the distribution-level status)
-  // Values: 'assigned' (pending), 'in_progress' (ongoing), 'resolved' (resolved)
+  // Values: 'assigned' (pending), 'in_progress' (ongoing), 'resolved' (resolved), 'rejected' (rejected)
   if (concern.distribution_status) {
     const distributionStatusMap: Record<string, string> = {
       'assigned': 'pending',
       'in_progress': 'ongoing',
       'resolved': 'resolved',
+      'rejected': 'rejected',
     };
     const mapped = distributionStatusMap[concern.distribution_status.toLowerCase()];
     if (mapped) {
@@ -285,6 +327,7 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
       'assigned': 'pending',
       'in_progress': 'ongoing',
       'resolved': 'resolved',
+      'rejected': 'rejected',
     };
     const mapped = distStatusMap[concern.distribution.status.toLowerCase()];
     backendStatus = mapped || concern.distribution.status;

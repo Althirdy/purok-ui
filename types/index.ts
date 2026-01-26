@@ -32,7 +32,7 @@ export interface EmergencyReport {
   description: string;
   location: string;
   timestamp: Date;
-  status: 'pending' | 'acknowledged' | 'resolved';
+  status: 'pending' | 'acknowledged' | 'resolved' | 'rejected';
   severity: 'low' | 'medium' | 'high' | 'critical';
   reportedBy?: string;
   source?: 'cctv' | 'sensor' | 'citizen' | 'official';

@@ -149,6 +149,9 @@ export function getStatusColor(status: EmergencyReport['status']): {
   if (status === 'resolved') {
     return { backgroundColor: colors.semantic.success + '20', borderColor: colors.semantic.success };
   }
+  if (status === 'rejected') {
+    return { backgroundColor: colors.semantic.error + '15', borderColor: colors.semantic.error };
+  }
   return { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' };
 }
 
@@ -159,6 +162,7 @@ export function getStatusText(status: EmergencyReport['status']): string {
   if (status === 'pending') return 'Pending';
   if (status === 'acknowledged') return 'Acknowledged';
   if (status === 'resolved') return 'Resolved ✓';
+  if (status === 'rejected') return 'Rejected ✗';
   return 'Pending';
 }
 

@@ -404,16 +404,34 @@ export async function httpPut<T = any>(path: string, body?: any, init?: RequestI
     if (contentType.includes('application/json')) {
       try {
         const errorData = await response.json();
+        console.error('❌ [HTTP] Error Response Data:', JSON.stringify(errorData, null, 2));
+        
+        // Laravel validation errors have an 'errors' object
+        if (errorData?.errors) {
+          const validationErrors = Object.entries(errorData.errors)
+            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+            .join('; ');
+          const errorMessage = errorData?.message || `Validation failed: ${validationErrors}`;
+          throw new Error(errorMessage);
+        }
+        
         const errorMessage = errorData?.message || errorData?.error || `HTTP ${response.status}`;
         throw new Error(errorMessage);
       } catch (parseError) {
+        // If JSON parsing failed, try to get text
+        try {
+          const text = await response.text();
+          console.error('[HTTP] Error response text:', text.substring(0, 500));
+        } catch (textError) {
+          // Ignore
+        }
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
     } else {
       // Non-JSON error response
       try {
         const text = await response.text();
-        console.error('[HTTP] Non-JSON error response:', text.substring(0, 200));
+        console.error('[HTTP] Non-JSON error response:', text.substring(0, 500));
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       } catch (textError) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);

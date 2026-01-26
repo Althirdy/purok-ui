@@ -31,7 +31,7 @@ interface UseReportsFeedReturn {
   refreshing: boolean;
   fetchReports: (source: FeedSource) => Promise<void>;
   handleRefresh: (source: FeedSource) => Promise<void>;
-  updateReportStatus: (reportId: string, status: EmergencyReport['status'], remarks?: string) => Promise<void>;
+  updateReportStatus: (reportId: string, status: EmergencyReport['status'], remarks?: string, rejectionReason?: string) => Promise<void>;
 }
 
 export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsFeedReturn {
@@ -326,7 +326,8 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
   const updateReportStatus = useCallback(async (
     reportId: string,
     status: EmergencyReport['status'],
-    remarks?: string
+    remarks?: string,
+    rejectionReason?: string
   ) => {
     // Optimistic UI update
     const originalReport = reports.find(r => r.id === reportId);
@@ -370,9 +371,10 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
         });
 
         const numericId = reportId.replace('PUROK-', '');
-        const apiStatus: 'pending' | 'ongoing' | 'escalated' | 'resolved' =
+        const apiStatus: 'pending' | 'ongoing' | 'escalated' | 'resolved' | 'rejected' =
           status === 'acknowledged' ? 'ongoing' :
           status === 'resolved' ? 'resolved' :
+          status === 'rejected' ? 'rejected' :
           'pending';
 
         console.log('[ReportsFeed] Updating concern status via API:', {
@@ -381,9 +383,10 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
           frontendStatus: status,
           apiStatus,
           hasRemarks: !!remarks,
+          hasRejectionReason: !!rejectionReason,
         });
 
-        const updateResponse = await updateAssignedConcernStatus(authToken, numericId, apiStatus, remarks);
+        const updateResponse = await updateAssignedConcernStatus(authToken, numericId, apiStatus, remarks, rejectionReason);
 
         console.log('[ReportsFeed] Status update API call successful:', {
           reportId,
@@ -401,6 +404,7 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
             'ongoing': 'acknowledged',
             'escalated': 'acknowledged',
             'resolved': 'resolved',
+            'rejected': 'rejected',
           };
           
           const mappedStatus = responseStatusMap[responseStatus.toLowerCase()] || status;

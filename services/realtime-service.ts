@@ -327,6 +327,7 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
     'ongoing': 'acknowledged',
     'escalated': 'acknowledged',
     'resolved': 'resolved',
+    'rejected': 'rejected',
   };
 
   // Parse coordinates - support both formats:
@@ -633,11 +634,12 @@ export async function subscribeToStatusUpdates(
     }
 
     // Map backend status to frontend status
-    const statusMap: Record<string, 'pending' | 'acknowledged' | 'resolved'> = {
+    const statusMap: Record<string, EmergencyReport['status']> = {
       'pending': 'pending',
       'ongoing': 'acknowledged',
       'escalated': 'acknowledged',
       'resolved': 'resolved',
+      'rejected': 'rejected',
     };
 
     // Listen for concern.status.updated event
