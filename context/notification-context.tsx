@@ -1,11 +1,24 @@
 /**
  * Notification Context - Manages in-app notifications from alerts and reports
+ * 
+ * Integrates with backend API for persistent notification storage
+ * - Fetches notifications from backend on login
+ * - Syncs read status with backend
+ * - Merges real-time Pusher notifications with API data
  */
 
 import { createNotificationFromReport } from '@/services/notification-service';
+import {
+  fetchNotifications as apiFetchNotifications,
+  markNotificationAsRead as apiMarkAsRead,
+  markAllNotificationsAsRead as apiMarkAllAsRead,
+  normalizeBackendNotification,
+  type BackendNotification,
+} from '@/services/notification-api-service';
 import type { EmergencyReport } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState, useRef } from 'react';
+import { useAuth } from './auth-context';
 
 export interface Notification {
   id: string;
@@ -17,6 +30,7 @@ export interface Notification {
   read: boolean;
   severity?: 'low' | 'medium' | 'high' | 'critical';
   reportType?: 'accident' | 'crime' | 'fire' | 'medical' | 'suspicious' | 'other';
+  backendId?: number; // ID from backend for syncing
 }
 
 interface NotificationContextType {
@@ -28,14 +42,19 @@ interface NotificationContextType {
   deleteNotification: (notificationId: string) => void;
   unreadCount: number;
   clearAll: () => void;
+  fetchFromBackend: () => Promise<void>;
+  isLoading: boolean;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
-const NOTIFICATIONS_STORAGE_KEY = '@urbanwatch:notifications';
+const NOTIFICATIONS_STORAGE_KEY = '@urbanwatch:purok:notifications';
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const hasFetchedFromBackend = useRef(false);
+  const { isAuthenticated, accessToken } = useAuth();
 
   // Load notifications from storage on mount
   useEffect(() => {
@@ -44,8 +63,21 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // Save notifications to storage whenever they change
   useEffect(() => {
-    saveNotifications();
+    if (notifications.length > 0) {
+      saveNotifications();
+    }
   }, [notifications]);
+
+  // Fetch from backend when user logs in
+  useEffect(() => {
+    if (isAuthenticated && accessToken && !hasFetchedFromBackend.current) {
+      console.log('[NotificationContext] 🔑 User logged in, fetching notifications from backend...');
+      fetchFromBackendInternal();
+    } else if (!isAuthenticated) {
+      // User logged out, reset state
+      hasFetchedFromBackend.current = false;
+    }
+  }, [isAuthenticated, accessToken]);
 
   const loadNotifications = async () => {
     try {
@@ -79,6 +111,66 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   };
 
+  /**
+   * Fetch notifications from the backend API (internal implementation)
+   * Called when user logs in to sync with persistent storage
+   */
+  const fetchFromBackendInternal = async () => {
+    if (isLoading) return;
+    
+    console.log('[NotificationContext] 🌐 Fetching notifications from backend...');
+    setIsLoading(true);
+    
+    try {
+      const response = await apiFetchNotifications(1, 50);
+      
+      if (response.success && response.data?.notifications) {
+        const backendNotifications = response.data.notifications;
+        console.log('[NotificationContext] ✅ Received', backendNotifications.length, 'notifications from backend');
+        
+        // Convert and merge with existing notifications
+        setNotifications(prev => {
+          const normalizedBackend = backendNotifications.map(normalizeBackendNotification);
+          
+          // Create a map to track existing backend IDs
+          const existingBackendIds = new Set(
+            prev.filter(n => n.backendId).map(n => n.backendId)
+          );
+          
+          // Filter out duplicates
+          const newFromBackend = normalizedBackend.filter(
+            n => !existingBackendIds.has(n.backendId)
+          );
+          
+          // Also filter out local notifications that now exist in backend
+          const localOnly = prev.filter(n => !n.backendId);
+          
+          // Merge: backend notifications + local-only notifications
+          const merged = [...normalizedBackend, ...localOnly];
+          
+          // Sort by timestamp (newest first) and limit
+          merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+          
+          console.log('[NotificationContext] 📊 Merged total:', merged.length);
+          return merged.slice(0, 100);
+        });
+        
+        hasFetchedFromBackend.current = true;
+      }
+    } catch (error) {
+      console.error('[NotificationContext] ❌ Error fetching from backend:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * Exposed function to manually fetch from backend (e.g., pull to refresh)
+   */
+  const fetchFromBackend = useCallback(async () => {
+    await fetchFromBackendInternal();
+  }, []);
+
   const addNotification = useCallback((notification: Notification) => {
     console.log('[NotificationContext] 🔔 addNotification called with:', notification);
     setNotifications(prev => {
@@ -110,12 +202,26 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, [addNotification]);
 
   const markAsRead = useCallback((notificationId: string) => {
-    setNotifications(prev =>
-      prev.map(n => (n.id === notificationId ? { ...n, read: true } : n))
-    );
+    setNotifications(prev => {
+      const notification = prev.find(n => n.id === notificationId);
+      
+      // If notification has a backend ID, sync with backend
+      if (notification?.backendId) {
+        apiMarkAsRead(notification.backendId).catch(error => {
+          console.error('[NotificationContext] ❌ Failed to sync read status:', error);
+        });
+      }
+      
+      return prev.map(n => (n.id === notificationId ? { ...n, read: true } : n));
+    });
   }, []);
 
   const markAllAsRead = useCallback(() => {
+    // Sync with backend
+    apiMarkAllAsRead().catch(error => {
+      console.error('[NotificationContext] ❌ Failed to sync mark all as read:', error);
+    });
+    
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   }, []);
 
@@ -140,6 +246,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         deleteNotification,
         unreadCount,
         clearAll,
+        fetchFromBackend,
+        isLoading,
       }}
     >
       {children}
