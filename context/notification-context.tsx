@@ -7,17 +7,16 @@
  * - Merges real-time Pusher notifications with API data
  */
 
-import { createNotificationFromReport } from '@/services/notification-service';
 import {
-  fetchNotifications as apiFetchNotifications,
-  markNotificationAsRead as apiMarkAsRead,
-  markAllNotificationsAsRead as apiMarkAllAsRead,
-  normalizeBackendNotification,
-  type BackendNotification,
+    fetchNotifications as apiFetchNotifications,
+    markAllNotificationsAsRead as apiMarkAllAsRead,
+    markNotificationAsRead as apiMarkAsRead,
+    normalizeBackendNotification,
+    type BackendNotification,
 } from '@/services/notification-api-service';
 import type { EmergencyReport } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useCallback, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from './auth-context';
 
 export interface Notification {
