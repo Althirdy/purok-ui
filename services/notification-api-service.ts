@@ -238,12 +238,17 @@ export function normalizeBackendNotification(
     'system_announcement': 'system',
   };
 
+  // Build the reportId with PUROK- prefix to match the format used in purok-leader-service
+  // This ensures clicking notifications navigates to the correct report
+  const concernId = backendNotification.data?.concern_id;
+  const reportId = concernId ? `PUROK-${concernId}` : undefined;
+
   return {
     id: `backend-${backendNotification.id}`,
     type: typeMap[backendNotification.type] || 'system',
     title: backendNotification.title,
     message: backendNotification.message,
-    reportId: backendNotification.data?.concern_id?.toString(),
+    reportId,
     timestamp: new Date(backendNotification.created_at),
     read: backendNotification.read_at !== null,
     severity: backendNotification.data?.severity as any,

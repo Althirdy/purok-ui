@@ -160,29 +160,39 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
             
             const authEndpoint = realtimeConfig.authEndpoint;
             console.log('[Pusher] 🔐 Authorizing channel:', channel.name);
+            console.log('[Pusher] 📤 Auth endpoint:', authEndpoint);
+            console.log('[Pusher] 📤 Socket ID:', socketId);
+            
+            // Build form data - Laravel expects application/x-www-form-urlencoded
+            const formData = new URLSearchParams();
+            formData.append('socket_id', socketId);
+            formData.append('channel_name', channel.name);
             
             // First attempt with current token
             let response = await fetch(authEndpoint, {
               method: 'POST',
               headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
                 'Accept': 'application/json',
                 'Authorization': `Bearer ${currentToken}`,
                 'ngrok-skip-browser-warning': 'true',
               },
-              body: JSON.stringify({
-                socket_id: socketId,
-                channel_name: channel.name,
-              }),
+              body: formData.toString(),
             });
 
             // Get response text
+            console.log('[Pusher] 📥 Initial response status:', response.status);
             let responseText = await response.text();
+            console.log('[Pusher] 📥 Initial response text length:', responseText?.length ?? 0);
+            if (responseText && responseText.length > 0) {
+              console.log('[Pusher] 📥 Initial response text:', responseText.substring(0, 200));
+            }
+            
             const isEmpty = !responseText || responseText.trim().length === 0;
             
             // Handle empty response or 401 - token expired
             if (isEmpty || response.status === 401) {
-              console.log('[Pusher] 🔄 Token expired or empty response, refreshing token...');
+              console.log('[Pusher] 🔄 Token expired or empty response (status:', response.status, ', isEmpty:', isEmpty, '), refreshing token...');
               
               // Try to refresh token
               const refreshToken = await AsyncStorage.getItem('@urbanwatch:refresh_token');
@@ -228,21 +238,27 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
               console.log('[Pusher] ✅ Token refreshed, retrying auth...');
               
               // Retry auth with new token
+              console.log('[Pusher] 🔄 Retrying auth request with new token...');
+              console.log('[Pusher] 📤 Auth endpoint:', authEndpoint);
+              console.log('[Pusher] 📤 Request body:', formData.toString());
+              
               response = await fetch(authEndpoint, {
                 method: 'POST',
                 headers: {
-                  'Content-Type': 'application/json',
+                  'Content-Type': 'application/x-www-form-urlencoded',
                   'Accept': 'application/json',
                   'Authorization': `Bearer ${currentToken}`,
                   'ngrok-skip-browser-warning': 'true',
                 },
-                body: JSON.stringify({
-                  socket_id: socketId,
-                  channel_name: channel.name,
-                }),
+                body: formData.toString(),
               });
 
+              console.log('[Pusher] 📥 Response status:', response.status);
+              console.log('[Pusher] 📥 Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
+              
               responseText = await response.text();
+              console.log('[Pusher] 📥 Response text length:', responseText?.length ?? 0);
+              console.log('[Pusher] 📥 Response text:', responseText?.substring(0, 500));
             }
 
             // Handle non-OK responses
@@ -255,6 +271,8 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
             // Check if response is still empty
             if (!responseText || responseText.trim().length === 0) {
               console.error('[Pusher] ❌ Empty response from auth endpoint');
+              console.error('[Pusher] 📥 Response status was:', response.status);
+              console.error('[Pusher] 📥 Content-Type:', response.headers.get('content-type'));
               callback(new Error('Empty response from auth endpoint'), null);
               return;
             }

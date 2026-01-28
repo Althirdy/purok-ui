@@ -114,9 +114,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   /**
    * Fetch notifications from the backend API (internal implementation)
    * Called when user logs in to sync with persistent storage
+   * @param force - If true, bypasses the hasFetchedFromBackend check
    */
-  const fetchFromBackendInternal = async () => {
+  const fetchFromBackendInternal = async (force: boolean = false) => {
     if (isLoading) return;
+    
+    // Skip if already fetched (unless forced)
+    if (!force && hasFetchedFromBackend.current) {
+      console.log('[NotificationContext] ⏭️ Already fetched from backend, skipping (use force=true to refetch)');
+      return;
+    }
     
     console.log('[NotificationContext] 🌐 Fetching notifications from backend...');
     setIsLoading(true);
@@ -124,39 +131,56 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     try {
       const response = await apiFetchNotifications(1, 50);
       
+      console.log('[NotificationContext] 📥 API Response:', JSON.stringify(response, null, 2).substring(0, 500));
+      
+      // Handle different response structures
+      // Could be: { success, data: { notifications } } or { notifications } or { data: [...] }
+      let backendNotifications: BackendNotification[] = [];
+      
       if (response.success && response.data?.notifications) {
-        const backendNotifications = response.data.notifications;
-        console.log('[NotificationContext] ✅ Received', backendNotifications.length, 'notifications from backend');
-        
-        // Convert and merge with existing notifications
-        setNotifications(prev => {
-          const normalizedBackend = backendNotifications.map(normalizeBackendNotification);
-          
-          // Create a map to track existing backend IDs
-          const existingBackendIds = new Set(
-            prev.filter(n => n.backendId).map(n => n.backendId)
-          );
-          
-          // Filter out duplicates
-          const newFromBackend = normalizedBackend.filter(
-            n => !existingBackendIds.has(n.backendId)
-          );
-          
-          // Also filter out local notifications that now exist in backend
-          const localOnly = prev.filter(n => !n.backendId);
-          
-          // Merge: backend notifications + local-only notifications
-          const merged = [...normalizedBackend, ...localOnly];
-          
-          // Sort by timestamp (newest first) and limit
-          merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-          
-          console.log('[NotificationContext] 📊 Merged total:', merged.length);
-          return merged.slice(0, 100);
-        });
-        
-        hasFetchedFromBackend.current = true;
+        backendNotifications = response.data.notifications;
+      } else if (Array.isArray((response as any).notifications)) {
+        backendNotifications = (response as any).notifications;
+      } else if (Array.isArray((response as any).data)) {
+        backendNotifications = (response as any).data;
       }
+      
+      console.log('[NotificationContext] ✅ Received', backendNotifications.length, 'notifications from backend');
+      
+      if (backendNotifications.length > 0) {
+        console.log('[NotificationContext] 📋 First notification:', JSON.stringify(backendNotifications[0]));
+      } else {
+        console.log('[NotificationContext] ⚠️ No notifications found in backend');
+      }
+      
+      // Convert and merge with existing notifications
+      setNotifications(prev => {
+        const normalizedBackend = backendNotifications.map(normalizeBackendNotification);
+        
+        // Create a map to track existing backend IDs
+        const existingBackendIds = new Set(
+          prev.filter(n => n.backendId).map(n => n.backendId)
+        );
+        
+        // Filter out duplicates
+        const newFromBackend = normalizedBackend.filter(
+          n => !existingBackendIds.has(n.backendId)
+        );
+        
+        // Also filter out local notifications that now exist in backend
+        const localOnly = prev.filter(n => !n.backendId);
+        
+        // Merge: backend notifications + local-only notifications
+        const merged = [...normalizedBackend, ...localOnly];
+        
+        // Sort by timestamp (newest first) and limit
+        merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        
+        console.log('[NotificationContext] 📊 Merged total:', merged.length);
+        return merged.slice(0, 100);
+      });
+      
+      hasFetchedFromBackend.current = true;
     } catch (error) {
       console.error('[NotificationContext] ❌ Error fetching from backend:', error);
     } finally {
@@ -166,9 +190,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   /**
    * Exposed function to manually fetch from backend (e.g., pull to refresh)
+   * Always forces a fresh fetch from the backend
    */
   const fetchFromBackend = useCallback(async () => {
-    await fetchFromBackendInternal();
+    console.log('[NotificationContext] 🔄 Manual fetch requested (forced)');
+    await fetchFromBackendInternal(true); // Force fetch
   }, []);
 
   const addNotification = useCallback((notification: Notification) => {

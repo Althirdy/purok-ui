@@ -41,7 +41,7 @@ const getNotificationColor = (title: string): string => {
 };
 
 export default function NotificationsScreen() {
-  const { notifications, markAsRead, clearAll } = useNotifications();
+  const { notifications, markAsRead, clearAll, fetchFromBackend, isLoading: isContextLoading } = useNotifications();
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -56,6 +56,12 @@ export default function NotificationsScreen() {
     })));
   }, [notifications]);
 
+  // Fetch from backend when screen mounts
+  useEffect(() => {
+    console.log('[NotificationsScreen] 📱 Screen mounted, fetching notifications...');
+    fetchFromBackend();
+  }, []);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
@@ -63,10 +69,17 @@ export default function NotificationsScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 500);
-  }, []);
+    try {
+      console.log('[NotificationsScreen] 🔄 Pull to refresh - fetching from backend...');
+      await fetchFromBackend();
+    } catch (error) {
+      console.error('[NotificationsScreen] ❌ Refresh error:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchFromBackend]);
 
   const handleNotificationPress = useCallback((notification: Notification) => {
     if (!notification.read) {
