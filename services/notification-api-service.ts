@@ -213,6 +213,10 @@ export async function clearAllNotifications(): Promise<void> {
 /**
  * Convert backend notification to local notification format
  * Used by notification context to normalize data
+ * 
+ * NOTE: For purok leaders, we only show 'concern_assigned' (new reports).
+ * Status updates (acknowledged, resolved) are filtered out in notification-context
+ * because purok leaders don't need notifications for their own actions.
  */
 export function normalizeBackendNotification(
   backendNotification: BackendNotification
@@ -229,11 +233,12 @@ export function normalizeBackendNotification(
   backendId: number;
 } {
   // Map backend notification type to local type
+  // For purok leaders: only 'concern_assigned' is relevant (new reports)
   const typeMap: Record<string, 'sensor_alert' | 'report_update' | 'new_report' | 'system'> = {
-    'concern_assigned': 'new_report',
-    'concern_acknowledged': 'report_update',
-    'concern_resolved': 'report_update',
-    'concern_status_update': 'report_update',
+    'concern_assigned': 'new_report',        // New concern assigned - SHOW
+    'concern_acknowledged': 'report_update', // Status update - filtered out
+    'concern_resolved': 'report_update',     // Status update - filtered out
+    'concern_status_update': 'report_update',// Status update - filtered out
     'new_safety_post': 'system',
     'system_announcement': 'system',
   };

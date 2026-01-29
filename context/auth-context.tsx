@@ -147,6 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest', // Laravel AJAX detection
           'ngrok-skip-browser-warning': 'true', // Required for ngrok free tier
         },
         body: bodyStr,

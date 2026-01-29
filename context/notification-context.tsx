@@ -152,9 +152,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         console.log('[NotificationContext] ⚠️ No notifications found in backend');
       }
       
+      // Filter: Only show NEW concern assignments, not status updates
+      // Purok leaders don't need notifications for their own actions (acknowledge, resolve)
+      const newReportTypes = ['concern_assigned'];
+      const filteredBackendNotifications = backendNotifications.filter(
+        n => newReportTypes.includes(n.type)
+      );
+      
+      console.log('[NotificationContext] 🔍 Filtered to', filteredBackendNotifications.length, 'new report notifications (excluded status updates)');
+      
       // Convert and merge with existing notifications
       setNotifications(prev => {
-        const normalizedBackend = backendNotifications.map(normalizeBackendNotification);
+        const normalizedBackend = filteredBackendNotifications.map(normalizeBackendNotification);
         
         // Create a map to track existing backend IDs
         const existingBackendIds = new Set(
