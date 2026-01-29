@@ -248,10 +248,16 @@ export function normalizeBackendNotification(
   const concernId = backendNotification.data?.concern_id;
   const reportId = concernId ? `PUROK-${concernId}` : undefined;
 
+  // Override title for concern_assigned to be cleaner
+  let title = backendNotification.title;
+  if (backendNotification.type === 'concern_assigned') {
+    title = 'New Concern';
+  }
+
   return {
     id: `backend-${backendNotification.id}`,
     type: typeMap[backendNotification.type] || 'system',
-    title: backendNotification.title,
+    title,
     message: backendNotification.message,
     reportId,
     timestamp: new Date(backendNotification.created_at),

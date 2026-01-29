@@ -41,7 +41,7 @@ const getNotificationColor = (title: string): string => {
 };
 
 export default function NotificationsScreen() {
-  const { notifications, markAsRead, clearAll, fetchFromBackend, isLoading: isContextLoading } = useNotifications();
+  const { notifications, markAsRead, fetchFromBackend, isLoading: isContextLoading } = useNotifications();
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -89,10 +89,6 @@ export default function NotificationsScreen() {
       router.push({ pathname: 'report-details', params: { reportId: notification.reportId } } as any);
     }
   }, [markAsRead]);
-
-  const handleClearAll = useCallback(() => {
-    clearAll();
-  }, [clearAll]);
 
   const renderItem = useCallback(({ item }: { item: Notification }) => {
     const iconName = getNotificationIcon(item.title);
@@ -145,13 +141,7 @@ export default function NotificationsScreen() {
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        {notifications.length > 0 ? (
-          <TouchableOpacity onPress={handleClearAll} style={styles.clearButton}>
-            <Text style={styles.clearButtonText}>Clear all</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.clearButton} />
-        )}
+        <View style={styles.clearButton} />
       </View>
 
       {/* Content */}

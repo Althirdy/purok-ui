@@ -152,14 +152,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         console.log('[NotificationContext] ⚠️ No notifications found in backend');
       }
       
-      // Filter: Only show NEW concern assignments, not status updates
-      // Purok leaders don't need notifications for their own actions (acknowledge, resolve)
+      // Filter: Only show NEW concern assignments that are UNREAD
+      // 1. Only 'concern_assigned' type (not status updates)
+      // 2. Only unread (read_at is null)
       const newReportTypes = ['concern_assigned'];
       const filteredBackendNotifications = backendNotifications.filter(
-        n => newReportTypes.includes(n.type)
+        n => newReportTypes.includes(n.type) && n.read_at === null
       );
       
-      console.log('[NotificationContext] 🔍 Filtered to', filteredBackendNotifications.length, 'new report notifications (excluded status updates)');
+      console.log('[NotificationContext] 🔍 Filtered to', filteredBackendNotifications.length, 'unread new report notifications');
       
       // Convert and merge with existing notifications
       setNotifications(prev => {
@@ -264,7 +265,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const clearAll = useCallback(() => {
+    // Mark all as read on backend so they don't come back on refresh
+    apiMarkAllAsRead().catch(error => {
+      console.error('[NotificationContext] ❌ Failed to mark all as read on backend:', error);
+    });
+    
+    // Clear locally
     setNotifications([]);
+    
+    // Also clear from AsyncStorage
+    AsyncStorage.removeItem(NOTIFICATIONS_STORAGE_KEY).catch(error => {
+      console.error('[NotificationContext] ❌ Failed to clear storage:', error);
+    });
   }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
