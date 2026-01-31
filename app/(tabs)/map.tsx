@@ -16,8 +16,9 @@
  */
 
 import { InfoCard } from '@/components/map/info-card';
-import { BARANGAY_176E_BOUNDARY, BARANGAY_176E_REGION } from '@/constants/barangay-boundary';
+import { BARANGAY_176E_REGION } from '@/constants/barangay-boundary';
 import { DesignSystem } from '@/constants/design-system';
+import purokBoundaries from '@/constants/geojson.json';
 import { globalStyles } from '@/constants/global-styles';
 import { mapStyles as styles } from '@/constants/map-screen.styles';
 import { useAuth } from '@/context/auth-context';
@@ -29,8 +30,7 @@ import { getMarkerColor, processMarkersWithJitter, type SelectedMarker } from '@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import purokBoundaries from '@/constants/geojson.json';
-import MapView, { Marker, Polygon, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 
 const { colors } = DesignSystem;
 
