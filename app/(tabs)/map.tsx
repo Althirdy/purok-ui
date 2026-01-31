@@ -29,7 +29,8 @@ import { getMarkerColor, processMarkersWithJitter, type SelectedMarker } from '@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, Polygon } from 'react-native-maps';
+import purokBoundaries from '@/constants/geojson.json';
+import MapView, { Marker, Polygon, Polyline } from 'react-native-maps';
 
 const { colors } = DesignSystem;
 
@@ -363,14 +364,24 @@ export default function MapScreen() {
           showsCompass
           onMapReady={() => setMapReady(true)}
         >
-          {/* Barangay Boundary */}
-          <Polygon
-            coordinates={BARANGAY_176E_BOUNDARY.coordinates}
-            fillColor={BARANGAY_176E_BOUNDARY.fillColor}
-            strokeColor={BARANGAY_176E_BOUNDARY.strokeColor}
-            strokeWidth={BARANGAY_176E_BOUNDARY.strokeWidth}
-          />
-
+{/* Purok Boundaries */}
+{purokBoundaries.features
+  .filter((feature) => 
+    feature.geometry.type === 'LineString' && 
+    Array.isArray(feature.geometry.coordinates) && 
+    feature.geometry.coordinates.length > 0
+  )
+  .map((feature, index) => (
+  <Polyline
+    key={`purok-${index}`}
+    coordinates={(feature.geometry.coordinates as number[][]).map((coord) => ({
+      latitude: coord[1],
+      longitude: coord[0],
+    }))}
+    strokeColor={feature.properties.color || '#FF6B6B'}
+    strokeWidth={2}
+  />
+))}
           {/* Incident Markers (Citizen Concerns + CCTV Accidents) */}
           {mapReady && displayedMarkers.map((m) => (
             <Marker
