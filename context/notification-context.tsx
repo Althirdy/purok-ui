@@ -89,8 +89,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           ...n,
           timestamp: new Date(n.timestamp),
         }));
-        console.log('[NotificationContext] 📂 Loaded notifications:', withDates.length);
-        setNotifications(withDates);
+        
+        // Filter out old status update notifications (Report Resolved/Acknowledged)
+        // Only keep new_report type and backend notifications (those with backendId)
+        // This cleans up old notifications that shouldn't have been stored
+        const filtered = withDates.filter((n: Notification) => 
+          n.backendId || n.type === 'new_report'
+        );
+        
+        if (filtered.length !== withDates.length) {
+          console.log('[NotificationContext] 🧹 Cleaned up', withDates.length - filtered.length, 'old status update notifications');
+          // Save the cleaned list back to storage
+          await AsyncStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(filtered));
+        }
+        
+        console.log('[NotificationContext] 📂 Loaded notifications:', filtered.length);
+        setNotifications(filtered);
       } else {
         console.log('[NotificationContext] 📂 No stored notifications found');
       }
@@ -176,10 +190,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           n => !existingBackendIds.has(n.backendId)
         );
         
-        // Also filter out local notifications that now exist in backend
-        const localOnly = prev.filter(n => !n.backendId);
+        // Filter local notifications: ONLY keep new_report type (not status updates like report_update)
+        // This ensures only NEW concerns show up, not "Report Resolved"/"Report Acknowledged" updates
+        const localOnly = prev.filter(n => !n.backendId && n.type === 'new_report');
         
-        // Merge: backend notifications + local-only notifications
+        // Merge: backend notifications + local-only NEW REPORT notifications only
         const merged = [...normalizedBackend, ...localOnly];
         
         // Sort by timestamp (newest first) and limit

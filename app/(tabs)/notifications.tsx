@@ -5,6 +5,7 @@
 import { NotificationSkeleton } from '@/components/news/notification-skeleton';
 import { useNotifications, type Notification } from '@/context/notification-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -55,6 +56,16 @@ export default function NotificationsScreen() {
       read: n.read,
     })));
   }, [notifications]);
+
+  // Force UI update when screen gains focus (e.g., switching tabs)
+  // This ensures new notifications added via Pusher while on other screens appear immediately
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[NotificationsScreen] 👁️ Screen focused - notifications count:', notifications.length);
+      // The notifications from context should already be up-to-date
+      // This effect just ensures the screen knows it's focused
+    }, [notifications.length])
+  );
 
   // Fetch from backend when screen mounts
   useEffect(() => {
@@ -150,6 +161,7 @@ export default function NotificationsScreen() {
           data={isLoading ? [] : notifications}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
+          extraData={notifications.length} // Ensures FlatList re-renders when notifications change
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             isLoading ? (

@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
 export default function NewsFeedScreen() {
   const { user } = useAuth();
   const [toast, setToast] = useState<ToastData | null>(null);
-  const { addNotification, unreadCount } = useNotifications();
+  const { unreadCount } = useNotifications();
   const [searchQuery, setSearchQuery] = useState('');
   const [committedQuery, setCommittedQuery] = useState('');
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
@@ -149,21 +149,25 @@ export default function NewsFeedScreen() {
     try {
       // Mark as acknowledged with optional remarks
       await updateReportStatus(reportId, 'acknowledged', remarks);
-
-      // Add notification after successful update
-      addNotification({
-        id: `acknowledge-${r.id}-${Date.now()}`,
-        type: 'report_update',
-        title: 'Report Acknowledged',
-        message: r.title,
-        reportId: r.id,
-        timestamp: new Date(),
-        read: false,
+      
+      // Show success toast
+      setToast({
+        id: `toast-ack-${reportId}-${Date.now()}`,
+        title: '✅ Report Acknowledged',
+        message: r.title || 'Concern has been acknowledged',
+        severity: 'low',
       });
     } catch (error) {
       console.error('[NewsFeed] Failed to acknowledge report:', error);
+      // Show error toast
+      setToast({
+        id: `toast-ack-error-${Date.now()}`,
+        title: '❌ Failed to Acknowledge',
+        message: 'Please try again',
+        severity: 'high',
+      });
     }
-  }, [reports, addNotification, updateReportStatus]);
+  }, [reports, updateReportStatus]);
 
   // Handle resolve - mark report as resolved (second step)
   const handleResolvePress = useCallback(async (reportId: string, remarks?: string) => {
@@ -173,21 +177,25 @@ export default function NewsFeedScreen() {
     try {
       // Mark as resolved with optional remarks
       await updateReportStatus(reportId, 'resolved', remarks);
-
-      // Add notification after successful update
-      addNotification({
-        id: `resolve-${r.id}-${Date.now()}`,
-        type: 'report_update',
-        title: 'Report Resolved',
-        message: r.title,
-        reportId: r.id,
-        timestamp: new Date(),
-        read: false,
+      
+      // Show success toast
+      setToast({
+        id: `toast-resolve-${reportId}-${Date.now()}`,
+        title: '✅ Report Resolved',
+        message: r.title || 'Concern has been resolved',
+        severity: 'low',
       });
     } catch (error) {
       console.error('[NewsFeed] Failed to resolve report:', error);
+      // Show error toast
+      setToast({
+        id: `toast-resolve-error-${Date.now()}`,
+        title: '❌ Failed to Resolve',
+        message: 'Please try again',
+        severity: 'high',
+      });
     }
-  }, [reports, addNotification, updateReportStatus]);
+  }, [reports, updateReportStatus]);
 
   // Handle acknowledge button - opens acknowledge modal (first step)
   const handleAcknowledgeAction = useCallback((reportId: string) => {

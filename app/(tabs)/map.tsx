@@ -52,6 +52,7 @@ export default function MapScreen() {
 
   // Fetch citizen concerns on mount
   useEffect(() => {
+    console.log('[MapScreen] Fetching reports...');
     fetchReports('all');
   }, [fetchReports]);
 
@@ -63,6 +64,7 @@ export default function MapScreen() {
     }
     setLoadingAccidents(true);
     try {
+      console.log('[MapScreen] Fetching CCTV accidents...');
       const markers = await fetchActiveAccidentMarkers(accessToken);
       const converted = markers.map(markerToEmergencyReport);
       setCctvAccidents(converted);
@@ -163,17 +165,17 @@ export default function MapScreen() {
     setRefreshing(false);
   }, [fetchReports, fetchAccidents]);
 
-  // PRIVACY FILTER: Only show verified/acknowledged citizen concerns
-  const verifiedConcerns = useMemo(() => {
-    return reports.filter((r: EmergencyReport) => 
-      r.status === 'acknowledged' || r.status === 'resolved'
-    );
+  // Show ALL citizen concerns (pending, acknowledged, resolved) on the map
+  // Previously filtered only verified - now showing all for visibility
+  const allConcerns = useMemo(() => {
+    console.log('[MapScreen] Total reports from feed:', reports.length);
+    return reports;
   }, [reports]);
 
-  // Combine both sources: verified citizen concerns + CCTV accidents
+  // Combine both sources: all citizen concerns + CCTV accidents
   const allIncidents = useMemo(() => {
-    return [...verifiedConcerns, ...cctvAccidents];
-  }, [verifiedConcerns, cctvAccidents]);
+    return [...allConcerns, ...cctvAccidents];
+  }, [allConcerns, cctvAccidents]);
 
   // Convert to markers (only valid coordinates)
   const incidentMarkers = useMemo(() => {
@@ -292,7 +294,7 @@ export default function MapScreen() {
   };
 
   const loading = loadingConcerns || loadingAccidents;
-  const citizenCount = verifiedConcerns.length;
+  const citizenCount = allConcerns.length;
   const cctvCount = cctvAccidents.length;
 
   // Helper function to zoom to coordinates
@@ -325,7 +327,7 @@ export default function MapScreen() {
 
   // Zoom to citizen concerns when badge is clicked
   const handleCitizenBadgePress = useCallback(() => {
-    const coordinates = verifiedConcerns
+    const coordinates = allConcerns
       .filter((r) => {
         const { latitude: lat, longitude: lng } = r.coordinates ?? {};
         return lat != null && lng != null && !isNaN(lat) && !isNaN(lng);
@@ -336,7 +338,7 @@ export default function MapScreen() {
       }));
 
     zoomToCoordinates(coordinates);
-  }, [verifiedConcerns, zoomToCoordinates]);
+  }, [allConcerns, zoomToCoordinates]);
 
   // Zoom to CCTV accidents when badge is clicked
   const handleCctvBadgePress = useCallback(() => {

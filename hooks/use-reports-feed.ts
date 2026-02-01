@@ -221,18 +221,8 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
                   newStatus,
                 });
                 
-                // Add notification for status update
-                setTimeout(() => {
-                  addNotificationRef.current({
-                    id: `status-update-${reportId}-${Date.now()}`,
-                    type: 'report_update',
-                    title: newStatus === 'resolved' ? 'Report Resolved' : 'Report Acknowledged',
-                    message: reportTitle,
-                    reportId: reportId,
-                    timestamp: new Date(),
-                    read: false,
-                  });
-                }, 0);
+                // Note: We don't add notifications for status updates
+                // Only NEW concerns should appear in the notifications list
                 
                 return { ...report, status: newStatus };
               }
