@@ -5,6 +5,7 @@
  * Integrates with backend public-posts API
  */
 
+import { PostCard } from '@/components/news/PostCard';
 import { usePublicPosts } from '@/hooks/usePublicPosts';
 import { usePostStore } from '@/stores/postStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +13,6 @@ import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { PostCard } from '@/components/news/PostCard';
 
 export default function NewsScreen() {
   const {
