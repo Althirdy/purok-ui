@@ -9,7 +9,8 @@ import { usePublicPosts } from '@/hooks/usePublicPosts';
 import { usePostStore } from '@/stores/postStore';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
-import React, { useEffect, useMemo } from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { PostCard } from '@/components/news/PostCard';
 
@@ -39,6 +40,14 @@ export default function NewsScreen() {
       setPosts(posts);
     }
   }, [posts, setPosts]);
+
+  // Refresh posts when screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[NewsScreen] 👁️ Screen focused - refreshing posts...');
+      refetch();
+    }, [refetch])
+  );
 
   // Subtle branded header
   const renderHeader = () => (

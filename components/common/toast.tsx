@@ -6,7 +6,7 @@
 import { DesignSystem } from '@/constants/design-system';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing, borderRadius } = DesignSystem;
@@ -208,46 +208,54 @@ export function Toast({ toast, onDismiss, duration = 5000 }: ToastProps) {
   const severityStyles = getSeverityStyles();
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          top: toastTopPosition,
-          transform: [
-            { translateY: slideAnim },
-            { scale: scaleAnim },
-          ],
-          opacity: opacityAnim,
-        },
-      ]}
-      pointerEvents="box-none"
+    <Modal
+      visible={!!toast}
+      transparent={true}
+      animationType="none"
+      statusBarTranslucent={true}
+      onRequestClose={onDismiss}
     >
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={() => {
-          if (toast.onPress) {
-            toast.onPress();
-          }
-          onDismiss();
-        }}
-        style={styles.touchable}
-      >
-        <View
+      <View style={styles.modalOverlay} pointerEvents="box-none">
+        <Animated.View
           style={[
-            styles.toast,
+            styles.container,
             {
-              backgroundColor: severityStyles.backgroundColor,
+              top: toastTopPosition,
+              transform: [
+                { translateY: slideAnim },
+                { scale: scaleAnim },
+              ],
+              opacity: opacityAnim,
             },
           ]}
+          pointerEvents="box-none"
         >
-          {/* Vertical colored bar with icon */}
-          <View style={[styles.leftBar, { backgroundColor: severityStyles.barColor }]}>
-            <Ionicons name={severityStyles.icon} size={20} color={severityStyles.iconColor} />
-          </View>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => {
+              if (toast.onPress) {
+                toast.onPress();
+              }
+              onDismiss();
+            }}
+            style={styles.touchable}
+          >
+            <View
+              style={[
+                styles.toast,
+                {
+                  backgroundColor: severityStyles.backgroundColor,
+                },
+              ]}
+            >
+              {/* Vertical colored bar with icon */}
+              <View style={[styles.leftBar, { backgroundColor: severityStyles.barColor }]}>
+                <Ionicons name={severityStyles.icon} size={20} color={severityStyles.iconColor} />
+              </View>
 
-          {/* Content */}
-          <View style={styles.content}>
-            <View style={styles.textContainer}>
+              {/* Content */}
+              <View style={styles.content}>
+                <View style={styles.textContainer}>
               {/* Show title without emoji (emoji is replaced by icon) */}
               <Text style={[styles.title, { color: severityStyles.textColor }]} numberOfLines={1}>
                 {toast.title.replace(/[✅❌📢🚨⚠️]/g, '').trim()}
@@ -269,11 +277,17 @@ export function Toast({ toast, onDismiss, duration = 5000 }: ToastProps) {
           </View>
         </View>
       </TouchableOpacity>
-    </Animated.View>
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   container: {
     position: 'absolute',
     left: 0,

@@ -14,7 +14,7 @@ import { useAuth } from '@/context/auth-context';
 import { useNotifications } from '@/context/notification-context';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
 import type { EmergencyReport } from '@/types';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Dimensions, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
 export default function NewsFeedScreen() {
   const { user } = useAuth();
   const [toast, setToast] = useState<ToastData | null>(null);
-  const { unreadCount } = useNotifications();
+  const { unreadCount, notifications } = useNotifications();
   const [searchQuery, setSearchQuery] = useState('');
   const [committedQuery, setCommittedQuery] = useState('');
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
@@ -46,6 +46,11 @@ export default function NewsFeedScreen() {
   const [reportTypeFilter, setReportTypeFilter] = useState<'all' | 'manual' | 'voice'>('all');
   const [acknowledgeTarget, setAcknowledgeTarget] = useState<EmergencyReport | null>(null);
   const [resolveTarget, setResolveTarget] = useState<EmergencyReport | null>(null);
+
+  // Debug: Log unreadCount changes
+  useEffect(() => {
+    console.log('[NewsFeed] 🔔 Unread count updated:', unreadCount, 'Total notifications:', notifications.length);
+  }, [unreadCount, notifications.length]);
 
   const handleReportPress = useCallback((reportId: string) => {
     router.push({ pathname: 'report-details', params: { reportId } } as any);
@@ -111,6 +116,15 @@ export default function NewsFeedScreen() {
       console.log('[NewsFeed] ✅ Toast displayed for new report');
     },
   });
+
+  // Refresh reports when screen gains focus (e.g., coming back from report-details)
+  // This ensures the news-feed stays in sync after status updates on other screens
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[NewsFeed] 👁️ Screen focused - refreshing reports...');
+      fetchReports('all');
+    }, [fetchReports])
+  );
 
   // Debug: Log toast state changes
   useEffect(() => {
@@ -284,6 +298,7 @@ export default function NewsFeedScreen() {
         pendingCount={pendingCount}
         acknowledgedCount={ongoingCount}
         resolvedCount={resolvedCount}
+        displayedCount={totalCount} // Total of all concerns assigned to purok
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         committedQuery={committedQuery}
@@ -293,7 +308,7 @@ export default function NewsFeedScreen() {
         setReportTypeFilter={setReportTypeFilter}
       />
     );
-  }, [pendingCount, ongoingCount, resolvedCount, statusFilter, reportTypeFilter, searchQuery, committedQuery]);
+  }, [pendingCount, ongoingCount, resolvedCount, totalCount, statusFilter, reportTypeFilter, searchQuery, committedQuery]);
 
   return (
     <View style={globalStyles.container}>
@@ -326,7 +341,8 @@ export default function NewsFeedScreen() {
       />
 
       {/* Draggable Notification Bell - users can position it anywhere */}
-      <DraggableNotificationBell unreadCount={unreadCount} />
+      {/* Key ensures re-render when unreadCount changes */}
+      <DraggableNotificationBell key={`bell-${unreadCount}`} unreadCount={unreadCount} />
 
       {/* Filter Modal - Lazy loaded */}
       {isFilterModalVisible && (

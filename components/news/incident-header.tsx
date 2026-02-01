@@ -24,6 +24,7 @@ export interface IncidentHeaderProps {
   pendingCount: number;
   acknowledgedCount: number;
   resolvedCount: number;
+  displayedCount: number; // Count of currently displayed/filtered reports
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   committedQuery: string;
@@ -40,6 +41,7 @@ export function IncidentHeader(props: IncidentHeaderProps) {
     pendingCount,
     acknowledgedCount,
     resolvedCount,
+    displayedCount,
     searchQuery,
     setSearchQuery,
     committedQuery,
@@ -160,7 +162,7 @@ export function IncidentHeader(props: IncidentHeaderProps) {
       {/* Current Report Section */}
       <View style={styles.currentReportSection}>
         <View style={styles.currentReportHeader}>
-          <Text style={styles.currentReportTitle}>Community Concerns ({pendingCount})</Text>
+          <Text style={styles.currentReportTitle}>Community Concerns ({displayedCount})</Text>
         </View>
       </View>
     </View>

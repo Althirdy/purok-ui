@@ -28,6 +28,7 @@ import { subscribeToAccidentStatusUpdates } from '@/services/realtime-service';
 import type { EmergencyReport } from '@/types';
 import { getMarkerColor, processMarkersWithJitter, type SelectedMarker } from '@/utils/mapHelpers';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -79,6 +80,15 @@ export default function MapScreen() {
   useEffect(() => {
     fetchAccidents();
   }, [fetchAccidents]);
+
+  // Refresh data when screen gains focus (e.g., coming back from other screens)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[MapScreen] 👁️ Screen focused - refreshing data...');
+      fetchReports('all');
+      fetchAccidents();
+    }, [fetchReports, fetchAccidents])
+  );
 
   // Subscribe to real-time accident status updates
   useEffect(() => {

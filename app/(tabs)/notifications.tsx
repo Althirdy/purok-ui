@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const formatDate = (timestamp: Date): string => {
@@ -41,7 +41,7 @@ const getNotificationColor = (title: string): string => {
 };
 
 export default function NotificationsScreen() {
-  const { notifications, markAsRead, fetchFromBackend, isLoading: isContextLoading } = useNotifications();
+  const { notifications, markAsRead, fetchFromBackend, clearAll, isLoading: isContextLoading } = useNotifications();
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -137,6 +137,26 @@ export default function NotificationsScreen() {
 
   const keyExtractor = useCallback((item: Notification) => item.id, []);
 
+  const handleClearAll = useCallback(() => {
+    if (notifications.length === 0) return;
+    
+    Alert.alert(
+      'Clear All Notifications',
+      'Are you sure you want to clear all notifications? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: () => {
+            console.log('[NotificationsScreen] 🗑️ Clearing all notifications...');
+            clearAll();
+          },
+        },
+      ]
+    );
+  }, [notifications.length, clearAll]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <StatusBar style="light" backgroundColor="#1e3a8a" />
@@ -151,7 +171,17 @@ export default function NotificationsScreen() {
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <View style={styles.clearButton} />
+        {notifications.length > 0 ? (
+          <TouchableOpacity 
+            style={styles.clearButton} 
+            onPress={handleClearAll}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.clearButtonText}>Clear All</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.clearButtonPlaceholder} />
+        )}
       </View>
 
       {/* Content */}
@@ -208,12 +238,17 @@ const styles = StyleSheet.create({
   clearButton: {
     minWidth: 70,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    paddingVertical: 8,
+    borderRadius: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearButtonPlaceholder: {
+    minWidth: 70,
   },
   clearButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#ffffff',
   },
