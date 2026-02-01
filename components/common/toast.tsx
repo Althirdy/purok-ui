@@ -40,8 +40,8 @@ export function Toast({ toast, onDismiss, duration = 5000 }: ToastProps) {
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   
-  // Calculate position: below header (safe area + header ~100px + small padding)
-  const toastTopPosition = insets.top + 100;
+  // Position at top of screen, just below safe area (status bar)
+  const toastTopPosition = insets.top + 8;
 
   useEffect(() => {
     if (!toast) {
@@ -101,6 +101,35 @@ export function Toast({ toast, onDismiss, duration = 5000 }: ToastProps) {
   if (!toast) return null;
 
   const getSeverityStyles = () => {
+    // Check if this is a success toast (title contains ✅)
+    const isSuccess = toast.title.includes('✅') || toast.title.toLowerCase().includes('success');
+    // Check if this is an error toast (title contains ❌)
+    const isError = toast.title.includes('❌') || toast.title.toLowerCase().includes('failed') || toast.title.toLowerCase().includes('error');
+    
+    // Success toast style
+    if (isSuccess) {
+      return {
+        backgroundColor: '#dcfce7', // Light green background
+        barColor: '#22c55e', // Green bar
+        textColor: '#166534', // Dark green text
+        icon: 'checkmark-circle' as any,
+        iconColor: '#ffffff',
+        closeColor: '#166534',
+      };
+    }
+    
+    // Error toast style
+    if (isError) {
+      return {
+        backgroundColor: '#fee2e2', // Light red background
+        barColor: '#ef4444', // Red bar
+        textColor: '#991b1b', // Dark red text
+        icon: 'close-circle' as any,
+        iconColor: '#ffffff',
+        closeColor: '#991b1b',
+      };
+    }
+    
     // Determine icon based on report type first, then severity
     let icon: string;
     
@@ -219,6 +248,10 @@ export function Toast({ toast, onDismiss, duration = 5000 }: ToastProps) {
           {/* Content */}
           <View style={styles.content}>
             <View style={styles.textContainer}>
+              {/* Show title without emoji (emoji is replaced by icon) */}
+              <Text style={[styles.title, { color: severityStyles.textColor }]} numberOfLines={1}>
+                {toast.title.replace(/[✅❌📢🚨⚠️]/g, '').trim()}
+              </Text>
               <Text style={[styles.message, { color: severityStyles.textColor }]} numberOfLines={2}>
                 {toast.message}
               </Text>
@@ -251,17 +284,24 @@ const styles = StyleSheet.create({
   touchable: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
+    // Shadow for iOS
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    // Shadow for Android
+    elevation: 8,
   },
   toast: {
     flexDirection: 'row',
     borderRadius: borderRadius.lg,
     backgroundColor: colors.background.card,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    minHeight: 60,
+    borderColor: 'rgba(0,0,0,0.05)',
+    minHeight: 70,
   },
   leftBar: {
-    width: 48,
+    width: 52,
     justifyContent: 'center',
     alignItems: 'center',
     borderTopLeftRadius: borderRadius.lg,
@@ -278,16 +318,24 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: spacing.sm,
   },
+  title: {
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
   message: {
     fontSize: typography.fontSize.sm,
-    lineHeight: typography.fontSize.sm * 1.5,
-    fontWeight: typography.fontWeight.medium,
+    lineHeight: typography.fontSize.sm * 1.4,
+    fontWeight: typography.fontWeight.regular,
+    opacity: 0.85,
   },
   closeButton: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
 });
 
