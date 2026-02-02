@@ -152,20 +152,8 @@ function AnomalyCardComponent({ anomaly, onPress, onConfirm, onDismiss }: Anomal
       </View>
 
       {/* Action Buttons - shown for pending anomalies */}
-      {isPending && (onPress || onConfirm || onDismiss) && (
+      {isPending && (onConfirm || onDismiss) && (
         <View style={styles.actionsContainer}>
-          {onPress && (
-            <TouchableOpacity 
-              style={styles.seeMoreButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                onPress(anomaly.id);
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.seeMoreText}>See More</Text>
-            </TouchableOpacity>
-          )}
           {onDismiss && (
             <TouchableOpacity 
               style={styles.dismissButton}
@@ -315,18 +303,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border?.light ?? '#f1f5f9',
     gap: 8,
-  },
-  seeMoreButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.primary?.blue ?? '#1a73e8',
-  },
-  seeMoreText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.primary?.blue ?? '#1a73e8',
   },
   dismissButton: {
     flexDirection: 'row',

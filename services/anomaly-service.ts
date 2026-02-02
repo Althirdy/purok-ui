@@ -22,6 +22,31 @@ import type {
 const BASE_PATH = '/api/v1/anomaly-logs';
 
 /**
+ * Helper to ensure the details field is parsed as an array
+ * Database stores it as JSON text, API might return string or parsed
+ */
+function parseAnomalyDetails(anomaly: any): AnomalyLog {
+  if (!anomaly) return anomaly;
+  
+  // If details is a string, try to parse it as JSON
+  if (typeof anomaly.details === 'string') {
+    try {
+      anomaly.details = JSON.parse(anomaly.details);
+    } catch (e) {
+      console.warn('[AnomalyService] Failed to parse details JSON:', e);
+      anomaly.details = [];
+    }
+  }
+  
+  // Ensure details is an array
+  if (!Array.isArray(anomaly.details)) {
+    anomaly.details = anomaly.details ? [anomaly.details] : [];
+  }
+  
+  return anomaly;
+}
+
+/**
  * Build query string from params object
  */
 function buildQueryString(params: AnomalyLogsQueryParams): string {
@@ -149,8 +174,8 @@ export async function fetchAnomalyStatistics(
 export async function fetchAnomalyById(
   token: string,
   id: number
-): Promise<AnomalyLog> {
-  const response = await httpGet<AnomalyLogResponse>(
+): Promise<AnomalyLog | null> {
+  const response = await httpGet<any>(
     `${BASE_PATH}/${id}`,
     {
       headers: {
@@ -158,7 +183,38 @@ export async function fetchAnomalyById(
       },
     }
   );
-  return response.data;
+  
+  console.log('[AnomalyService] Full raw response:', JSON.stringify(response, null, 2));
+  
+  let anomaly: any = null;
+  
+  // Handle different response structures
+  // Try: { data: { anomaly_log: {...} } }
+  if (response?.data?.anomaly_log) {
+    console.log('[AnomalyService] Found in response.data.anomaly_log');
+    anomaly = response.data.anomaly_log;
+  }
+  // Try: { anomaly_log: {...} }
+  else if (response?.anomaly_log) {
+    console.log('[AnomalyService] Found in response.anomaly_log');
+    anomaly = response.anomaly_log;
+  }
+  // Try: { data: {...} } with id (direct anomaly object)
+  else if (response?.data && response.data.id) {
+    console.log('[AnomalyService] Found in response.data (direct)');
+    anomaly = response.data;
+  }
+  // Try: {...} direct response with id
+  else if (response?.id) {
+    console.log('[AnomalyService] Found in response (direct)');
+    anomaly = response;
+  }
+  
+  if (anomaly) {
+    return parseAnomalyDetails(anomaly);
+  }
+  console.log('[AnomalyService] Could not find anomaly in response');
+  return null;
 }
 
 /**

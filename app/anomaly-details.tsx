@@ -88,6 +88,7 @@ export default function AnomalyDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   // Fetch anomaly details
   const fetchDetails = useCallback(async () => {
@@ -95,6 +96,7 @@ export default function AnomalyDetailsScreen() {
 
     try {
       const anomalyData = await fetchAnomalyById(accessToken, anomalyId);
+      console.log('[AnomalyDetails] Received anomaly data:', JSON.stringify(anomalyData, null, 2));
       if (anomalyData) {
         setAnomaly(anomalyData);
       }
@@ -217,14 +219,42 @@ export default function AnomalyDetailsScreen() {
     );
   }
 
+  // Safe to access anomaly properties after null check
   const iconColor = getAnomalyColor(anomaly.anomaly_type);
   const isPending = !anomaly.is_confirmed;
-  const locationDisplay = getLocationDisplay(anomaly.location) || getIoTBoxLocation(anomaly.iot_box);
-  const deviceName = getIoTBoxDisplayName(anomaly.iot_box);
+  
+  // Get location from various possible sources
+  const locationDisplay = getLocationDisplay(anomaly.location) || 
+    getIoTBoxLocation(anomaly.iot_box) || 
+    (anomaly.iot_box as any)?.display_location ||
+    (anomaly.iot_box as any)?.location_name ||
+    (anomaly as any)?.location_name ||
+    null;
+  
+  // Get device name from various possible fields
+  // Check iot_box relation first, then direct fields on anomaly
+  const deviceName = getIoTBoxDisplayName(anomaly.iot_box) || 
+    (anomaly.iot_box as any)?.device_name ||
+    (anomaly.iot_box as any)?.name ||
+    (anomaly as any)?.device_name ||
+    anomaly.device_id ||  // Use device_id directly (e.g., "Device_01")
+    (anomaly.iot_box_id ? `IoT Box #${anomaly.iot_box_id}` : 'Unknown Device');
+  
+  // Get anomaly type label (API may or may not provide it)
+  const anomalyTypeLabel = anomaly.anomaly_type_label || 
+    (anomaly.anomaly_type === 'sound_anomaly' ? 'Sound Anomaly' :
+     anomaly.anomaly_type === 'anti_tampering' ? 'Anti-Tampering Alert' :
+     anomaly.anomaly_type === 'crowded' ? 'Crowded Area Detected' : 'Unknown Anomaly');
+  
+  const anomalyTypeDisplay = anomaly.anomaly_type ? 
+    anomaly.anomaly_type.replace(/_/g, ' ').toUpperCase() : 'IOT ANOMALY';
 
   // Build image URL if exists
   const imageUrl = anomaly.image ? 
     `https://cristopher-perished-taren.ngrok-free.dev/storage/${anomaly.image}` : null;
+  
+  // Format timestamp safely
+  const formattedTimestamp = anomaly.created_at ? formatTimestamp(anomaly.created_at) : 'Unknown time';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -265,9 +295,9 @@ export default function AnomalyDetailsScreen() {
               <Ionicons name={getAnomalyIcon(anomaly.anomaly_type)} size={32} color={iconColor} />
             </View>
             <View style={styles.typeInfo}>
-              <Text style={styles.typeTitle}>{anomaly.anomaly_type_label}</Text>
+              <Text style={styles.typeTitle}>{anomalyTypeLabel}</Text>
               <Text style={styles.typeSubtitle}>
-                {anomaly.anomaly_type.replace('_', ' ').toUpperCase()}
+                {anomalyTypeDisplay}
               </Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: isPending ? '#fef3c7' : '#d1fae5' }]}>
@@ -286,11 +316,29 @@ export default function AnomalyDetailsScreen() {
           >
             <Text style={styles.sectionLabel}>CAPTURED IMAGE</Text>
             <View style={styles.imageContainer}>
-              <Image
-                source={{ uri: imageUrl }}
-                style={styles.anomalyImage}
-                contentFit="cover"
-              />
+              {imageError ? (
+                <View style={styles.imagePlaceholder}>
+                  <Ionicons name="image-outline" size={48} color={colors.text.tertiary} />
+                  <Text style={styles.imagePlaceholderText}>Image unavailable</Text>
+                  <Text style={styles.imagePlaceholderSubtext}>403 - Access denied</Text>
+                </View>
+              ) : (
+                <Image
+                  source={{ 
+                    uri: imageUrl,
+                    headers: {
+                      'Authorization': `Bearer ${accessToken}`,
+                      'ngrok-skip-browser-warning': 'true',
+                    }
+                  }}
+                  style={styles.anomalyImage}
+                  contentFit="cover"
+                  onError={(e) => {
+                    console.log('[AnomalyDetails] Image load error:', e);
+                    setImageError(true);
+                  }}
+                />
+              )}
             </View>
           </Animated.View>
         )}
@@ -330,7 +378,7 @@ export default function AnomalyDetailsScreen() {
             </View>
             <View style={styles.infoContent}>
               <Text style={styles.infoLabel}>Detected At</Text>
-              <Text style={styles.infoValue}>{formatTimestamp(anomaly.created_at)}</Text>
+              <Text style={styles.infoValue}>{formattedTimestamp}</Text>
             </View>
           </View>
 
@@ -590,6 +638,28 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,
     borderRadius: 12,
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    backgroundColor: colors.background.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    borderStyle: 'dashed',
+  },
+  imagePlaceholderText: {
+    marginTop: spacing.sm,
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.text.secondary,
+  },
+  imagePlaceholderSubtext: {
+    marginTop: spacing.xs,
+    fontSize: 12,
+    color: colors.text.tertiary,
   },
   infoRow: {
     flexDirection: 'row',
