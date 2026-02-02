@@ -1,19 +1,20 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { ImageViewer } from '@/components/ui/image-viewer';
+import { reportDetailsStyles as styles } from '@/app/report-details.styles';
 import { RejectSheet } from '@/components/news/reject-sheet';
+import { ImageViewer } from '@/components/ui/image-viewer';
+import { DesignSystem } from '@/constants/design-system';
+import type { EmergencyReport } from '@/types';
+import {
+    cleanTitle,
+    formatDateReadable,
+    formatReportId,
+    formatTime12Hour,
+    getStatusColor,
+} from '@/utils/reportHelpers';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
-import type { EmergencyReport, RelatedReport } from '@/types';
-import { DesignSystem } from '@/constants/design-system';
-import {
-  cleanTitle,
-  formatDateReadable,
-  formatReportId,
-  formatTime12Hour,
-} from '@/utils/reportHelpers';
-import { reportDetailsStyles as styles } from '@/app/report-details.styles';
 
 const { colors, spacing, typography } = DesignSystem;
 
@@ -270,58 +271,70 @@ export function ReportDetailsBody({
         </View>
       </Animated.View>
 
-      {/* Status Timeline */}
+      {/* Status Timeline - only shows phases that have been reached */}
       <Animated.View entering={FadeInDown.delay(460).duration(500)} style={styles.timelineSection}>
         <View style={styles.timelineHeader}>
           <Ionicons name="time-outline" size={18} color={colors.primary.blue} />
           <Text style={styles.timelineTitle}>Status Timeline</Text>
         </View>
-        <View style={styles.timelineList}>
-          {statusSteps.map((step, index) => {
-            const isActive =
-              report.status === step.key ||
-              (step.key === 'acknowledged' && report.status === 'resolved') ||
-              (step.key === 'pending' && report.status === 'pending');
-            const isCompleted =
-              step.key === 'pending' ||
-              (step.key === 'acknowledged' &&
-                (report.status === 'acknowledged' || report.status === 'resolved')) ||
-              (step.key === 'resolved' && report.status === 'resolved');
+        <View style={[styles.timelineList, styles.timelineContainer]}>
+          {statusSteps
+            .filter((step) => {
+              // Only show steps that have been reached based on current status
+              if (report.status === 'pending') {
+                return step.key === 'pending';
+              }
+              if (report.status === 'acknowledged') {
+                return step.key === 'pending' || step.key === 'acknowledged';
+              }
+              if (report.status === 'resolved') {
+                return step.key === 'pending' || step.key === 'acknowledged' || step.key === 'resolved';
+              }
+              // For rejected status, show pending + rejected
+              if (report.status === 'rejected') {
+                return step.key === 'pending';
+              }
+              return false;
+            })
+            .map((step, index, filteredSteps) => {
+              const statusColor = getStatusColor(step.key);
+              const isLastStep = index === filteredSteps.length - 1;
 
-            const dotColor =
-              isActive || isCompleted ? colors.primary.blue : colors.border.light;
-            const textOpacity = isCompleted || isActive ? 1 : 0.5;
-
-            return (
-              <View key={step.key} style={styles.timelineItem}>
-                <View style={styles.timelineMarker}>
-                  <View
-                    style={[
-                      styles.timelineDot,
-                      {
-                        backgroundColor: dotColor,
-                      },
-                    ]}
-                  />
-                  {index < statusSteps.length - 1 && <View style={styles.timelineLine} />}
-                </View>
-                <View style={styles.timelineContent}>
-                  <Text style={[styles.timelineStatus, { opacity: textOpacity }]}>
-                    {step.label}
-                  </Text>
-                  <Text style={[styles.timelineDescription, { opacity: textOpacity }]}>
-                    {step.description}
-                  </Text>
-                  {index === 0 && (
-                    <Text style={styles.timelineMeta}>
-                      Reported {formatDateReadable(report.timestamp)}{' '}
-                      {formatTime12Hour(report.timestamp)}
+              return (
+                <View
+                  key={step.key}
+                  style={styles.timelineItem}
+                >
+                  <View style={styles.timelineIconContainer}>
+                    <View
+                      style={[
+                        styles.timelineDot,
+                        { backgroundColor: statusColor.borderColor },
+                      ]}
+                    />
+                    {!isLastStep && <View style={styles.timelineLine} />}
+                  </View>
+                  <View style={styles.timelineContent}>
+                    <View style={styles.timelineHeaderRow}>
+                      <Text style={styles.timelineStatus}>{step.label}</Text>
+                      {index === 0 && (
+                        <Text style={styles.timelineDate}>
+                          {formatDateReadable(report.timestamp)} {formatTime12Hour(report.timestamp)}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.timelineDescription}>
+                      {step.description}
                     </Text>
-                  )}
+                    {index === 0 && (
+                      <Text style={styles.timelineMeta}>
+                        Reported {formatDateReadable(report.timestamp)}
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              </View>
-            );
-          })}
+              );
+            })}
         </View>
       </Animated.View>
 

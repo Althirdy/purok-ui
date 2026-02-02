@@ -270,52 +270,58 @@ export const ReportCard: React.MemoExoticComponent<React.NamedExoticComponent<Re
   return true;
 });
 
+// Layout aligned with uw-citizen ConcernCard: padding 16, marginBottom 8, icon 40x40, content marginLeft 52
 const styles = StyleSheet.create({
   card: {
-    padding: spacing.lg, // 16px same as citizen
-    marginBottom: spacing.sm, // 8px same as citizen
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
+    padding: spacing.md, // 16px - same as citizen ConcernCard Spacing.lg
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border?.default ?? '#e2e8f0',
+    backgroundColor: colors.background?.card ?? '#ffffff',
     borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  
+
   topRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: 4, // Same as citizen
+    marginBottom: 4,
     gap: 8,
   },
-  
+
   idBadge: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.background?.secondary ?? '#f1f5f9',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  
+
   idText: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: colors.text?.secondary ?? '#94a3b8',
     fontWeight: '600',
     fontFamily: 'monospace',
   },
-  
+
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 8, // Same as citizen
+    marginBottom: 8,
   },
-  
+
   iconContainer: {
-    width: 40, // Same as citizen (was 48)
-    height: 40, // Same as citizen (was 48)
-    backgroundColor: '#f1f5f9',
-    borderRadius: 20, // Same as citizen (was 24)
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.background?.secondary ?? '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12, // Same as citizen (was 16)
+    marginRight: 12,
   },
   
   info: {
