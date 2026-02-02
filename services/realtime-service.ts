@@ -722,14 +722,36 @@ export async function subscribeToStatusUpdates(
 // Anomaly created event payload from WebSocket
 type AnomalyCreatedPayload = {
   id: number;
+  device_id?: string;
   anomaly_type: 'sound_anomaly' | 'anti_tampering' | 'crowded';
   anomaly_type_label: string;
+  image?: string;
+  details?: Array<{
+    vibration?: string;
+    mic_left?: string;
+    mic_right?: string;
+    hall_effect?: string;
+    audio_floor?: string;
+    people_detected?: string;
+  }>;
+  is_confirmed: boolean;
   iot_box: {
     id: number;
-    name: string;
-    location?: string;
+    device_name?: string;       // WebSocket payload field
+    display_location?: string;  // WebSocket payload field (combined location)
+    name?: string;              // Alternative field
+    location_name?: string;     // From nested location object
+    location?: string;          // Alternative field
+    barangay?: string;          // Barangay name from API
+    latitude?: string;
+    longitude?: string;
+    is_online?: boolean;
   };
-  location?: string;
+  location?: {
+    id: number;
+    location_name: string;
+    barangay: string;
+  };
   created_at: string;
 };
 
@@ -771,8 +793,8 @@ export async function subscribeToAnomalyLogs(
           id: data.id,
           type: data.anomaly_type,
           label: data.anomaly_type_label,
-          iotBox: data.iot_box?.name,
-          location: data.location || data.iot_box?.location,
+          iotBox: data.iot_box?.device_name || data.iot_box?.name || `Device ${data.iot_box?.id}`,
+          location: data.iot_box?.display_location || data.location?.location_name,
         });
         
         onAnomalyCreated(data);

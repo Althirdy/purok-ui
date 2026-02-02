@@ -57,7 +57,7 @@ export async function fetchAnomalyLogs(
   params: AnomalyLogsQueryParams = {}
 ): Promise<AnomalyLogsListResponse> {
   const queryString = buildQueryString(params);
-  const response = await httpGet<AnomalyLogsListResponse>(
+  const response = await httpGet<any>(
     `${BASE_PATH}${queryString}`,
     {
       headers: {
@@ -65,7 +65,62 @@ export async function fetchAnomalyLogs(
       },
     }
   );
-  return response;
+  
+  // Debug: Log raw response structure
+  console.log('[AnomalyService] Raw response:', JSON.stringify(response, null, 2).substring(0, 500));
+  
+  // Handle different response structures
+  // Expected: { success: true, data: [...], meta: {...} }
+  // Possible: { success: true, data: { data: [...], ... }, meta: {...} }
+  // Or Laravel paginated: { data: [...], current_page: ..., ... }
+  
+  let anomalies: AnomalyLog[] = [];
+  let meta: any = null;
+  
+  if (Array.isArray(response.data)) {
+    // Direct array: { data: [...] }
+    anomalies = response.data;
+    meta = response.meta;
+  } else if (response.data?.anomaly_logs?.data && Array.isArray(response.data.anomaly_logs.data)) {
+    // Deeply nested: { data: { anomaly_logs: { data: [...], ... } } }
+    const pagination = response.data.anomaly_logs;
+    anomalies = pagination.data;
+    meta = {
+      current_page: pagination.current_page,
+      last_page: pagination.last_page,
+      per_page: pagination.per_page,
+      total: pagination.total,
+      from: pagination.from,
+      to: pagination.to,
+    };
+  } else if (response.data?.data && Array.isArray(response.data.data)) {
+    // Nested: { data: { data: [...], ... } }
+    anomalies = response.data.data;
+    meta = response.data.meta || response.meta || {
+      current_page: response.data.current_page,
+      last_page: response.data.last_page,
+      per_page: response.data.per_page,
+      total: response.data.total,
+    };
+  } else if (Array.isArray(response)) {
+    // Direct array response
+    anomalies = response;
+  }
+  
+  console.log('[AnomalyService] Parsed anomalies count:', anomalies.length);
+  
+  return {
+    success: response.success ?? true,
+    data: anomalies,
+    meta: meta || {
+      current_page: 1,
+      from: 1,
+      last_page: 1,
+      per_page: 15,
+      to: anomalies.length,
+      total: anomalies.length,
+    },
+  };
 }
 
 /**

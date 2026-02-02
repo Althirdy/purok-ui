@@ -15,22 +15,68 @@ export const ANOMALY_TYPE_LABELS: Record<AnomalyType, string> = {
 // IoT Box information
 export interface IoTBox {
   id: number;
-  name: string;
-  location?: string;
+  // API returns different field names in different contexts
+  name?: string;              // Alternative field
+  device_name?: string;       // WebSocket payload field
+  location_name?: string;     // From nested location object
+  display_location?: string;  // WebSocket payload field (combined location)
+  location?: string;          // Alternative field
+  barangay?: string;          // Barangay name from API
   latitude?: number | string | null;
   longitude?: number | string | null;
   status?: 'online' | 'offline' | 'maintenance';
+  is_online?: boolean;        // WebSocket payload field
+}
+
+// Location object (separate from iot_box in some responses)
+export interface AnomalyLocation {
+  id: number;
+  location_name: string;
+  barangay: string;
+}
+
+// Helper to get IoT box display name
+export function getIoTBoxDisplayName(iotBox?: IoTBox): string {
+  if (!iotBox) return 'Unknown Device';
+  // Priority: device_name > location_name > name > fallback
+  return iotBox.device_name || iotBox.location_name || iotBox.name || `Device ${iotBox.id}`;
+}
+
+// Helper to get IoT box location
+export function getIoTBoxLocation(iotBox?: IoTBox): string | undefined {
+  if (!iotBox) return undefined;
+  // Priority: display_location > barangay > location
+  return iotBox.display_location || iotBox.barangay || iotBox.location;
+}
+
+// Helper to get location display string from AnomalyLocation or string
+export function getLocationDisplay(location?: AnomalyLocation | string): string | undefined {
+  if (!location) return undefined;
+  if (typeof location === 'string') return location;
+  // It's an object - combine location_name and barangay
+  const parts = [location.location_name, location.barangay].filter(Boolean);
+  return parts.length > 0 ? parts.join(', ') : undefined;
 }
 
 // Single Anomaly Log
 export interface AnomalyLog {
   id: number;
+  device_id?: string;           // Device ID string from IoT box
   anomaly_type: AnomalyType;
   anomaly_type_label: string;
-  iot_box_id: number;
+  iot_box_id?: number;
   iot_box?: IoTBox;
   is_confirmed: boolean;
-  location?: string;
+  location?: AnomalyLocation | string;  // Can be object or string
+  image?: string;               // Anomaly image path
+  details?: Array<{             // Sensor details
+    vibration?: string;
+    mic_left?: string;
+    mic_right?: string;
+    hall_effect?: string;
+    audio_floor?: string;
+    people_detected?: string;
+  }>;
   latitude?: number | string | null;
   longitude?: number | string | null;
   description?: string;

@@ -275,15 +275,23 @@ export function useAnomalyFeed(options: UseAnomalyFeedOptions = {}): UseAnomalyF
         processedAnomalyIds.current.add(anomaly.id);
         console.log('[AnomalyFeed] 🚨 New anomaly received:', anomaly.id);
         
+        // Handle location - can be object or string
+        const locationValue = anomaly.location;
+        const locationDisplay = anomaly.iot_box?.display_location || 
+          (typeof locationValue === 'object' && locationValue ? `${locationValue.location_name}, ${locationValue.barangay}` : locationValue) ||
+          anomaly.iot_box?.barangay;
+        
         // Add to list (prepend for newest first)
         const newAnomalyLog: AnomalyLog = {
           id: anomaly.id,
           anomaly_type: anomaly.anomaly_type,
           anomaly_type_label: anomaly.anomaly_type_label,
-          iot_box_id: anomaly.iot_box.id,
+          iot_box_id: anomaly.iot_box?.id,
           iot_box: anomaly.iot_box,
-          is_confirmed: false,
-          location: anomaly.location || anomaly.iot_box.location,
+          is_confirmed: anomaly.is_confirmed ?? false,
+          location: anomaly.location,
+          image: anomaly.image,
+          details: anomaly.details,
           created_at: anomaly.created_at,
         };
         
@@ -310,10 +318,13 @@ export function useAnomalyFeed(options: UseAnomalyFeedOptions = {}): UseAnomalyF
           };
         });
         
+        // Get display name - handle device_name, name, or location_name fields
+        const iotBoxName = anomaly.iot_box?.device_name || anomaly.iot_box?.location_name || anomaly.iot_box?.name || `Device ${anomaly.iot_box?.id}`;
+        
         // Trigger push notification
         tryScheduleNotification(
           `🚨 ${anomaly.anomaly_type_label}`,
-          `Detected at ${anomaly.iot_box.name || anomaly.location || 'Unknown location'}`,
+          `Detected at ${iotBoxName || locationDisplay || 'Unknown location'}`,
           { anomalyId: anomaly.id }
         );
         

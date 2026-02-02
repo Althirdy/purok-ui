@@ -1,10 +1,12 @@
 /**
  * Anomaly Card Component - Displays IoT anomaly logs
+ * Styled to match ReportCard from citizen concerns
  */
 
 import { Card } from '@/components/common/card';
 import { DesignSystem } from '@/constants/design-system';
 import type { AnomalyLog, AnomalyType } from '@/types/anomaly';
+import { getIoTBoxDisplayName, getIoTBoxLocation, getLocationDisplay } from '@/types/anomaly';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -90,6 +92,7 @@ function AnomalyCardComponent({ anomaly, onPress, onConfirm, onDismiss }: Anomal
   const iconColor = getAnomalyColor(anomaly.anomaly_type);
   const badgeColors = getAnomalyBadgeColors(anomaly.anomaly_type);
   const isPending = !anomaly.is_confirmed;
+  const locationDisplay = getLocationDisplay(anomaly.location) || getIoTBoxLocation(anomaly.iot_box);
 
   return (
     <Card 
@@ -97,181 +100,259 @@ function AnomalyCardComponent({ anomaly, onPress, onConfirm, onDismiss }: Anomal
       variant="default" 
       style={styles.card}
     >
-      {/* Status indicator strip */}
-      <View 
-        style={[
-          styles.statusStrip, 
-          { backgroundColor: isPending ? '#f59e0b' : '#10b981' }
-        ]} 
-      />
-
-      {/* Main content */}
-      <View style={styles.content}>
-        {/* Header: Icon + Type + ID */}
-        <View style={styles.header}>
-          <View style={[styles.iconContainer, { backgroundColor: iconColor + '15' }]}>
-            <Ionicons 
-              name={getAnomalyIcon(anomaly.anomaly_type)} 
-              size={22} 
-              color={iconColor} 
-            />
-          </View>
-
-          <View style={styles.headerInfo}>
-            <Text style={styles.title}>{anomaly.anomaly_type_label}</Text>
-            <Text style={styles.idText}>ID: {anomaly.id}</Text>
-          </View>
-
-          {/* Status Badge */}
-          <View style={[styles.statusBadge, { backgroundColor: isPending ? '#fef3c7' : '#d1fae5' }]}>
-            <Text style={[styles.statusText, { color: isPending ? '#b45309' : '#047857' }]}>
-              {isPending ? 'Pending' : 'Confirmed'}
-            </Text>
-          </View>
+      {/* Top Row: Type Badge + ID Badge */}
+      <View style={styles.topRow}>
+        <View style={[styles.typeBadge, { backgroundColor: badgeColors.bg }]}>
+          <Text style={[styles.typeBadgeText, { color: badgeColors.text }]}>
+            IoT Anomaly
+          </Text>
         </View>
-
-        {/* IoT Box Info */}
-        {anomaly.iot_box && (
-          <View style={styles.infoRow}>
-            <Ionicons name="hardware-chip-outline" size={16} color={colors.text.secondary} />
-            <Text style={styles.infoText}>{anomaly.iot_box.name}</Text>
-          </View>
-        )}
-
-        {/* Location */}
-        {(anomaly.location || anomaly.iot_box?.location) && (
-          <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={16} color={colors.text.secondary} />
-            <Text style={styles.infoText} numberOfLines={1}>
-              {anomaly.location || anomaly.iot_box?.location}
-            </Text>
-          </View>
-        )}
-
-        {/* Timestamp */}
-        <View style={styles.infoRow}>
-          <Ionicons name="time-outline" size={16} color={colors.text.secondary} />
-          <Text style={styles.infoText}>{formatTimestamp(anomaly.created_at)}</Text>
+        <View style={styles.idBadge}>
+          <Text style={styles.idText}>#{anomaly.id}</Text>
         </View>
-
-        {/* Action buttons for pending anomalies */}
-        {isPending && (onConfirm || onDismiss) && (
-          <View style={styles.actions}>
-            {onDismiss && (
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.dismissButton]}
-                onPress={() => onDismiss(anomaly.id)}
-              >
-                <Ionicons name="close-outline" size={18} color="#64748b" />
-                <Text style={styles.dismissButtonText}>Dismiss</Text>
-              </TouchableOpacity>
-            )}
-            {onConfirm && (
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.confirmButton]}
-                onPress={() => onConfirm(anomaly.id)}
-              >
-                <Ionicons name="checkmark-outline" size={18} color="#fff" />
-                <Text style={styles.confirmButtonText}>Confirm</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
       </View>
+
+      {/* Header: Icon, Title, Status */}
+      <View style={styles.header}>
+        {/* Icon on Left */}
+        <View style={[styles.iconContainer, { backgroundColor: iconColor + '15' }]}>
+          <Ionicons name={getAnomalyIcon(anomaly.anomaly_type)} size={24} color={iconColor} />
+        </View>
+
+        {/* Content */}
+        <View style={styles.info}>
+          <Text style={styles.title} numberOfLines={2}>{anomaly.anomaly_type_label}</Text>
+          <Text style={[styles.category, { color: iconColor }]}>
+            {getIoTBoxDisplayName(anomaly.iot_box)}
+          </Text>
+        </View>
+
+        {/* Status Badge on Right */}
+        <View style={[styles.statusBadge, { backgroundColor: isPending ? '#fef3c7' : '#d1fae5' }]}>
+          <Text style={[styles.statusText, { color: isPending ? '#b45309' : '#047857' }]}>
+            {isPending ? 'Pending' : 'Confirmed'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Location - Indented */}
+      {locationDisplay && (
+        <View style={styles.locationRow}>
+          <Ionicons name="location-outline" size={14} color={colors.text.secondary} />
+          <Text style={styles.location} numberOfLines={1}>{locationDisplay}</Text>
+        </View>
+      )}
+
+      {/* Footer Row: Timestamp */}
+      <View style={styles.footer}>
+        <View style={styles.timestampRow}>
+          <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
+          <Text style={styles.timestampText}>{formatTimestamp(anomaly.created_at)}</Text>
+        </View>
+      </View>
+
+      {/* Action Buttons - shown for pending anomalies */}
+      {isPending && (onPress || onConfirm || onDismiss) && (
+        <View style={styles.actionsContainer}>
+          {onPress && (
+            <TouchableOpacity 
+              style={styles.seeMoreButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                onPress(anomaly.id);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.seeMoreText}>See More</Text>
+            </TouchableOpacity>
+          )}
+          {onDismiss && (
+            <TouchableOpacity 
+              style={styles.dismissButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                onDismiss(anomaly.id);
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close-outline" size={16} color="#64748b" />
+              <Text style={styles.dismissText}>Dismiss</Text>
+            </TouchableOpacity>
+          )}
+          {onConfirm && (
+            <TouchableOpacity 
+              style={styles.confirmButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                onConfirm(anomaly.id);
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="checkmark-outline" size={16} color="#fff" />
+              <Text style={styles.confirmText}>Confirm</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </Card>
   );
 }
 
+// Layout aligned with ReportCard styling
 const styles = StyleSheet.create({
   card: {
-    marginBottom: spacing.md,
-    marginHorizontal: spacing.md,
-    padding: 0,
-    overflow: 'hidden',
-    flexDirection: 'row',
-  },
-  statusStrip: {
-    width: 4,
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-  },
-  content: {
-    flex: 1,
     padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border?.default ?? '#e2e8f0',
+    backgroundColor: colors.background?.card ?? '#ffffff',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  typeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  typeBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  idBadge: {
+    backgroundColor: colors.background?.secondary ?? '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  idText: {
+    fontSize: 12,
+    color: colors.text?.secondary ?? '#94a3b8',
+    fontWeight: '600',
+    fontFamily: 'monospace',
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
+    alignItems: 'flex-start',
+    marginBottom: 8,
   },
   iconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
+    borderRadius: 20,
     alignItems: 'center',
-    marginRight: spacing.sm,
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  headerInfo: {
+  info: {
     flex: 1,
   },
   title: {
-    fontSize: typography.fontSize.base,
-    fontWeight: '600',
-    color: colors.text.primary,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 4,
   },
-  idText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.tertiary,
-    marginTop: 2,
+  category: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   statusBadge: {
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   statusText: {
-    fontSize: typography.fontSize.xs,
+    fontSize: 12,
     fontWeight: '600',
   },
-  infoRow: {
+  locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.xs,
-    gap: spacing.xs,
-  },
-  infoText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-    flex: 1,
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: spacing.md,
-    gap: spacing.sm,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 8,
+    marginLeft: 52, // Align with content after icon
+    marginBottom: 8,
     gap: 4,
   },
-  dismissButton: {
-    backgroundColor: '#f1f5f9',
+  location: {
+    fontSize: 14,
+    color: colors.text?.secondary ?? '#64748b',
+    flex: 1,
   },
-  dismissButtonText: {
-    fontSize: typography.fontSize.xs,
+  footer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginLeft: 52, // Align with content after icon
+    marginTop: 4,
+  },
+  timestampRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  timestampText: {
+    fontSize: 13,
+    color: colors.text?.secondary ?? '#94a3b8',
+    fontWeight: '500',
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border?.light ?? '#f1f5f9',
+    gap: 8,
+  },
+  seeMoreButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary?.blue ?? '#1a73e8',
+  },
+  seeMoreText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary?.blue ?? '#1a73e8',
+  },
+  dismissButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    gap: 4,
+  },
+  dismissText: {
+    fontSize: 13,
     fontWeight: '600',
     color: '#64748b',
   },
   confirmButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
     backgroundColor: '#10b981',
+    gap: 4,
   },
-  confirmButtonText: {
-    fontSize: typography.fontSize.xs,
+  confirmText: {
+    fontSize: 13,
     fontWeight: '600',
     color: '#fff',
   },

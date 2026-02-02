@@ -2,6 +2,7 @@
  * News Feed Screen - Main Dashboard for Purok Officials
  */
 
+import { AnomalyCard } from '@/components/anomaly/anomaly-card';
 import { DraggableNotificationBell } from '@/components/common/draggable-notification-bell';
 import { Toast, type ToastData } from '@/components/common/toast';
 import { EmptyState } from '@/components/news/empty-state';
@@ -12,7 +13,9 @@ import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
 import { useNotifications } from '@/context/notification-context';
+import { useAnomalyFeed } from '@/hooks/use-anomaly-feed';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
+import type { AnomalyLog } from '@/types/anomaly';
 import type { EmergencyReport } from '@/types';
 import { router, useFocusEffect } from 'expo-router';
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
@@ -27,6 +30,11 @@ const FilterModal = lazy(() => import('@/components/news/filter-modal').then(m =
 const { colors, spacing } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 768;
+
+// Unified feed item type - can be either a report or an anomaly
+type FeedItem = 
+  | { type: 'report'; data: EmergencyReport; timestamp: Date }
+  | { type: 'anomaly'; data: AnomalyLog; timestamp: Date };
 
 const styles = StyleSheet.create({
   listContent: {
@@ -56,6 +64,9 @@ export default function NewsFeedScreen() {
     router.push({ pathname: 'report-details', params: { reportId } } as any);
   }, []);
 
+  const handleAnomalyPress = useCallback((anomalyId: number) => {
+    router.push({ pathname: 'anomaly-details', params: { anomalyId: String(anomalyId) } } as any);
+  }, []);
 
   const {
     reports,
@@ -117,13 +128,106 @@ export default function NewsFeedScreen() {
     },
   });
 
+  // Anomaly Feed - IoT Box anomalies
+  const {
+    anomalies,
+    loading: anomaliesLoading,
+    refreshAnomalies,
+    confirmAnomalyById,
+    dismissAnomalyById,
+  } = useAnomalyFeed({
+    onNewAnomaly: async (anomaly) => {
+      // Get display name - handle device_name, name, or location_name fields
+      const iotBoxName = anomaly.iot_box?.device_name || anomaly.iot_box?.location_name || anomaly.iot_box?.name || `Device ${anomaly.iot_box?.id}`;
+      // Handle location as object or string
+      const locationObj = anomaly.location;
+      const locationName = anomaly.iot_box?.display_location || 
+        (typeof locationObj === 'object' && locationObj ? `${locationObj.location_name}, ${locationObj.barangay}` : locationObj) ||
+        anomaly.iot_box?.barangay || 
+        'Unknown location';
+      
+      console.log('[NewsFeed] 🚨 New anomaly received from Pusher:', {
+        id: anomaly.id,
+        type: anomaly.anomaly_type,
+        label: anomaly.anomaly_type_label,
+        iotBox: iotBoxName,
+      });
+
+      // Haptic feedback for anomalies - always heavy for alerts
+      try {
+        const { impactAsync, ImpactFeedbackStyle } = await import('expo-haptics');
+        impactAsync(ImpactFeedbackStyle.Heavy);
+        console.log('[NewsFeed] ✅ Haptic feedback triggered for anomaly');
+      } catch (error) {
+        console.error('[NewsFeed] Error with haptic feedback:', error);
+      }
+
+      // Show toast for new anomaly
+      setToast({
+        id: `toast-anomaly-${anomaly.id}-${Date.now()}`,
+        title: `🚨 ${anomaly.anomaly_type_label}`,
+        message: `Detected at ${iotBoxName} - ${locationName}`,
+        severity: 'high',
+      });
+      
+      console.log('[NewsFeed] ✅ Toast displayed for new anomaly');
+    },
+  });
+
+  // Handle anomaly confirm
+  const handleAnomalyConfirm = useCallback(async (id: number) => {
+    try {
+      const success = await confirmAnomalyById(id);
+      if (success) {
+        setToast({
+          id: `toast-anomaly-confirm-${id}-${Date.now()}`,
+          title: '✅ Anomaly Confirmed',
+          message: 'The anomaly has been confirmed',
+          severity: 'low',
+        });
+      }
+    } catch (error) {
+      console.error('[NewsFeed] Failed to confirm anomaly:', error);
+      setToast({
+        id: `toast-anomaly-error-${Date.now()}`,
+        title: '❌ Failed to Confirm',
+        message: 'Please try again',
+        severity: 'high',
+      });
+    }
+  }, [confirmAnomalyById]);
+
+  // Handle anomaly dismiss
+  const handleAnomalyDismiss = useCallback(async (id: number) => {
+    try {
+      const success = await dismissAnomalyById(id);
+      if (success) {
+        setToast({
+          id: `toast-anomaly-dismiss-${id}-${Date.now()}`,
+          title: '✅ Anomaly Dismissed',
+          message: 'The anomaly has been dismissed',
+          severity: 'low',
+        });
+      }
+    } catch (error) {
+      console.error('[NewsFeed] Failed to dismiss anomaly:', error);
+      setToast({
+        id: `toast-anomaly-error-${Date.now()}`,
+        title: '❌ Failed to Dismiss',
+        message: 'Please try again',
+        severity: 'high',
+      });
+    }
+  }, [dismissAnomalyById]);
+
   // Refresh reports when screen gains focus (e.g., coming back from report-details)
   // This ensures the news-feed stays in sync after status updates on other screens
   useFocusEffect(
     useCallback(() => {
-      console.log('[NewsFeed] 👁️ Screen focused - refreshing reports...');
+      console.log('[NewsFeed] 👁️ Screen focused - refreshing reports and anomalies...');
       fetchReports('all');
-    }, [fetchReports])
+      refreshAnomalies();
+    }, [fetchReports, refreshAnomalies])
   );
 
   // Debug: Log toast state changes
@@ -247,8 +351,35 @@ export default function NewsFeedScreen() {
     );
   }, [handleReportPress, handleAcknowledgeAction, handleResolveAction]);
 
-  // Memoize keyExtractor
-  const keyExtractor = useCallback((item: EmergencyReport) => item.id, []);
+  // Render anomaly item
+  const renderAnomalyItem = useCallback(({ item, index }: { item: AnomalyLog; index: number }) => {
+    return (
+      <Animated.View
+        entering={FadeInDown.delay(120 + index * 40).duration(450)}
+      >
+        <AnomalyCard
+          anomaly={item}
+          onPress={handleAnomalyPress}
+          onConfirm={!item.is_confirmed ? handleAnomalyConfirm : undefined}
+          onDismiss={!item.is_confirmed ? handleAnomalyDismiss : undefined}
+        />
+      </Animated.View>
+    );
+  }, [handleAnomalyPress, handleAnomalyConfirm, handleAnomalyDismiss]);
+
+  // Unified render item for mixed feed
+  const renderFeedItem = useCallback(({ item, index }: { item: FeedItem; index: number }) => {
+    if (item.type === 'report') {
+      return renderReportItem({ item: item.data, index });
+    } else {
+      return renderAnomalyItem({ item: item.data, index });
+    }
+  }, [renderReportItem, renderAnomalyItem]);
+
+  // Memoize keyExtractor for unified feed
+  const keyExtractor = useCallback((item: FeedItem) => {
+    return item.type === 'report' ? `report-${item.data.id}` : `anomaly-${item.data.id}`;
+  }, []);
 
   // Calculate counts for header (memoized to prevent recalculation)
   const pendingCount = useMemo(() => reports.filter(r => r.status === 'pending').length, [reports]);
@@ -257,6 +388,7 @@ export default function NewsFeedScreen() {
   const manualCount = useMemo(() => reports.filter(r => r.reportType === 'manual' || (!r.reportType && !r.audio)).length, [reports]);
   const voiceCount = useMemo(() => reports.filter(r => r.reportType === 'voice' || !!r.audio).length, [reports]);
   const totalCount = reports.length;
+  const anomalyCount = useMemo(() => anomalies.filter(a => !a.is_confirmed).length, [anomalies]);
   
   // Derived: reports filtered by search query, status, and report type
   const displayedReports = useMemo(() => {
@@ -288,6 +420,26 @@ export default function NewsFeedScreen() {
       return title.includes(q) || location.includes(q);
     });
   }, [reports, committedQuery, statusFilter, reportTypeFilter]);
+
+  // Unified feed: Combine reports and anomalies, sorted by timestamp (newest first)
+  const unifiedFeed = useMemo((): FeedItem[] => {
+    const reportItems: FeedItem[] = displayedReports.map(report => ({
+      type: 'report' as const,
+      data: report,
+      timestamp: report.timestamp,
+    }));
+
+    const anomalyItems: FeedItem[] = anomalies.map(anomaly => ({
+      type: 'anomaly' as const,
+      data: anomaly,
+      timestamp: new Date(anomaly.created_at),
+    }));
+
+    // Combine and sort by timestamp (newest first)
+    return [...reportItems, ...anomalyItems].sort(
+      (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
+    );
+  }, [displayedReports, anomalies]);
   
   // Memoize header component - only recompute when dependencies change
   const memoizedHeader = useMemo(() => {
@@ -310,24 +462,35 @@ export default function NewsFeedScreen() {
     );
   }, [pendingCount, ongoingCount, resolvedCount, totalCount, statusFilter, reportTypeFilter, searchQuery, committedQuery]);
 
+  // Combined loading state
+  const isLoading = loading || anomaliesLoading;
+
+  // Handle unified refresh
+  const handleUnifiedRefresh = useCallback(async () => {
+    await Promise.all([
+      handleRefresh('all'),
+      refreshAnomalies(),
+    ]);
+  }, [handleRefresh, refreshAnomalies]);
+
   return (
     <View style={globalStyles.container}>
-      {/* Reports List */}
+      {/* Unified Feed - Reports + Anomalies */}
       <FlatList
-        data={displayedReports}
+        data={unifiedFeed}
         keyExtractor={keyExtractor}
-        renderItem={renderReportItem}
+        renderItem={renderFeedItem}
         ListHeaderComponent={memoizedHeader}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => handleRefresh('all')} // Always refresh all, filter client-side
+            onRefresh={handleUnifiedRefresh}
             tintColor={colors.primary.blue}
           />
         }
         ListEmptyComponent={
-          loading
+          isLoading
             ? <ReportCardSkeleton count={4} />
             : <EmptyState loading={false} />
         }
