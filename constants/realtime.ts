@@ -26,6 +26,9 @@ export const realtimeConfig = {
   purokChannelPrefix: 'private-purok-leader.',
   purokAssignmentEvent: 'concern.assigned',
   authEndpoint: (process.env.EXPO_PUBLIC_PUSHER_AUTH_ENDPOINT ?? DEFAULT_AUTH_ENDPOINT),
+  // IoT Box / Anomaly Logs
+  anomalyChannel: 'anomaly-logs',
+  anomalyCreatedEvent: 'anomaly.created',
 } as const;
 
 export type RealtimeConfig = typeof realtimeConfig;

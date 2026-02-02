@@ -105,3 +105,6 @@ export interface BadgeProps {
   variant?: 'default' | 'success' | 'warning' | 'error' | 'info';
 }
 
+// Re-export anomaly types
+export * from './anomaly';
+

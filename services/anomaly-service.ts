@@ -1,0 +1,204 @@
+/**
+ * Anomaly Service - API service for IoT Box / Anomaly Logs
+ * 
+ * Endpoints:
+ * - GET /api/v1/anomaly-logs - List all anomaly logs (paginated)
+ * - GET /api/v1/anomaly-logs/statistics - Dashboard statistics
+ * - GET /api/v1/anomaly-logs/{id} - Get single anomaly detail
+ * - PUT /api/v1/anomaly-logs/{id} - Confirm/dismiss anomaly
+ */
+
+import { httpGet, httpPut } from '@/lib/axios';
+import type {
+    AnomalyLog,
+    AnomalyLogResponse,
+    AnomalyLogsListResponse,
+    AnomalyLogsQueryParams,
+    AnomalyStatistics,
+    AnomalyStatisticsResponse,
+    UpdateAnomalyPayload,
+} from '@/types/anomaly';
+
+const BASE_PATH = '/api/v1/anomaly-logs';
+
+/**
+ * Build query string from params object
+ */
+function buildQueryString(params: AnomalyLogsQueryParams): string {
+  const searchParams = new URLSearchParams();
+  
+  if (params.anomaly_type) {
+    searchParams.append('anomaly_type', params.anomaly_type);
+  }
+  if (params.is_confirmed !== undefined) {
+    searchParams.append('is_confirmed', String(params.is_confirmed));
+  }
+  if (params.iot_box_id) {
+    searchParams.append('iot_box_id', String(params.iot_box_id));
+  }
+  if (params.per_page) {
+    searchParams.append('per_page', String(params.per_page));
+  }
+  if (params.page) {
+    searchParams.append('page', String(params.page));
+  }
+  
+  const queryString = searchParams.toString();
+  return queryString ? `?${queryString}` : '';
+}
+
+/**
+ * Fetch anomaly logs list (paginated)
+ * @param token - Auth token
+ * @param params - Query parameters for filtering
+ */
+export async function fetchAnomalyLogs(
+  token: string,
+  params: AnomalyLogsQueryParams = {}
+): Promise<AnomalyLogsListResponse> {
+  const queryString = buildQueryString(params);
+  const response = await httpGet<AnomalyLogsListResponse>(
+    `${BASE_PATH}${queryString}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return response;
+}
+
+/**
+ * Fetch anomaly statistics for dashboard
+ * @param token - Auth token
+ */
+export async function fetchAnomalyStatistics(
+  token: string
+): Promise<AnomalyStatistics> {
+  const response = await httpGet<AnomalyStatisticsResponse>(
+    `${BASE_PATH}/statistics`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return response.data;
+}
+
+/**
+ * Fetch single anomaly detail by ID
+ * @param token - Auth token
+ * @param id - Anomaly log ID
+ */
+export async function fetchAnomalyById(
+  token: string,
+  id: number
+): Promise<AnomalyLog> {
+  const response = await httpGet<AnomalyLogResponse>(
+    `${BASE_PATH}/${id}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return response.data;
+}
+
+/**
+ * Update anomaly status (confirm or dismiss)
+ * @param token - Auth token
+ * @param id - Anomaly log ID
+ * @param isConfirmed - Whether to confirm (true) or dismiss (false)
+ */
+export async function updateAnomalyStatus(
+  token: string,
+  id: number,
+  isConfirmed: boolean
+): Promise<AnomalyLog> {
+  const payload: UpdateAnomalyPayload = { is_confirmed: isConfirmed };
+  const response = await httpPut<AnomalyLogResponse>(
+    `${BASE_PATH}/${id}`,
+    payload,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return response.data;
+}
+
+/**
+ * Confirm an anomaly
+ * @param token - Auth token
+ * @param id - Anomaly log ID
+ */
+export async function confirmAnomaly(
+  token: string,
+  id: number
+): Promise<AnomalyLog> {
+  return updateAnomalyStatus(token, id, true);
+}
+
+/**
+ * Dismiss an anomaly
+ * @param token - Auth token
+ * @param id - Anomaly log ID
+ */
+export async function dismissAnomaly(
+  token: string,
+  id: number
+): Promise<AnomalyLog> {
+  return updateAnomalyStatus(token, id, false);
+}
+
+/**
+ * Fetch pending anomalies (not yet confirmed)
+ * @param token - Auth token
+ * @param perPage - Items per page (default 15)
+ */
+export async function fetchPendingAnomalies(
+  token: string,
+  perPage: number = 15
+): Promise<AnomalyLogsListResponse> {
+  return fetchAnomalyLogs(token, {
+    is_confirmed: false,
+    per_page: perPage,
+  });
+}
+
+/**
+ * Fetch anomalies by type
+ * @param token - Auth token
+ * @param type - Anomaly type filter
+ * @param perPage - Items per page (default 15)
+ */
+export async function fetchAnomaliesByType(
+  token: string,
+  type: 'sound_anomaly' | 'anti_tampering' | 'crowded',
+  perPage: number = 15
+): Promise<AnomalyLogsListResponse> {
+  return fetchAnomalyLogs(token, {
+    anomaly_type: type,
+    per_page: perPage,
+  });
+}
+
+/**
+ * Fetch anomalies for a specific IoT box
+ * @param token - Auth token
+ * @param iotBoxId - IoT box ID
+ * @param perPage - Items per page (default 15)
+ */
+export async function fetchAnomaliesByIoTBox(
+  token: string,
+  iotBoxId: number,
+  perPage: number = 15
+): Promise<AnomalyLogsListResponse> {
+  return fetchAnomalyLogs(token, {
+    iot_box_id: iotBoxId,
+    per_page: perPage,
+  });
+}

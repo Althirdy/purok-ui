@@ -715,4 +715,90 @@ export async function subscribeToStatusUpdates(
   }
 }
 
+// ============================================================================
+// Anomaly Logs Real-time Subscription
+// ============================================================================
+
+// Anomaly created event payload from WebSocket
+type AnomalyCreatedPayload = {
+  id: number;
+  anomaly_type: 'sound_anomaly' | 'anti_tampering' | 'crowded';
+  anomaly_type_label: string;
+  iot_box: {
+    id: number;
+    name: string;
+    location?: string;
+  };
+  location?: string;
+  created_at: string;
+};
+
+/**
+ * Subscribe to anomaly created events on the public anomaly-logs channel
+ * 
+ * Channel: anomaly-logs (public)
+ * Event: anomaly.created
+ * 
+ * @param onAnomalyCreated - Callback when a new anomaly is detected
+ * @returns Unsubscribe function
+ */
+export async function subscribeToAnomalyLogs(
+  onAnomalyCreated: (anomaly: AnomalyCreatedPayload) => void
+): Promise<() => void> {
+  try {
+    const pusher = await getPusherClient();
+    const channelName = 'anomaly-logs';
+    
+    console.log('[Pusher] 🔔 Subscribing to anomaly logs channel:', channelName);
+    
+    // Subscribe to public channel (no auth required)
+    const channel = pusher.subscribe(channelName);
+    
+    // Handle subscription success
+    channel.bind('pusher:subscription_succeeded', () => {
+      console.log('[Pusher] ✅ Successfully subscribed to', channelName);
+    });
+    
+    // Handle subscription error
+    channel.bind('pusher:subscription_error', (err: any) => {
+      console.error('[Pusher] ❌ Failed to subscribe to', channelName, err);
+    });
+    
+    // Anomaly created event handler
+    const anomalyCreatedHandler = (data: AnomalyCreatedPayload) => {
+      try {
+        console.log('[Pusher] 🚨 New anomaly detected:', {
+          id: data.id,
+          type: data.anomaly_type,
+          label: data.anomaly_type_label,
+          iotBox: data.iot_box?.name,
+          location: data.location || data.iot_box?.location,
+        });
+        
+        onAnomalyCreated(data);
+      } catch (error) {
+        console.error('[Pusher] ❌ Failed to process anomaly event:', error);
+      }
+    };
+    
+    // Bind to both event name formats (with and without leading dot)
+    channel.bind('.anomaly.created', anomalyCreatedHandler);
+    channel.bind('anomaly.created', anomalyCreatedHandler);
+    
+    console.log('[Pusher] ✅ Listening for anomaly events on', channelName);
+    
+    return () => {
+      console.log('[Pusher] Unsubscribing from anomaly logs channel:', channelName);
+      channel.unbind('.anomaly.created', anomalyCreatedHandler);
+      channel.unbind('anomaly.created', anomalyCreatedHandler);
+      pusher.unsubscribe(channelName);
+    };
+  } catch (error) {
+    console.error('[Pusher] Error setting up anomaly subscription:', error);
+    return () => {};
+  }
+}
+
+// Export the anomaly payload type for consumers
+export type { AnomalyCreatedPayload };
 
