@@ -2,23 +2,22 @@
  * Profile Screen - Purok profile, styled like citizen app profile
  */
 
+import { ProfileSkeleton } from '@/components/profile/profile-skeleton';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
-import { ProfileSkeleton } from '@/components/profile/profile-skeleton';
 import { getInitials } from '@/utils/userHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
     Alert,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
