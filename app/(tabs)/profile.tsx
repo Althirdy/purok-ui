@@ -99,17 +99,12 @@ export default function ProfileScreen() {
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
             </View>
-            <View style={styles.verificationBadge}>
-              <Ionicons name="time-outline" size={24} color="#f59e0b" />
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
             </View>
           </View>
           <Text style={styles.userName}>{user?.name || 'Purok Leader'}</Text>
           <Text style={styles.userRole}>Purok Leader</Text>
-          <View style={styles.verificationStatus}>
-            <Text style={[styles.verificationText, { color: '#f59e0b' }]}>
-              Pending Verification
-            </Text>
-          </View>
         </View>
 
         {/* Contact Information */}
@@ -227,7 +222,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
   },
-  verificationBadge: {
+  verifiedBadge: {
     position: 'absolute',
     bottom: 0,
     right: 0,
@@ -248,16 +243,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#64748b',
     marginBottom: 8,
-  },
-  verificationStatus: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: '#f1f5f9',
-  },
-  verificationText: {
-    fontSize: 14,
-    fontWeight: '500',
   },
   section: {
     backgroundColor: '#ffffff',
