@@ -61,9 +61,9 @@ export default function TabLayout() {
         <Tabs.Screen
           name="news-feed"
           options={{
-            title: 'Incident',
+            title: 'Feed',
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="warning-outline" size={size} color={color} />
+              <Ionicons name="list-outline" size={size} color={color} />
             ),
           }}
         />

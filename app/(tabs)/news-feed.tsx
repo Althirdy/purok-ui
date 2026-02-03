@@ -17,9 +17,10 @@ import { useAnomalyFeed } from '@/hooks/use-anomaly-feed';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
 import type { EmergencyReport } from '@/types';
 import type { AnomalyLog } from '@/types/anomaly';
+import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { Dimensions, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { Dimensions, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 // Lazy load heavy modals/sheets - only load when needed
@@ -36,10 +37,43 @@ type FeedItem =
   | { type: 'report'; data: EmergencyReport; timestamp: Date }
   | { type: 'anomaly'; data: AnomalyLog; timestamp: Date };
 
+// Feed type for tab selection
+type FeedType = 'concerns' | 'anomalies';
+
 const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: spacing.lg * (isTablet ? 1.5 : 1),
     paddingBottom: spacing.xl,
+  },
+  // Simple underline tab style
+  feedTabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+  },
+  feedTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -1,
+  },
+  feedTabActive: {
+    borderBottomColor: colors.primary.blue,
+  },
+  feedTabText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#94a3b8',
+  },
+  feedTabTextActive: {
+    fontWeight: '600',
+    color: colors.primary.blue,
   },
 });
 
@@ -54,6 +88,7 @@ export default function NewsFeedScreen() {
   const [reportTypeFilter, setReportTypeFilter] = useState<'all' | 'manual' | 'voice'>('all');
   const [acknowledgeTarget, setAcknowledgeTarget] = useState<EmergencyReport | null>(null);
   const [resolveTarget, setResolveTarget] = useState<EmergencyReport | null>(null);
+  const [feedType, setFeedType] = useState<FeedType>('concerns');
 
   // Debug: Log unreadCount changes
   useEffect(() => {
@@ -422,6 +457,7 @@ export default function NewsFeedScreen() {
   }, [reports, committedQuery, statusFilter, reportTypeFilter]);
 
   // Unified feed: Combine reports and anomalies, sorted by timestamp (newest first)
+  // Filter based on feedType selection
   const unifiedFeed = useMemo((): FeedItem[] => {
     const reportItems: FeedItem[] = displayedReports.map(report => ({
       type: 'report' as const,
@@ -435,32 +471,78 @@ export default function NewsFeedScreen() {
       timestamp: new Date(anomaly.created_at),
     }));
 
-    // Combine and sort by timestamp (newest first)
-    return [...reportItems, ...anomalyItems].sort(
-      (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
-    );
-  }, [displayedReports, anomalies]);
+    // Filter based on selected feed type
+    let items: FeedItem[] = [];
+    if (feedType === 'concerns') {
+      items = reportItems;
+    } else {
+      items = anomalyItems;
+    }
+
+    // Sort by timestamp (newest first)
+    return items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  }, [displayedReports, anomalies, feedType]);
+
+  // Feed Tab Selector Component - Simple underline style
+  const FeedTabSelector = useMemo(() => (
+    <View style={styles.feedTabsContainer}>
+      {/* Concerns Tab */}
+      <TouchableOpacity
+        style={[styles.feedTab, feedType === 'concerns' && styles.feedTabActive]}
+        onPress={() => setFeedType('concerns')}
+        activeOpacity={0.7}
+      >
+        <Ionicons 
+          name="warning-outline" 
+          size={18} 
+          color={feedType === 'concerns' ? colors.primary.blue : '#94a3b8'} 
+        />
+        <Text style={[styles.feedTabText, feedType === 'concerns' && styles.feedTabTextActive]}>
+          Concerns
+        </Text>
+      </TouchableOpacity>
+
+      {/* Anomalies Tab */}
+      <TouchableOpacity
+        style={[styles.feedTab, feedType === 'anomalies' && styles.feedTabActive]}
+        onPress={() => setFeedType('anomalies')}
+        activeOpacity={0.7}
+      >
+        <Ionicons 
+          name="radio-outline" 
+          size={18} 
+          color={feedType === 'anomalies' ? colors.primary.blue : '#94a3b8'} 
+        />
+        <Text style={[styles.feedTabText, feedType === 'anomalies' && styles.feedTabTextActive]}>
+          Anomalies
+        </Text>
+      </TouchableOpacity>
+    </View>
+  ), [feedType]);
   
   // Memoize header component - only recompute when dependencies change
   const memoizedHeader = useMemo(() => {
     return (
-      <IncidentHeader
-        statusFilter={statusFilter}
-        reportTypeFilter={reportTypeFilter}
-        pendingCount={pendingCount}
-        acknowledgedCount={ongoingCount}
-        resolvedCount={resolvedCount}
-        displayedCount={totalCount} // Total of all concerns assigned to purok
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        committedQuery={committedQuery}
-        setCommittedQuery={setCommittedQuery}
-        onFilterPress={() => setIsFilterModalVisible(true)}
-        setStatusFilter={setStatusFilter}
-        setReportTypeFilter={setReportTypeFilter}
-      />
+      <>
+        <IncidentHeader
+          statusFilter={statusFilter}
+          reportTypeFilter={reportTypeFilter}
+          pendingCount={pendingCount}
+          acknowledgedCount={ongoingCount}
+          resolvedCount={resolvedCount}
+          displayedCount={totalCount} // Total of all concerns assigned to purok
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          committedQuery={committedQuery}
+          setCommittedQuery={setCommittedQuery}
+          onFilterPress={() => setIsFilterModalVisible(true)}
+          setStatusFilter={setStatusFilter}
+          setReportTypeFilter={setReportTypeFilter}
+        />
+        {FeedTabSelector}
+      </>
     );
-  }, [pendingCount, ongoingCount, resolvedCount, totalCount, statusFilter, reportTypeFilter, searchQuery, committedQuery]);
+  }, [pendingCount, ongoingCount, resolvedCount, totalCount, statusFilter, reportTypeFilter, searchQuery, committedQuery, FeedTabSelector]);
 
   // Combined loading state
   const isLoading = loading || anomaliesLoading;
@@ -514,18 +596,22 @@ export default function NewsFeedScreen() {
             visible={isFilterModalVisible}
             statusFilter={statusFilter}
             reportTypeFilter={reportTypeFilter}
+            feedType={feedType}
             totalCount={totalCount}
             pendingCount={pendingCount}
             ongoingCount={ongoingCount}
             resolvedCount={resolvedCount}
             manualCount={manualCount}
             voiceCount={voiceCount}
+            anomalyCount={anomalies.length}
             onStatusFilterChange={setStatusFilter}
             onReportTypeFilterChange={setReportTypeFilter}
+            onFeedTypeChange={setFeedType}
             onClose={() => setIsFilterModalVisible(false)}
             onClearAll={() => {
               setStatusFilter('all');
               setReportTypeFilter('all');
+              setFeedType('concerns');
               setIsFilterModalVisible(false);
             }}
           />

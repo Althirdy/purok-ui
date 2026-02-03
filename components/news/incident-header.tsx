@@ -162,7 +162,7 @@ export function IncidentHeader(props: IncidentHeaderProps) {
       {/* Current Report Section */}
       <View style={styles.currentReportSection}>
         <View style={styles.currentReportHeader}>
-          <Text style={styles.currentReportTitle}>Community Concerns ({displayedCount})</Text>
+          <Text style={styles.currentReportTitle}>Activity Feed</Text>
         </View>
       </View>
     </View>

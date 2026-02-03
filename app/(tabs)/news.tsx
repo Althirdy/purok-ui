@@ -9,10 +9,9 @@ import { PostCard } from '@/components/news/PostCard';
 import { usePublicPosts } from '@/hooks/usePublicPosts';
 import { usePostStore } from '@/stores/postStore';
 import { Ionicons } from '@expo/vector-icons';
-import { FlashList } from '@shopify/flash-list';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function NewsScreen() {
   const {
@@ -109,7 +108,7 @@ export default function NewsScreen() {
 
   return (
     <View style={styles.container}>
-      <FlashList
+      <FlatList
         data={posts}
         renderItem={({ item }) => <PostCard post={item} />}
         keyExtractor={(item) => item.id}
@@ -126,7 +125,6 @@ export default function NewsScreen() {
           }
         }}
         onEndReachedThreshold={0.5}
-        estimatedItemSize={150}
       />
     </View>
   );

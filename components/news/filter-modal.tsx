@@ -7,18 +7,24 @@ const { colors, typography, spacing } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 768;
 
+// Feed type for filtering
+type FeedType = 'concerns' | 'anomalies';
+
 export interface FilterModalProps {
   visible: boolean;
   statusFilter: 'all' | 'pending' | 'ongoing' | 'resolved';
   reportTypeFilter: 'all' | 'manual' | 'voice';
+  feedType: FeedType;
   totalCount: number;
   pendingCount: number;
   ongoingCount: number;
   resolvedCount: number;
   manualCount: number; // Count of manual reports
   voiceCount: number; // Count of voice reports
+  anomalyCount: number; // Count of anomalies
   onStatusFilterChange: (filter: 'all' | 'pending' | 'ongoing' | 'resolved') => void;
   onReportTypeFilterChange: (filter: 'all' | 'manual' | 'voice') => void;
+  onFeedTypeChange: (feedType: FeedType) => void;
   onClose: () => void;
   onClearAll: () => void;
 }
@@ -27,14 +33,17 @@ export function FilterModal({
   visible,
   statusFilter,
   reportTypeFilter,
+  feedType,
   totalCount,
   pendingCount,
   ongoingCount,
   resolvedCount,
   manualCount,
   voiceCount,
+  anomalyCount,
   onStatusFilterChange,
   onReportTypeFilterChange,
+  onFeedTypeChange,
   onClose,
   onClearAll,
 }: FilterModalProps) {
@@ -49,16 +58,59 @@ export function FilterModal({
         <View style={styles.modalContent}>
           {/* Modal Header */}
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Filter Concerns</Text>
+            <Text style={styles.modalTitle}>Filter Feed</Text>
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="close" size={24} color="#1e293b" />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-            {/* Status Filter */}
+            {/* Feed Type Filter */}
             <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Status</Text>
+              <Text style={styles.filterSectionTitle}>Feed Type</Text>
+              <View style={styles.filterOptionsRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterChip,
+                    feedType === 'concerns' && styles.filterChipActive,
+                  ]}
+                  onPress={() => onFeedTypeChange('concerns')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name="warning-outline" 
+                    size={16} 
+                    color={feedType === 'concerns' ? '#ffffff' : '#f59e0b'} 
+                  />
+                  <Text style={[styles.filterChipText, feedType === 'concerns' && styles.filterChipTextActive]}>
+                    Concerns
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.filterChip,
+                    feedType === 'anomalies' && styles.filterChipActive,
+                  ]}
+                  onPress={() => onFeedTypeChange('anomalies')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name="radio-outline" 
+                    size={16} 
+                    color={feedType === 'anomalies' ? '#ffffff' : '#8b5cf6'} 
+                  />
+                  <Text style={[styles.filterChipText, feedType === 'anomalies' && styles.filterChipTextActive]}>
+                    Anomalies
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Status Filter - Only show when viewing concerns */}
+            {feedType !== 'anomalies' && (
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Concern Status</Text>
               <View style={styles.filterOptions}>
                 <TouchableOpacity
                   style={[
@@ -156,8 +208,10 @@ export function FilterModal({
                 </TouchableOpacity>
               </View>
             </View>
+            )}
 
-            {/* Type Filter */}
+            {/* Type Filter - Only show when viewing concerns */}
+            {feedType !== 'anomalies' && (
             <View style={styles.filterSection}>
               <Text style={styles.filterSectionTitle}>Report Type</Text>
               <View style={styles.filterOptions}>
@@ -233,6 +287,7 @@ export function FilterModal({
                 </TouchableOpacity>
               </View>
             </View>
+            )}
           </ScrollView>
 
           {/* Modal Footer */}
@@ -298,6 +353,56 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#475569',
     marginBottom: 12,
+  },
+  // Horizontal row for feed type chips
+  filterOptionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    gap: 6,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+  },
+  filterChipActive: {
+    backgroundColor: '#1e3a8a',
+    borderColor: '#1e3a8a',
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  filterChipTextActive: {
+    color: '#ffffff',
+  },
+  filterChipBadge: {
+    minWidth: 22,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#cbd5e1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  filterChipBadgeActive: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  filterChipBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  filterChipBadgeTextActive: {
+    color: '#ffffff',
   },
   filterOptions: {
     gap: 10,
