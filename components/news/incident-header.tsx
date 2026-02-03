@@ -106,10 +106,10 @@ export function IncidentHeader(props: IncidentHeaderProps) {
           </View>
           <TouchableOpacity
             style={styles.filterButton}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
             onPress={onFilterPress}
           >
-            <Ionicons name="options-outline" size={18} color={colors.text.inverse} />
+            <Ionicons name="options-outline" size={20} color={colors.text.secondary} />
             {(statusFilter !== 'all' || reportTypeFilter !== 'all') && (
               <View style={styles.filterButtonDot} />
             )}
@@ -230,22 +230,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   filterButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.primary.blue,
+    width: 44,
+    height: 44,
+    borderRadius: 20,
+    backgroundColor: colors.background.card,
+    borderWidth: 1,
+    borderColor: colors.border.light,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
   },
   filterButtonDot: {
     position: 'absolute',
-    top: 6,
-    right: 6,
+    top: 8,
+    right: 8,
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.semantic.error,
+    backgroundColor: colors.primary.blue,
   },
   activeFiltersContainer: {
     marginBottom: spacing.sm,
