@@ -279,11 +279,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border?.default ?? '#e2e8f0',
     backgroundColor: colors.background?.card ?? '#ffffff',
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
   },
 
   topRow: {

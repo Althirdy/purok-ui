@@ -53,6 +53,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
+    marginBottom: spacing.md,
   },
   feedTab: {
     flex: 1,
