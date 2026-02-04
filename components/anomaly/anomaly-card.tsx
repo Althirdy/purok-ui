@@ -142,6 +142,20 @@ function AnomalyCardComponent({ anomaly, onPress }: AnomalyCardProps) {
           <Text style={styles.timestampText}>{formatTimestamp(anomaly.created_at)}</Text>
         </View>
       </View>
+
+      {/* Related Anomalies Banner - shown when there are grouped anomalies */}
+      {anomaly.related_anomalies_count !== undefined && anomaly.related_anomalies_count > 0 && (
+        <View style={styles.relatedBanner}>
+          <View style={styles.relatedIconContainer}>
+            <Ionicons name="git-merge-outline" size={16} color="#7c3aed" />
+          </View>
+          <Text style={styles.relatedBannerText}>
+            <Text style={styles.relatedCount}>{anomaly.related_anomalies_count}</Text>
+            {' '}related anomal{anomaly.related_anomalies_count > 1 ? 'ies' : 'y'}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color="#64748b" />
+        </View>
+      )}
     </Card>
   );
 }
@@ -248,6 +262,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.text?.secondary ?? '#94a3b8',
     fontWeight: '500',
+  },
+  // Related anomalies banner styles (matches report-card followUpBanner)
+  relatedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f3ff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#e9d5ff',
+    gap: 8,
+  },
+  relatedIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#ede9fe',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  relatedBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#475569',
+  },
+  relatedCount: {
+    fontWeight: '700',
+    color: '#7c3aed',
   },
 });
 

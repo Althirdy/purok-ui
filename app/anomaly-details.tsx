@@ -444,6 +444,45 @@ export default function AnomalyDetailsScreen() {
           </Animated.View>
         )}
 
+        {/* Related Anomalies Section (grouped/merged anomalies) */}
+        {anomaly.related_anomalies && anomaly.related_anomalies.length > 0 && (
+          <Animated.View
+            entering={FadeInDown.delay(350).duration(400)}
+            style={styles.section}
+          >
+            <View style={styles.relatedHeader}>
+              <Ionicons name="git-merge-outline" size={18} color="#7c3aed" />
+              <Text style={styles.sectionLabel}>RELATED ANOMALIES ({anomaly.related_anomalies.length})</Text>
+            </View>
+            <View style={styles.relatedList}>
+              {anomaly.related_anomalies.map((related, index) => (
+                <View 
+                  key={related.id} 
+                  style={[
+                    styles.relatedItem,
+                    index < anomaly.related_anomalies!.length - 1 && styles.relatedItemBorder
+                  ]}
+                >
+                  <View style={[styles.relatedIconContainer, { backgroundColor: getAnomalyColor(related.anomaly_type) + '15' }]}>
+                    <Ionicons 
+                      name={getAnomalyIcon(related.anomaly_type)} 
+                      size={18} 
+                      color={getAnomalyColor(related.anomaly_type)} 
+                    />
+                  </View>
+                  <View style={styles.relatedContent}>
+                    <Text style={styles.relatedTitle}>{related.anomaly_type_label}</Text>
+                    <Text style={styles.relatedTime}>{formatTimestamp(related.created_at)}</Text>
+                  </View>
+                  <View style={styles.relatedIdBadge}>
+                    <Text style={styles.relatedIdText}>#{related.id}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </Animated.View>
+        )}
+
         {/* Action Buttons */}
         {isPending && (
           <Animated.View
@@ -743,5 +782,59 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     fontWeight: '600',
     color: '#fff',
+  },
+  // Related anomalies styles
+  relatedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  relatedList: {
+    backgroundColor: colors.background.secondary,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  relatedItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  relatedItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  relatedIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  relatedContent: {
+    flex: 1,
+  },
+  relatedTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  relatedTime: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  relatedIdBadge: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  relatedIdText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    fontFamily: 'monospace',
   },
 });

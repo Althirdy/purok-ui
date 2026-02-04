@@ -57,6 +57,15 @@ export function getLocationDisplay(location?: AnomalyLocation | string): string 
   return parts.length > 0 ? parts.join(', ') : undefined;
 }
 
+// Related Anomaly (for grouped/merged anomalies)
+export interface RelatedAnomaly {
+  id: number;
+  anomaly_type: AnomalyType;
+  anomaly_type_label: string;
+  image?: string;
+  created_at: string;
+}
+
 // Single Anomaly Log
 export interface AnomalyLog {
   id: number;
@@ -87,6 +96,12 @@ export interface AnomalyLog {
     id: number;
     name: string;
   };
+  // Branching/Merging fields (similar to concerns)
+  parent_anomaly_id?: number | null;
+  is_duplicate?: boolean;
+  related_anomalies_count?: number;
+  related_anomalies?: RelatedAnomaly[];
+  parent_anomaly?: AnomalyLog;
 }
 
 // Pagination metadata
