@@ -116,10 +116,17 @@ export function ReportDetailsBody({
         </View>
       </Animated.View>
 
-      {/* Title Section */}
+      {/* Title Section with Priority */}
       <Animated.View entering={FadeInDown.delay(150).duration(500)} style={styles.section}>
         <Text style={styles.sectionLabel}>What happened?</Text>
-        <Text style={styles.titleText}>{cleanTitle(report.title)}</Text>
+        <View style={styles.titleHeader}>
+          <Text style={styles.titleText}>{cleanTitle(report.title)}</Text>
+          <View style={[styles.priorityBadgeSmall, { backgroundColor: severityColor + '20' }]}>
+            <Text style={[styles.priorityBadgeSmallText, { color: severityColor }]}>
+              {report.severity.toUpperCase()}
+            </Text>
+          </View>
+        </View>
         <Text style={styles.dateText}>
           {formatDateReadable(report.timestamp)} {formatTime12Hour(report.timestamp)}
         </Text>
@@ -257,22 +264,8 @@ export function ReportDetailsBody({
         />
       )}
 
-      {/* Info Grid */}
-      <Animated.View entering={FadeInDown.delay(420).duration(500)} style={styles.section}>
-        <View style={styles.infoGrid}>
-          <View style={styles.infoItem}>
-            <View style={[styles.severityBadge, { backgroundColor: severityColor + '20' }]}>
-              <Text style={[styles.severityBadgeText, { color: severityColor }]}>
-                {report.severity.toUpperCase()}
-              </Text>
-            </View>
-            <Text style={styles.infoLabel}>Priority</Text>
-          </View>
-        </View>
-      </Animated.View>
-
       {/* Status Timeline - only shows phases that have been reached */}
-      <Animated.View entering={FadeInDown.delay(460).duration(500)} style={styles.timelineSection}>
+      <Animated.View entering={FadeInDown.delay(420).duration(500)} style={styles.timelineSection}>
         <View style={styles.timelineHeader}>
           <Ionicons name="time-outline" size={18} color={colors.primary.blue} />
           <Text style={styles.timelineTitle}>Status Timeline</Text>
@@ -301,6 +294,16 @@ export function ReportDetailsBody({
               const isLastStep = index === filteredSteps.length - 1;
               const isCurrentStep = step.key === report.status;
 
+              // Determine timestamp for each step
+              let stepTimestamp = '';
+              if (step.key === 'pending') {
+                // Pending always shows the report creation time
+                stepTimestamp = `${formatDateReadable(report.timestamp)} • ${formatTime12Hour(report.timestamp)}`;
+              } else if (isCurrentStep) {
+                // Current step shows "Current" badge instead of timestamp
+                stepTimestamp = '';
+              }
+
               return (
                 <View
                   key={step.key}
@@ -318,11 +321,13 @@ export function ReportDetailsBody({
                   <View style={styles.timelineContent}>
                     <View style={styles.timelineHeaderRow}>
                       <Text style={styles.timelineStatus}>{step.label}</Text>
-                      {isCurrentStep && (
+                      {isCurrentStep && step.key !== 'pending' ? (
                         <View style={[styles.currentStatusBadge, { backgroundColor: statusColor.borderColor + '20' }]}>
                           <Text style={[styles.currentStatusText, { color: statusColor.borderColor }]}>Current</Text>
                         </View>
-                      )}
+                      ) : stepTimestamp ? (
+                        <Text style={styles.timelineTimestamp}>{stepTimestamp}</Text>
+                      ) : null}
                     </View>
                     <Text style={styles.timelineDescription}>
                       {step.description}
