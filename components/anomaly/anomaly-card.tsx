@@ -9,15 +9,13 @@ import type { AnomalyLog, AnomalyType } from '@/types/anomaly';
 import { getIoTBoxDisplayName, getIoTBoxLocation, getLocationDisplay } from '@/types/anomaly';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 const { colors, typography, spacing } = DesignSystem;
 
 export interface AnomalyCardProps {
   anomaly: AnomalyLog;
   onPress?: (id: number) => void;
-  onConfirm?: (id: number) => void;
-  onDismiss?: (id: number) => void;
 }
 
 // Get icon for anomaly type
@@ -27,8 +25,6 @@ function getAnomalyIcon(type: AnomalyType): keyof typeof Ionicons.glyphMap {
       return 'volume-high-outline';
     case 'anti_tampering':
       return 'warning-outline';
-    case 'crowded':
-      return 'people-outline';
     default:
       return 'alert-circle-outline';
   }
@@ -41,8 +37,6 @@ function getAnomalyColor(type: AnomalyType): string {
       return '#8b5cf6'; // Purple
     case 'anti_tampering':
       return '#ef4444'; // Red
-    case 'crowded':
-      return '#f59e0b'; // Orange
     default:
       return '#64748b'; // Gray
   }
@@ -55,8 +49,6 @@ function getAnomalyBadgeColors(type: AnomalyType): { bg: string; text: string } 
       return { bg: '#ede9fe', text: '#6d28d9' };  // Purple tones
     case 'anti_tampering':
       return { bg: '#fee2e2', text: '#b91c1c' };  // Red tones
-    case 'crowded':
-      return { bg: '#fef3c7', text: '#b45309' };  // Amber tones
     default:
       return { bg: '#f1f5f9', text: '#475569' };  // Gray tones
   }
@@ -88,7 +80,7 @@ function formatTimestamp(dateStr: string): string {
   }
 }
 
-function AnomalyCardComponent({ anomaly, onPress, onConfirm, onDismiss }: AnomalyCardProps) {
+function AnomalyCardComponent({ anomaly, onPress }: AnomalyCardProps) {
   const iconColor = getAnomalyColor(anomaly.anomaly_type);
   const badgeColors = getAnomalyBadgeColors(anomaly.anomaly_type);
   const isPending = !anomaly.is_confirmed;
@@ -150,38 +142,6 @@ function AnomalyCardComponent({ anomaly, onPress, onConfirm, onDismiss }: Anomal
           <Text style={styles.timestampText}>{formatTimestamp(anomaly.created_at)}</Text>
         </View>
       </View>
-
-      {/* Action Buttons - shown for pending anomalies */}
-      {isPending && (onConfirm || onDismiss) && (
-        <View style={styles.actionsContainer}>
-          {onDismiss && (
-            <TouchableOpacity 
-              style={styles.dismissButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                onDismiss(anomaly.id);
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close-outline" size={16} color="#64748b" />
-              <Text style={styles.dismissText}>Dismiss</Text>
-            </TouchableOpacity>
-          )}
-          {onConfirm && (
-            <TouchableOpacity 
-              style={styles.confirmButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                onConfirm(anomaly.id);
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="checkmark-outline" size={16} color="#fff" />
-              <Text style={styles.confirmText}>Confirm</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
     </Card>
   );
 }
@@ -293,44 +253,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.text?.secondary ?? '#94a3b8',
     fontWeight: '500',
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border?.light ?? '#f1f5f9',
-    gap: 8,
-  },
-  dismissButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
-    gap: 4,
-  },
-  dismissText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  confirmButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#10b981',
-    gap: 4,
-  },
-  confirmText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#fff',
   },
 });
 

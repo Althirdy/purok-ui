@@ -79,12 +79,6 @@ export function AnomalyStatisticsCard({ statistics, loading }: AnomalyStatistics
           color="#ef4444"
         />
         <StatItem
-          icon="people-outline"
-          label="Crowded"
-          value={statistics.today_by_type.crowded}
-          color="#f59e0b"
-        />
-        <StatItem
           icon="alert-circle-outline"
           label="Pending"
           value={statistics.by_status.pending}

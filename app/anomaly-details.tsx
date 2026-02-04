@@ -33,8 +33,6 @@ function getAnomalyIcon(type: AnomalyType): keyof typeof Ionicons.glyphMap {
       return 'volume-high';
     case 'anti_tampering':
       return 'warning';
-    case 'crowded':
-      return 'people';
     default:
       return 'alert-circle';
   }
@@ -47,8 +45,6 @@ function getAnomalyColor(type: AnomalyType): string {
       return '#8b5cf6'; // Purple
     case 'anti_tampering':
       return '#ef4444'; // Red
-    case 'crowded':
-      return '#f59e0b'; // Orange
     default:
       return '#64748b'; // Gray
   }
@@ -243,8 +239,7 @@ export default function AnomalyDetailsScreen() {
   // Get anomaly type label (API may or may not provide it)
   const anomalyTypeLabel = anomaly.anomaly_type_label || 
     (anomaly.anomaly_type === 'sound_anomaly' ? 'Sound Anomaly' :
-     anomaly.anomaly_type === 'anti_tampering' ? 'Anti-Tampering Alert' :
-     anomaly.anomaly_type === 'crowded' ? 'Crowded Area Detected' : 'Unknown Anomaly');
+     anomaly.anomaly_type === 'anti_tampering' ? 'Anti-Tampering Alert' : 'Unknown Anomaly');
   
   const anomalyTypeDisplay = anomaly.anomaly_type ? 
     anomaly.anomaly_type.replace(/_/g, ' ').toUpperCase() : 'IOT ANOMALY';

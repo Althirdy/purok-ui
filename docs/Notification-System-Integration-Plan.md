@@ -99,14 +99,74 @@ When Purok Leader Logs In:
 
 ### 4.2 Notification Types
 
-| Type | Target User | Trigger Event |
-|------|-------------|---------------|
-| concern_assigned | Purok Leader | New concern distributed to leader |
-| concern_acknowledged | Citizen | Leader acknowledged their concern |
-| concern_resolved | Citizen | Concern has been resolved |
-| concern_status_update | Both | Status change on a concern |
-| new_safety_post | Citizen | New public safety post published |
-| system_announcement | Both | System-wide announcements |
+#### Concern Notifications
+
+| Type | Constant | Target User | Trigger Event |
+|------|----------|-------------|---------------|
+| `concern_assigned` | `TYPE_CONCERN_ASSIGNED` | Purok Leader | New concern distributed to leader |
+| `concern_acknowledged` | `TYPE_CONCERN_ACKNOWLEDGED` | Citizen | Leader acknowledged their concern |
+| `concern_resolved` | `TYPE_CONCERN_RESOLVED` | Citizen | Concern has been resolved |
+| `concern_status_update` | `TYPE_CONCERN_STATUS_UPDATE` | Both | Status change on a concern |
+
+#### Anomaly Notifications (IoT Box)
+
+| Type | Constant | Target User | Trigger Event |
+|------|----------|-------------|---------------|
+| `anomaly_detected` | `TYPE_ANOMALY_DETECTED` | Purok Leader | New anomaly detected by IoT box |
+| `anomaly_confirmed` | `TYPE_ANOMALY_CONFIRMED` | Purok Leader | Anomaly confirmed by another purok leader |
+
+#### System Notifications
+
+| Type | Constant | Target User | Trigger Event |
+|------|----------|-------------|---------------|
+| `new_safety_post` | `TYPE_NEW_SAFETY_POST` | Citizen | New public safety post published |
+| `system_announcement` | `TYPE_SYSTEM_ANNOUNCEMENT` | Both | System-wide announcements |
+
+### 4.2.1 Notification Data Structures
+
+#### `anomaly_detected` Data Structure
+
+```json
+{
+  "anomaly_log_id": 123,
+  "anomaly_type": "sound_anomaly",
+  "anomaly_type_label": "Sound Anomaly",
+  "device_id": "123456",
+  "iot_box_id": 1,
+  "device_name": "IoT Box A",
+  "location": "Purok 1, Brgy. Sample",
+  "latitude": 14.5995,
+  "longitude": 120.9842,
+  "image": "path/to/image.jpg",
+  "details": { ... }
+}
+```
+
+#### `anomaly_confirmed` Data Structure
+
+```json
+{
+  "anomaly_log_id": 123,
+  "anomaly_type": "sound_anomaly",
+  "anomaly_type_label": "Sound Anomaly",
+  "iot_box_id": 1,
+  "device_name": "IoT Box A",
+  "location": "Purok 1, Brgy. Sample",
+  "confirmed_by": "Juan Dela Cruz",
+  "confirmed_by_id": 5
+}
+```
+
+#### `concern_assigned` Data Structure
+
+```json
+{
+  "concern_id": 123,
+  "tracking_code": "CN-20260125-ABC1",
+  "category": "safety",
+  "severity": "high"
+}
+```
 
 ### 4.3 Migration SQL
 
@@ -153,6 +213,19 @@ CREATE TABLE notifications (
 GET /api/v1/notifications?page=1&per_page=20
 Authorization: Bearer {token}
 ```
+
+**Request with Type Filter:**
+```
+GET /api/v1/notifications?page=1&per_page=20&type=anomaly_detected
+Authorization: Bearer {token}
+```
+
+**Supported type values:**
+- `concern_assigned` - Filter for new concern assignments
+- `anomaly_detected` - Filter for new anomaly detections
+- `anomaly_confirmed` - Filter for confirmed anomalies
+- `concern_acknowledged` - Filter for acknowledged concerns
+- `concern_resolved` - Filter for resolved concerns
 
 **Response:**
 ```json

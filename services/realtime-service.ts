@@ -723,7 +723,7 @@ export async function subscribeToStatusUpdates(
 type AnomalyCreatedPayload = {
   id: number;
   device_id?: string;
-  anomaly_type: 'sound_anomaly' | 'anti_tampering' | 'crowded';
+  anomaly_type: 'sound_anomaly' | 'anti_tampering';
   anomaly_type_label: string;
   image?: string;
   details?: Array<{

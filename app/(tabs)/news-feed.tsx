@@ -28,6 +28,8 @@ const AcknowledgeSheet = lazy(() => import('@/components/news/acknowledge-sheet'
 const ResolveSheet = lazy(() => import('@/components/news/resolve-sheet').then(m => ({ default: m.ResolveSheet })));
 const FilterModal = lazy(() => import('@/components/news/filter-modal').then(m => ({ default: m.FilterModal })));
 
+import type { AnomalyTypeFilter } from '@/components/news/filter-modal';
+
 const { colors, spacing } = DesignSystem;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 768;
@@ -86,6 +88,7 @@ export default function NewsFeedScreen() {
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'ongoing' | 'resolved'>('all');
   const [reportTypeFilter, setReportTypeFilter] = useState<'all' | 'manual' | 'voice'>('all');
+  const [anomalyTypeFilter, setAnomalyTypeFilter] = useState<AnomalyTypeFilter>('all');
   const [acknowledgeTarget, setAcknowledgeTarget] = useState<EmergencyReport | null>(null);
   const [resolveTarget, setResolveTarget] = useState<EmergencyReport | null>(null);
   const [feedType, setFeedType] = useState<FeedType>('concerns');
@@ -168,8 +171,6 @@ export default function NewsFeedScreen() {
     anomalies,
     loading: anomaliesLoading,
     refreshAnomalies,
-    confirmAnomalyById,
-    dismissAnomalyById,
   } = useAnomalyFeed({
     onNewAnomaly: async (anomaly) => {
       // Get display name - handle device_name, name, or location_name fields
@@ -208,52 +209,6 @@ export default function NewsFeedScreen() {
       console.log('[NewsFeed] ✅ Toast displayed for new anomaly');
     },
   });
-
-  // Handle anomaly confirm
-  const handleAnomalyConfirm = useCallback(async (id: number) => {
-    try {
-      const success = await confirmAnomalyById(id);
-      if (success) {
-        setToast({
-          id: `toast-anomaly-confirm-${id}-${Date.now()}`,
-          title: '✅ Anomaly Confirmed',
-          message: 'The anomaly has been confirmed',
-          severity: 'low',
-        });
-      }
-    } catch (error) {
-      console.error('[NewsFeed] Failed to confirm anomaly:', error);
-      setToast({
-        id: `toast-anomaly-error-${Date.now()}`,
-        title: '❌ Failed to Confirm',
-        message: 'Please try again',
-        severity: 'high',
-      });
-    }
-  }, [confirmAnomalyById]);
-
-  // Handle anomaly dismiss
-  const handleAnomalyDismiss = useCallback(async (id: number) => {
-    try {
-      const success = await dismissAnomalyById(id);
-      if (success) {
-        setToast({
-          id: `toast-anomaly-dismiss-${id}-${Date.now()}`,
-          title: '✅ Anomaly Dismissed',
-          message: 'The anomaly has been dismissed',
-          severity: 'low',
-        });
-      }
-    } catch (error) {
-      console.error('[NewsFeed] Failed to dismiss anomaly:', error);
-      setToast({
-        id: `toast-anomaly-error-${Date.now()}`,
-        title: '❌ Failed to Dismiss',
-        message: 'Please try again',
-        severity: 'high',
-      });
-    }
-  }, [dismissAnomalyById]);
 
   // Refresh reports when screen gains focus (e.g., coming back from report-details)
   // This ensures the news-feed stays in sync after status updates on other screens
@@ -395,12 +350,10 @@ export default function NewsFeedScreen() {
         <AnomalyCard
           anomaly={item}
           onPress={handleAnomalyPress}
-          onConfirm={!item.is_confirmed ? handleAnomalyConfirm : undefined}
-          onDismiss={!item.is_confirmed ? handleAnomalyDismiss : undefined}
         />
       </Animated.View>
     );
-  }, [handleAnomalyPress, handleAnomalyConfirm, handleAnomalyDismiss]);
+  }, [handleAnomalyPress]);
 
   // Unified render item for mixed feed
   const renderFeedItem = useCallback(({ item, index }: { item: FeedItem; index: number }) => {
@@ -424,6 +377,53 @@ export default function NewsFeedScreen() {
   const voiceCount = useMemo(() => reports.filter(r => r.reportType === 'voice' || !!r.audio).length, [reports]);
   const totalCount = reports.length;
   const anomalyCount = useMemo(() => anomalies.filter(a => !a.is_confirmed).length, [anomalies]);
+  const soundAnomalyCount = useMemo(() => anomalies.filter(a => a.anomaly_type === 'sound_anomaly').length, [anomalies]);
+  const antiTamperingCount = useMemo(() => anomalies.filter(a => a.anomaly_type === 'anti_tampering').length, [anomalies]);
+
+  // Filter anomalies by type and search query
+  const displayedAnomalies = useMemo(() => {
+    let base = anomalies;
+    
+    // Apply anomaly type filter
+    if (anomalyTypeFilter !== 'all') {
+      base = base.filter(a => a.anomaly_type === anomalyTypeFilter);
+    }
+    
+    // Apply search query filter for anomalies
+    const q = committedQuery.trim().toLowerCase();
+    if (!q) return base;
+    
+    return base.filter(a => {
+      // Search by anomaly type label (e.g., "Sound Anomaly", "Anti-Tampering")
+      const typeLabel = a.anomaly_type_label?.toLowerCase() ?? '';
+      
+      // Search by IoT box name
+      const iotBoxName = (a.iot_box?.device_name || a.iot_box?.location_name || a.iot_box?.name || '').toLowerCase();
+      
+      // Search by location (can be object or string)
+      let locationStr = '';
+      if (typeof a.location === 'string') {
+        locationStr = a.location.toLowerCase();
+      } else if (a.location) {
+        locationStr = `${a.location.location_name || ''} ${a.location.barangay || ''}`.toLowerCase();
+      }
+      // Also check display_location from iot_box
+      const displayLocation = (a.iot_box?.display_location || a.iot_box?.barangay || '').toLowerCase();
+      
+      // Search by description
+      const description = a.description?.toLowerCase() ?? '';
+      
+      // Search by device ID
+      const deviceId = a.device_id?.toLowerCase() ?? '';
+      
+      return typeLabel.includes(q) || 
+             iotBoxName.includes(q) || 
+             locationStr.includes(q) || 
+             displayLocation.includes(q) ||
+             description.includes(q) ||
+             deviceId.includes(q);
+    });
+  }, [anomalies, anomalyTypeFilter, committedQuery]);
   
   // Derived: reports filtered by search query, status, and report type
   const displayedReports = useMemo(() => {
@@ -450,9 +450,48 @@ export default function NewsFeedScreen() {
     // Apply search query filter
     if (!q) return base;
     return base.filter(r => {
+      // Search by title
       const title = r.title?.toLowerCase() ?? '';
+      
+      // Search by location
       const location = r.location?.toLowerCase() ?? '';
-      return title.includes(q) || location.includes(q);
+      
+      // Search by description
+      const description = r.description?.toLowerCase() ?? '';
+      
+      // Search by status (pending, ongoing/acknowledged, resolved)
+      const status = r.status?.toLowerCase() ?? '';
+      // Also allow "ongoing" to match "acknowledged"
+      const statusMatch = status.includes(q) || (q === 'ongoing' && status === 'acknowledged');
+      
+      // Search by severity (low, medium, high, critical)
+      const severity = r.severity?.toLowerCase() ?? '';
+      
+      // Search by category (safety, security, infrastructure, etc.)
+      const category = r.originalCategory?.toLowerCase() ?? '';
+      
+      // Search by report type (manual, voice)
+      const reportType = r.reportType?.toLowerCase() ?? '';
+      
+      // Search by reporter name
+      const reportedBy = r.reportedBy?.toLowerCase() ?? '';
+      
+      // Search by type (accident, crime, fire, medical, etc.)
+      const type = r.type?.toLowerCase() ?? '';
+      
+      // Search by transcript (for voice concerns)
+      const transcript = r.transcript?.toLowerCase() ?? '';
+      
+      return title.includes(q) || 
+             location.includes(q) || 
+             description.includes(q) ||
+             statusMatch ||
+             severity.includes(q) ||
+             category.includes(q) ||
+             reportType.includes(q) ||
+             reportedBy.includes(q) ||
+             type.includes(q) ||
+             transcript.includes(q);
     });
   }, [reports, committedQuery, statusFilter, reportTypeFilter]);
 
@@ -465,7 +504,7 @@ export default function NewsFeedScreen() {
       timestamp: report.timestamp,
     }));
 
-    const anomalyItems: FeedItem[] = anomalies.map(anomaly => ({
+    const anomalyItems: FeedItem[] = displayedAnomalies.map(anomaly => ({
       type: 'anomaly' as const,
       data: anomaly,
       timestamp: new Date(anomaly.created_at),
@@ -481,7 +520,7 @@ export default function NewsFeedScreen() {
 
     // Sort by timestamp (newest first)
     return items.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [displayedReports, anomalies, feedType]);
+  }, [displayedReports, displayedAnomalies, feedType]);
 
   // Feed Tab Selector Component - Simple underline style
   const FeedTabSelector = useMemo(() => (
@@ -596,6 +635,7 @@ export default function NewsFeedScreen() {
             visible={isFilterModalVisible}
             statusFilter={statusFilter}
             reportTypeFilter={reportTypeFilter}
+            anomalyTypeFilter={anomalyTypeFilter}
             feedType={feedType}
             totalCount={totalCount}
             pendingCount={pendingCount}
@@ -604,13 +644,17 @@ export default function NewsFeedScreen() {
             manualCount={manualCount}
             voiceCount={voiceCount}
             anomalyCount={anomalies.length}
+            soundAnomalyCount={soundAnomalyCount}
+            antiTamperingCount={antiTamperingCount}
             onStatusFilterChange={setStatusFilter}
             onReportTypeFilterChange={setReportTypeFilter}
+            onAnomalyTypeFilterChange={setAnomalyTypeFilter}
             onFeedTypeChange={setFeedType}
             onClose={() => setIsFilterModalVisible(false)}
             onClearAll={() => {
               setStatusFilter('all');
               setReportTypeFilter('all');
+              setAnomalyTypeFilter('all');
               setFeedType('concerns');
               setIsFilterModalVisible(false);
             }}

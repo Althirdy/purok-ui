@@ -12,7 +12,10 @@ import {
     markAllNotificationsAsRead as apiMarkAllAsRead,
     markNotificationAsRead as apiMarkAsRead,
     normalizeBackendNotification,
+    NOTIFICATION_TYPES,
+    type AnomalyDetectedData,
     type BackendNotification,
+    type LocalNotificationType,
 } from '@/services/notification-api-service';
 import type { EmergencyReport } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,15 +24,18 @@ import { useAuth } from './auth-context';
 
 export interface Notification {
   id: string;
-  type: 'sensor_alert' | 'report_update' | 'new_report' | 'system';
+  type: LocalNotificationType;
   title: string;
   message: string;
   reportId?: string;
+  anomalyLogId?: number; // For anomaly notifications
   timestamp: Date;
   read: boolean;
   severity?: 'low' | 'medium' | 'high' | 'critical';
   reportType?: 'accident' | 'crime' | 'fire' | 'medical' | 'suspicious' | 'other';
+  anomalyType?: string; // For anomaly notifications
   backendId?: number; // ID from backend for syncing
+  anomalyData?: AnomalyDetectedData; // Additional anomaly data
 }
 
 interface NotificationContextType {
@@ -166,15 +172,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         console.log('[NotificationContext] ⚠️ No notifications found in backend');
       }
       
-      // Filter: Only show NEW concern assignments that are UNREAD
-      // 1. Only 'concern_assigned' type (not status updates)
-      // 2. Only unread (read_at is null)
-      const newReportTypes = ['concern_assigned'];
+      // Filter: Only show NEW concern assignments and anomaly notifications that are UNREAD
+      // 1. 'concern_assigned' type (new reports)
+      // 2. 'anomaly_detected' type (new anomaly from IoT box)
+      // 3. Only unread (read_at is null)
+      const relevantTypes = [
+        NOTIFICATION_TYPES.TYPE_CONCERN_ASSIGNED,
+        NOTIFICATION_TYPES.TYPE_ANOMALY_DETECTED,
+      ];
       const filteredBackendNotifications = backendNotifications.filter(
-        n => newReportTypes.includes(n.type) && n.read_at === null
+        n => relevantTypes.includes(n.type as any) && n.read_at === null
       );
       
-      console.log('[NotificationContext] 🔍 Filtered to', filteredBackendNotifications.length, 'unread new report notifications');
+      console.log('[NotificationContext] 🔍 Filtered to', filteredBackendNotifications.length, 'unread notifications (concerns + anomalies)');
       
       // Convert and merge with existing notifications
       setNotifications(prev => {

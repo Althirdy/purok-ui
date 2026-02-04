@@ -11,18 +11,51 @@ import { httpGet, httpPut } from '@/lib/axios';
 // Types
 // =============================================================================
 
+// Notification type constants
+export const NOTIFICATION_TYPES = {
+  // Concern notification types
+  TYPE_CONCERN_ASSIGNED: 'concern_assigned',
+  TYPE_CONCERN_ACKNOWLEDGED: 'concern_acknowledged',
+  TYPE_CONCERN_RESOLVED: 'concern_resolved',
+  TYPE_CONCERN_STATUS_UPDATE: 'concern_status_update',
+  // Anomaly notification types
+  TYPE_ANOMALY_DETECTED: 'anomaly_detected',
+  // System notification types
+  TYPE_NEW_SAFETY_POST: 'new_safety_post',
+  TYPE_SYSTEM_ANNOUNCEMENT: 'system_announcement',
+} as const;
+
+export type NotificationType = typeof NOTIFICATION_TYPES[keyof typeof NOTIFICATION_TYPES];
+
+// Anomaly notification data structure (anomaly_detected)
+export interface AnomalyDetectedData {
+  anomaly_log_id: number;
+  anomaly_type: 'sound_anomaly' | 'anti_tampering';
+  anomaly_type_label: string;
+  device_id?: string;
+  iot_box_id: number;
+  device_name: string;
+  location: string;
+  latitude?: number;
+  longitude?: number;
+  image?: string;
+  details?: Record<string, any>;
+}
+
+// Concern notification data structure
+export interface ConcernNotificationData {
+  concern_id?: number;
+  tracking_code?: string;
+  category?: string;
+  severity?: string;
+}
+
 export interface BackendNotification {
   id: number;
   type: string;
   title: string;
   message: string;
-  data: {
-    concern_id?: number;
-    tracking_code?: string;
-    category?: string;
-    severity?: string;
-    [key: string]: any;
-  } | null;
+  data: (ConcernNotificationData | AnomalyDetectedData | AnomalyConfirmedData | Record<string, any>) | null;
   read_at: string | null;
   created_at: string;
 }
@@ -64,17 +97,22 @@ export interface MarkAsReadResponse {
  * Fetch paginated notifications from the backend
  * @param page - Page number (default: 1)
  * @param perPage - Items per page (default: 20)
+ * @param type - Optional notification type filter (e.g., 'anomaly_detected', 'concern_assigned')
  */
 export async function fetchNotifications(
   page: number = 1,
-  perPage: number = 20
+  perPage: number = 20,
+  type?: NotificationType | string
 ): Promise<FetchNotificationsResponse> {
   try {
-    console.log('[NotificationAPI] 📥 Fetching notifications, page:', page);
+    console.log('[NotificationAPI] 📥 Fetching notifications, page:', page, type ? `type: ${type}` : '');
     
-    const response = await httpGet<FetchNotificationsResponse>(
-      `/api/v1/notifications?page=${page}&per_page=${perPage}`
-    );
+    let url = `/api/v1/notifications?page=${page}&per_page=${perPage}`;
+    if (type) {
+      url += `&type=${encodeURIComponent(type)}`;
+    }
+    
+    const response = await httpGet<FetchNotificationsResponse>(url);
     
     console.log('[NotificationAPI] ✅ Fetched', response.data?.notifications?.length || 0, 'notifications');
     return response;
@@ -210,60 +248,85 @@ export async function clearAllNotifications(): Promise<void> {
 // Helper Functions
 // =============================================================================
 
+// Normalized notification type for local use
+export type LocalNotificationType = 'sensor_alert' | 'report_update' | 'new_report' | 'anomaly_detected' | 'system';
+
+export interface NormalizedNotification {
+  id: string;
+  type: LocalNotificationType;
+  title: string;
+  message: string;
+  reportId?: string;
+  anomalyLogId?: number; // For anomaly notifications
+  timestamp: Date;
+  read: boolean;
+  severity?: 'low' | 'medium' | 'high' | 'critical';
+  reportType?: string;
+  anomalyType?: string; // For anomaly notifications
+  backendId: number;
+  // Additional anomaly data
+  anomalyData?: AnomalyDetectedData;
+}
+
 /**
  * Convert backend notification to local notification format
  * Used by notification context to normalize data
  * 
- * NOTE: For purok leaders, we only show 'concern_assigned' (new reports).
+ * NOTE: For purok leaders:
+ * - 'concern_assigned' (new reports) - SHOW
+ * - 'anomaly_detected' (new anomaly from IoT) - SHOW
  * Status updates (acknowledged, resolved) are filtered out in notification-context
  * because purok leaders don't need notifications for their own actions.
  */
 export function normalizeBackendNotification(
   backendNotification: BackendNotification
-): {
-  id: string;
-  type: 'sensor_alert' | 'report_update' | 'new_report' | 'system';
-  title: string;
-  message: string;
-  reportId?: string;
-  timestamp: Date;
-  read: boolean;
-  severity?: 'low' | 'medium' | 'high' | 'critical';
-  reportType?: string;
-  backendId: number;
-} {
+): NormalizedNotification {
   // Map backend notification type to local type
-  // For purok leaders: only 'concern_assigned' is relevant (new reports)
-  const typeMap: Record<string, 'sensor_alert' | 'report_update' | 'new_report' | 'system'> = {
+  const typeMap: Record<string, LocalNotificationType> = {
     'concern_assigned': 'new_report',        // New concern assigned - SHOW
     'concern_acknowledged': 'report_update', // Status update - filtered out
     'concern_resolved': 'report_update',     // Status update - filtered out
     'concern_status_update': 'report_update',// Status update - filtered out
+    'anomaly_detected': 'anomaly_detected',  // New anomaly from IoT box - SHOW
     'new_safety_post': 'system',
     'system_announcement': 'system',
   };
 
-  // Build the reportId with PUROK- prefix to match the format used in purok-leader-service
-  // This ensures clicking notifications navigates to the correct report
-  const concernId = backendNotification.data?.concern_id;
+  const data = backendNotification.data;
+  const notifType = backendNotification.type;
+  
+  // Build the reportId with PUROK- prefix for concern notifications
+  const concernId = (data as ConcernNotificationData)?.concern_id;
   const reportId = concernId ? `PUROK-${concernId}` : undefined;
+  
+  // Extract anomaly log ID for anomaly notifications
+  const anomalyLogId = (data as AnomalyDetectedData | AnomalyConfirmedData)?.anomaly_log_id;
+  const anomalyType = (data as AnomalyDetectedData | AnomalyConfirmedData)?.anomaly_type;
 
-  // Override title for concern_assigned to be cleaner
+  // Override title based on notification type for cleaner display
   let title = backendNotification.title;
-  if (backendNotification.type === 'concern_assigned') {
+  if (notifType === 'concern_assigned') {
     title = 'New Concern';
+  } else if (notifType === 'anomaly_detected') {
+    const anomalyData = data as AnomalyDetectedData;
+    title = anomalyData?.anomaly_type_label || 'Anomaly Detected';
   }
 
   return {
     id: `backend-${backendNotification.id}`,
-    type: typeMap[backendNotification.type] || 'system',
+    type: typeMap[notifType] || 'system',
     title,
     message: backendNotification.message,
     reportId,
+    anomalyLogId,
     timestamp: new Date(backendNotification.created_at),
     read: backendNotification.read_at !== null,
-    severity: backendNotification.data?.severity as any,
-    reportType: backendNotification.data?.category,
+    severity: (data as ConcernNotificationData)?.severity as any,
+    reportType: (data as ConcernNotificationData)?.category,
+    anomalyType,
     backendId: backendNotification.id,
+    anomalyData: notifType === 'anomaly_detected' 
+      ? data as AnomalyDetectedData 
+      : undefined,
   };
 }

@@ -299,6 +299,7 @@ export function ReportDetailsBody({
             .map((step, index, filteredSteps) => {
               const statusColor = getStatusColor(step.key);
               const isLastStep = index === filteredSteps.length - 1;
+              const isCurrentStep = step.key === report.status;
 
               return (
                 <View
@@ -317,20 +318,15 @@ export function ReportDetailsBody({
                   <View style={styles.timelineContent}>
                     <View style={styles.timelineHeaderRow}>
                       <Text style={styles.timelineStatus}>{step.label}</Text>
-                      {index === 0 && (
-                        <Text style={styles.timelineDate}>
-                          {formatDateReadable(report.timestamp)} {formatTime12Hour(report.timestamp)}
-                        </Text>
+                      {isCurrentStep && (
+                        <View style={[styles.currentStatusBadge, { backgroundColor: statusColor.borderColor + '20' }]}>
+                          <Text style={[styles.currentStatusText, { color: statusColor.borderColor }]}>Current</Text>
+                        </View>
                       )}
                     </View>
                     <Text style={styles.timelineDescription}>
                       {step.description}
                     </Text>
-                    {index === 0 && (
-                      <Text style={styles.timelineMeta}>
-                        Reported {formatDateReadable(report.timestamp)}
-                      </Text>
-                    )}
                   </View>
                 </View>
               );
@@ -503,15 +499,17 @@ export function ReportDetailsBody({
 
           {/* Action Buttons */}
           <View style={actionButtonStyles.buttonRow}>
-            {/* Reject Button */}
-            <TouchableOpacity
-              style={actionButtonStyles.rejectButton}
-              activeOpacity={0.8}
-              onPress={() => setRejectSheetVisible(true)}
-            >
-              <Ionicons name="close-circle" size={18} color={colors.semantic.error} />
-              <Text style={actionButtonStyles.rejectButtonText}>Reject</Text>
-            </TouchableOpacity>
+            {/* Reject Button - only show on pending status */}
+            {report.status === 'pending' && (
+              <TouchableOpacity
+                style={actionButtonStyles.rejectButton}
+                activeOpacity={0.8}
+                onPress={() => setRejectSheetVisible(true)}
+              >
+                <Ionicons name="close-circle" size={18} color={colors.semantic.error} />
+                <Text style={actionButtonStyles.rejectButtonText}>Reject</Text>
+              </TouchableOpacity>
+            )}
 
             {/* Primary Action Button */}
             {report.status === 'pending' && (

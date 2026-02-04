@@ -405,6 +405,15 @@ export const reportDetailsStyles = StyleSheet.create({
     fontSize: 12,
     color: colors.text.tertiary,
   },
+  currentStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  currentStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
   timelineDescription: {
     fontSize: 14,
     color: colors.text.secondary,

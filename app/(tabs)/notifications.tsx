@@ -1,5 +1,5 @@
 /**
- * Notifications Screen - Exactly like uw-citizen
+ * Notifications Screen - With filter tabs for Concerns, Anomalies, and Safety News
  */
 
 import { NotificationSkeleton } from '@/components/news/notification-skeleton';
@@ -7,9 +7,12 @@ import { useNotifications, type Notification } from '@/context/notification-cont
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Filter tab types
+type NotificationFilter = 'all' | 'concerns' | 'anomalies' | 'news';
 
 const formatDate = (timestamp: Date): string => {
   const date = new Date(timestamp);
@@ -26,14 +29,24 @@ const formatDate = (timestamp: Date): string => {
   return date.toLocaleDateString();
 };
 
-const getNotificationIcon = (title: string): string => {
+const getNotificationIcon = (type: string, title: string): string => {
+  // Check notification type first
+  if (type === 'anomaly_detected') return 'alert-circle';
+  if (type === 'system') return 'newspaper-outline';
+  if (type === 'new_report') return 'document-text-outline';
+  // Fall back to title-based detection for legacy notifications
   if (title.includes('Resolved')) return 'checkmark-circle';
   if (title.includes('Acknowledged')) return 'time';
-  if (title.includes('New')) return 'notifications';
+  if (title.includes('New') || title.includes('Anomaly')) return 'notifications';
   return 'sync';
 };
 
-const getNotificationColor = (title: string): string => {
+const getNotificationColor = (type: string, title: string): string => {
+  // Check notification type first
+  if (type === 'anomaly_detected') return '#f59e0b'; // Amber for anomalies
+  if (type === 'system') return '#8b5cf6'; // Purple for news/system
+  if (type === 'new_report') return '#3b82f6'; // Blue for concerns
+  // Fall back to title-based detection for legacy notifications
   if (title.includes('Resolved')) return '#22c55e';
   if (title.includes('Acknowledged')) return '#3b82f6';
   if (title.includes('New') || title.includes('Report')) return '#f59e0b';
@@ -44,6 +57,39 @@ export default function NotificationsScreen() {
   const { notifications, markAsRead, fetchFromBackend, clearAll, isLoading: isContextLoading } = useNotifications();
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<NotificationFilter>('all');
+
+  // Filter notifications based on active tab
+  const filteredNotifications = useMemo(() => {
+    if (activeFilter === 'all') return notifications;
+    
+    return notifications.filter(n => {
+      switch (activeFilter) {
+        case 'concerns':
+          // Concerns: new_report, report_update, sensor_alert
+          return n.type === 'new_report' || n.type === 'report_update' || n.type === 'sensor_alert';
+        case 'anomalies':
+          // Anomalies: anomaly_detected
+          return n.type === 'anomaly_detected';
+        case 'news':
+          // News/System: system notifications
+          return n.type === 'system';
+        default:
+          return true;
+      }
+    });
+  }, [notifications, activeFilter]);
+
+  // Count notifications by type
+  const notificationCounts = useMemo(() => {
+    const concerns = notifications.filter(n => 
+      n.type === 'new_report' || n.type === 'report_update' || n.type === 'sensor_alert'
+    ).length;
+    const anomalies = notifications.filter(n => n.type === 'anomaly_detected').length;
+    const news = notifications.filter(n => n.type === 'system').length;
+    
+    return { all: notifications.length, concerns, anomalies, news };
+  }, [notifications]);
 
   // Debug: Log notifications when they change
   useEffect(() => {
@@ -95,14 +141,24 @@ export default function NotificationsScreen() {
     if (!notification.read) {
       markAsRead(notification.id);
     }
+    
+    // Handle anomaly notifications - navigate to anomaly details
+    if (notification.type === 'anomaly_detected') {
+      if (notification.anomalyLogId) {
+        router.push({ pathname: 'anomaly-details', params: { anomalyId: notification.anomalyLogId.toString() } } as any);
+      }
+      return;
+    }
+    
+    // Handle concern notifications - navigate to report details
     if (notification.reportId) {
       router.push({ pathname: 'report-details', params: { reportId: notification.reportId } } as any);
     }
   }, [markAsRead]);
 
   const renderItem = useCallback(({ item }: { item: Notification }) => {
-    const iconName = getNotificationIcon(item.title);
-    const iconColor = getNotificationColor(item.title);
+    const iconName = getNotificationIcon(item.type, item.title);
+    const iconColor = getNotificationColor(item.type, item.title);
 
     return (
       <TouchableOpacity
@@ -125,15 +181,24 @@ export default function NotificationsScreen() {
     );
   }, [handleNotificationPress]);
 
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="notifications-off-outline" size={64} color="#cbd5e1" />
-      <Text style={styles.emptyText}>No notifications yet</Text>
-      <Text style={styles.emptySubtext}>
-        You'll see updates about concerns here
-      </Text>
-    </View>
-  );
+  const renderEmpty = () => {
+    const emptyMessages: Record<NotificationFilter, { text: string; subtext: string }> = {
+      all: { text: 'No notifications yet', subtext: 'You\'ll see updates here' },
+      concerns: { text: 'No concern updates', subtext: 'Updates about citizen concerns will appear here' },
+      anomalies: { text: 'No anomaly alerts', subtext: 'IoT anomaly detections will appear here' },
+      news: { text: 'No safety news', subtext: 'Safety news and announcements will appear here' },
+    };
+    
+    const { text, subtext } = emptyMessages[activeFilter];
+    
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="notifications-off-outline" size={64} color="#cbd5e1" />
+        <Text style={styles.emptyText}>{text}</Text>
+        <Text style={styles.emptySubtext}>{subtext}</Text>
+      </View>
+    );
+  };
 
   const keyExtractor = useCallback((item: Notification) => item.id, []);
 
@@ -184,13 +249,110 @@ export default function NotificationsScreen() {
         )}
       </View>
 
+      {/* Filter Tabs */}
+      <View style={styles.filterTabsContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterTabsContent}
+        >
+          <TouchableOpacity
+            style={[styles.filterTab, activeFilter === 'all' && styles.filterTabActive]}
+            onPress={() => setActiveFilter('all')}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="list-outline" 
+              size={16} 
+              color={activeFilter === 'all' ? '#ffffff' : '#94a3b8'} 
+            />
+            <Text style={[styles.filterTabText, activeFilter === 'all' && styles.filterTabTextActive]}>
+              All
+            </Text>
+            {notificationCounts.all > 0 && (
+              <View style={[styles.filterBadge, activeFilter === 'all' && styles.filterBadgeActive]}>
+                <Text style={[styles.filterBadgeText, activeFilter === 'all' && styles.filterBadgeTextActive]}>
+                  {notificationCounts.all}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filterTab, activeFilter === 'concerns' && styles.filterTabActive]}
+            onPress={() => setActiveFilter('concerns')}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="document-text-outline" 
+              size={16} 
+              color={activeFilter === 'concerns' ? '#ffffff' : '#94a3b8'} 
+            />
+            <Text style={[styles.filterTabText, activeFilter === 'concerns' && styles.filterTabTextActive]}>
+              Concerns
+            </Text>
+            {notificationCounts.concerns > 0 && (
+              <View style={[styles.filterBadge, activeFilter === 'concerns' && styles.filterBadgeActive]}>
+                <Text style={[styles.filterBadgeText, activeFilter === 'concerns' && styles.filterBadgeTextActive]}>
+                  {notificationCounts.concerns}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filterTab, activeFilter === 'anomalies' && styles.filterTabActive]}
+            onPress={() => setActiveFilter('anomalies')}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="alert-circle-outline" 
+              size={16} 
+              color={activeFilter === 'anomalies' ? '#ffffff' : '#94a3b8'} 
+            />
+            <Text style={[styles.filterTabText, activeFilter === 'anomalies' && styles.filterTabTextActive]}>
+              Anomalies
+            </Text>
+            {notificationCounts.anomalies > 0 && (
+              <View style={[styles.filterBadge, activeFilter === 'anomalies' && styles.filterBadgeActive]}>
+                <Text style={[styles.filterBadgeText, activeFilter === 'anomalies' && styles.filterBadgeTextActive]}>
+                  {notificationCounts.anomalies}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filterTab, activeFilter === 'news' && styles.filterTabActive]}
+            onPress={() => setActiveFilter('news')}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="newspaper-outline" 
+              size={16} 
+              color={activeFilter === 'news' ? '#ffffff' : '#94a3b8'} 
+            />
+            <Text style={[styles.filterTabText, activeFilter === 'news' && styles.filterTabTextActive]}>
+              Safety News
+            </Text>
+            {notificationCounts.news > 0 && (
+              <View style={[styles.filterBadge, activeFilter === 'news' && styles.filterBadgeActive]}>
+                <Text style={[styles.filterBadgeText, activeFilter === 'news' && styles.filterBadgeTextActive]}>
+                  {notificationCounts.news}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+
       {/* Content */}
       <View style={styles.contentContainer}>
         <FlatList
-          data={isLoading ? [] : notifications}
+          data={isLoading ? [] : filteredNotifications}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
-          extraData={notifications.length} // Ensures FlatList re-renders when notifications change
+          extraData={[filteredNotifications.length, activeFilter]} // Re-render on filter change
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
             isLoading ? (
@@ -252,9 +414,61 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
+  // Filter Tabs
+  filterTabsContainer: {
+    backgroundColor: '#1e3a8a',
+    paddingBottom: 12,
+  },
+  filterTabsContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  filterTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    gap: 6,
+  },
+  filterTabActive: {
+    backgroundColor: '#3b82f6',
+  },
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#94a3b8',
+  },
+  filterTabTextActive: {
+    color: '#ffffff',
+  },
+  filterBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  filterBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  filterBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94a3b8',
+  },
+  filterBadgeTextActive: {
+    color: '#ffffff',
+  },
+  // Content
   contentContainer: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   listContent: {
     flexGrow: 1,

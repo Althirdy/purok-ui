@@ -10,10 +10,14 @@ const isTablet = SCREEN_WIDTH >= 768;
 // Feed type for filtering
 type FeedType = 'concerns' | 'anomalies';
 
+// Anomaly type filter
+export type AnomalyTypeFilter = 'all' | 'sound_anomaly' | 'anti_tampering';
+
 export interface FilterModalProps {
   visible: boolean;
   statusFilter: 'all' | 'pending' | 'ongoing' | 'resolved';
   reportTypeFilter: 'all' | 'manual' | 'voice';
+  anomalyTypeFilter: AnomalyTypeFilter;
   feedType: FeedType;
   totalCount: number;
   pendingCount: number;
@@ -22,8 +26,11 @@ export interface FilterModalProps {
   manualCount: number; // Count of manual reports
   voiceCount: number; // Count of voice reports
   anomalyCount: number; // Count of anomalies
+  soundAnomalyCount: number; // Count of sound anomalies
+  antiTamperingCount: number; // Count of anti-tampering anomalies
   onStatusFilterChange: (filter: 'all' | 'pending' | 'ongoing' | 'resolved') => void;
   onReportTypeFilterChange: (filter: 'all' | 'manual' | 'voice') => void;
+  onAnomalyTypeFilterChange: (filter: AnomalyTypeFilter) => void;
   onFeedTypeChange: (feedType: FeedType) => void;
   onClose: () => void;
   onClearAll: () => void;
@@ -33,6 +40,7 @@ export function FilterModal({
   visible,
   statusFilter,
   reportTypeFilter,
+  anomalyTypeFilter,
   feedType,
   totalCount,
   pendingCount,
@@ -41,8 +49,11 @@ export function FilterModal({
   manualCount,
   voiceCount,
   anomalyCount,
+  soundAnomalyCount,
+  antiTamperingCount,
   onStatusFilterChange,
   onReportTypeFilterChange,
+  onAnomalyTypeFilterChange,
   onFeedTypeChange,
   onClose,
   onClearAll,
@@ -282,6 +293,85 @@ export function FilterModal({
                   <View style={[styles.filterBadge, reportTypeFilter === 'voice' && styles.filterBadgeActive]}>
                     <Text style={[styles.filterBadgeText, reportTypeFilter === 'voice' && styles.filterBadgeTextActive]}>
                       {voiceCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+            )}
+
+            {/* Anomaly Type Filter - Only show when viewing anomalies */}
+            {feedType === 'anomalies' && (
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Anomaly Type</Text>
+              <View style={styles.filterOptions}>
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    anomalyTypeFilter === 'all' && styles.filterOptionActive,
+                  ]}
+                  onPress={() => onAnomalyTypeFilterChange('all')}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      anomalyTypeFilter === 'all' && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    All Anomalies
+                  </Text>
+                  <View style={[styles.filterBadge, anomalyTypeFilter === 'all' && styles.filterBadgeActive]}>
+                    <Text style={[styles.filterBadgeText, anomalyTypeFilter === 'all' && styles.filterBadgeTextActive]}>
+                      {anomalyCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    anomalyTypeFilter === 'sound_anomaly' && styles.filterOptionActive,
+                  ]}
+                  onPress={() => onAnomalyTypeFilterChange('sound_anomaly')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="volume-high" size={18} color={anomalyTypeFilter === 'sound_anomaly' ? '#ffffff' : '#ef4444'} />
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      anomalyTypeFilter === 'sound_anomaly' && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    Sound Anomaly
+                  </Text>
+                  <View style={[styles.filterBadge, anomalyTypeFilter === 'sound_anomaly' && styles.filterBadgeActive]}>
+                    <Text style={[styles.filterBadgeText, anomalyTypeFilter === 'sound_anomaly' && styles.filterBadgeTextActive]}>
+                      {soundAnomalyCount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.filterOption,
+                    anomalyTypeFilter === 'anti_tampering' && styles.filterOptionActive,
+                  ]}
+                  onPress={() => onAnomalyTypeFilterChange('anti_tampering')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="shield-checkmark" size={18} color={anomalyTypeFilter === 'anti_tampering' ? '#ffffff' : '#f59e0b'} />
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      anomalyTypeFilter === 'anti_tampering' && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    Anti-Tampering
+                  </Text>
+                  <View style={[styles.filterBadge, anomalyTypeFilter === 'anti_tampering' && styles.filterBadgeActive]}>
+                    <Text style={[styles.filterBadgeText, anomalyTypeFilter === 'anti_tampering' && styles.filterBadgeTextActive]}>
+                      {antiTamperingCount}
                     </Text>
                   </View>
                 </TouchableOpacity>

@@ -288,7 +288,7 @@ export async function fetchPendingAnomalies(
  */
 export async function fetchAnomaliesByType(
   token: string,
-  type: 'sound_anomaly' | 'anti_tampering' | 'crowded',
+  type: 'sound_anomaly' | 'anti_tampering',
   perPage: number = 15
 ): Promise<AnomalyLogsListResponse> {
   return fetchAnomalyLogs(token, {

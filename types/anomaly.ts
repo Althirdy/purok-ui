@@ -3,13 +3,12 @@
  */
 
 // Anomaly Types
-export type AnomalyType = 'sound_anomaly' | 'anti_tampering' | 'crowded';
+export type AnomalyType = 'sound_anomaly' | 'anti_tampering';
 
 // Anomaly type labels mapping
 export const ANOMALY_TYPE_LABELS: Record<AnomalyType, string> = {
   sound_anomaly: 'Sound Anomaly',
   anti_tampering: 'Anti-Tampering Alert',
-  crowded: 'Crowded Area Detected',
 };
 
 // IoT Box information
@@ -128,12 +127,10 @@ export interface AnomalyStatistics {
   by_type: {
     sound_anomaly: number;
     anti_tampering: number;
-    crowded: number;
   };
   today_by_type: {
     sound_anomaly: number;
     anti_tampering: number;
-    crowded: number;
   };
   devices: {
     total: number;
