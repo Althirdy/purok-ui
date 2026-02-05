@@ -1,5 +1,5 @@
-import { DesignSystem } from '@/constants/design-system';
 import { WelcomeModal } from '@/components/common/welcome-modal';
+import { DesignSystem } from '@/constants/design-system';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
