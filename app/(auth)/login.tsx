@@ -6,10 +6,9 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing } = DesignSystem;
@@ -33,12 +32,8 @@ const styles = StyleSheet.create({
   logo: {
     width: 96,
     height: 96,
-    borderRadius: 48,
-    backgroundColor: '#e0f2fe',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
   },
   appName: {
     fontSize: typography.fontSize['3xl'],
@@ -169,7 +164,11 @@ export default function LoginScreen() {
         <View style={styles.logoSection}>
           <View style={styles.logoContainer}>
             <View style={styles.logo}>
-              <Ionicons name="shield-checkmark" size={48} color={colors.primary.navy} />
+              <Image
+                source={require('@/assets/images/urbanwatchicondark.png')}
+                style={{ width: 64, height: 64 }}
+                resizeMode="contain"
+              />
             </View>
           </View>
           <Text style={styles.appName}>UrbanWatch</Text>

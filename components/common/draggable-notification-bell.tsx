@@ -22,6 +22,8 @@ import {
 const { colors, spacing } = DesignSystem;
 const BUTTON_SIZE = 56;
 const STORAGE_KEY = '@notification_bell_position';
+const NAV_BAR_HEIGHT = 90; // Height of bottom tab navigation bar
+const TOP_SAFE_AREA = 100; // Safe area from top (status bar + header)
 
 interface DraggableNotificationBellProps {
   unreadCount: number;
@@ -30,9 +32,13 @@ interface DraggableNotificationBellProps {
 export function DraggableNotificationBell({ unreadCount }: DraggableNotificationBellProps) {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
   
-  // Default position (bottom right)
+  // Default position (bottom right, above nav bar)
   const defaultX = SCREEN_WIDTH - BUTTON_SIZE - spacing.lg;
-  const defaultY = SCREEN_HEIGHT - BUTTON_SIZE - 140;
+  const defaultY = SCREEN_HEIGHT - BUTTON_SIZE - NAV_BAR_HEIGHT - spacing.lg;
+  
+  // Calculate bounds
+  const minY = TOP_SAFE_AREA;
+  const maxY = SCREEN_HEIGHT - BUTTON_SIZE - NAV_BAR_HEIGHT - spacing.md;
   
   const position = useRef(new Animated.ValueXY({ x: defaultX, y: defaultY })).current;
   const [isLoaded, setIsLoaded] = useState(false);
@@ -46,9 +52,9 @@ export function DraggableNotificationBell({ unreadCount }: DraggableNotification
         const saved = await AsyncStorage.getItem(STORAGE_KEY);
         if (saved) {
           const { x, y } = JSON.parse(saved);
-          // Validate position is within bounds
+          // Validate position is within bounds (respecting nav bar)
           const validX = Math.max(spacing.sm, Math.min(x, SCREEN_WIDTH - BUTTON_SIZE - spacing.sm));
-          const validY = Math.max(100, Math.min(y, SCREEN_HEIGHT - BUTTON_SIZE - 100));
+          const validY = Math.max(minY, Math.min(y, maxY));
           position.setValue({ x: validX, y: validY });
         }
       } catch (error) {
@@ -97,9 +103,9 @@ export function DraggableNotificationBell({ unreadCount }: DraggableNotification
         const currentX = (position.x as any)._value;
         const currentY = (position.y as any)._value;
         
-        // Keep within screen bounds
+        // Keep within screen bounds (respect nav bar at bottom)
         let finalX = Math.max(spacing.sm, Math.min(currentX, SCREEN_WIDTH - BUTTON_SIZE - spacing.sm));
-        let finalY = Math.max(100, Math.min(currentY, SCREEN_HEIGHT - BUTTON_SIZE - 100));
+        let finalY = Math.max(minY, Math.min(currentY, maxY));
 
         // Snap to nearest edge (left or right)
         const snapToLeft = finalX < SCREEN_WIDTH / 2;
