@@ -4,19 +4,19 @@
 
 import { useAuth } from '@/context/auth-context';
 import {
-    confirmAnomaly,
-    dismissAnomaly,
-    fetchAnomalyLogs,
-    fetchAnomalyStatistics
+  confirmAnomaly,
+  dismissAnomaly,
+  fetchAnomalyLogs,
+  fetchAnomalyStatistics
 } from '@/services/anomaly-service';
 import { subscribeToAnomalyLogs, type AnomalyCreatedPayload } from '@/services/realtime-service';
 import type {
-    AnomalyFilter,
-    AnomalyLog,
-    AnomalyLogsQueryParams,
-    AnomalyStatistics,
-    AnomalyType,
-    PaginationMeta,
+  AnomalyFilter,
+  AnomalyLog,
+  AnomalyLogsQueryParams,
+  AnomalyStatistics,
+  AnomalyType,
+  PaginationMeta,
 } from '@/types/anomaly';
 import { useCallback, useEffect, useRef, useState } from 'react';
 

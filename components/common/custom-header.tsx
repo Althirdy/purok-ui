@@ -4,25 +4,29 @@
  */
 
 import { DesignSystem } from '@/constants/design-system';
+import { useAuth } from '@/context/auth-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { colors, spacing, typography } = DesignSystem;
 
 export function CustomHeader() {
   const insets = useSafeAreaInsets();
-  
+  const { user } = useAuth();
+
   const handleAvatarPress = () => {
     router.push('/(tabs)/profile' as any);
   };
 
+  const profilePictureUri = user?.profilePicture;
+
   return (
     <View style={[
-      styles.container, 
-      { 
+      styles.container,
+      {
         paddingTop: insets.top,
       }
     ]}>
@@ -31,16 +35,20 @@ export function CustomHeader() {
           <Text style={styles.appName}>UrbanWatch</Text>
           <Text style={styles.appSubtitle}>Purok Leader</Text>
         </View>
-        
+
         <View style={styles.rightSection}>
-          <TouchableOpacity 
-            style={styles.avatarButton} 
+          <TouchableOpacity
+            style={styles.avatarButton}
             onPress={handleAvatarPress}
             activeOpacity={0.7}
           >
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={20} color={colors.text.inverse} />
-            </View>
+            {profilePictureUri ? (
+              <Image source={{ uri: profilePictureUri }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatar}>
+                <Ionicons name="person" size={20} color={colors.text.inverse} />
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -91,6 +99,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  avatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },

@@ -14,6 +14,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Dimensions,
+    Modal,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -25,6 +27,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, spacing, typography } = DesignSystem;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Get icon for anomaly type
 function getAnomalyIcon(type: AnomalyType): keyof typeof Ionicons.glyphMap {
@@ -85,6 +88,7 @@ export default function AnomalyDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
 
   // Fetch anomaly details
   const fetchDetails = useCallback(async () => {
@@ -244,9 +248,9 @@ export default function AnomalyDetailsScreen() {
   const anomalyTypeDisplay = anomaly.anomaly_type ? 
     anomaly.anomaly_type.replace(/_/g, ' ').toUpperCase() : 'IOT ANOMALY';
 
-  // Build image URL if exists
-  const imageUrl = anomaly.image ? 
-    `https://cristopher-perished-taren.ngrok-free.dev/storage/${anomaly.image}` : null;
+  // Use image_url from API if available, otherwise construct from image path
+  const imageUrl = anomaly.image_url || 
+    (anomaly.image ? `${process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me'}/storage/${anomaly.image}` : null);
   
   // Format timestamp safely
   const formattedTimestamp = anomaly.created_at ? formatTimestamp(anomaly.created_at) : 'Unknown time';
@@ -310,7 +314,11 @@ export default function AnomalyDetailsScreen() {
             style={styles.section}
           >
             <Text style={styles.sectionLabel}>CAPTURED IMAGE</Text>
-            <View style={styles.imageContainer}>
+            <TouchableOpacity 
+              style={styles.imageContainer}
+              onPress={() => !imageError && setImageModalVisible(true)}
+              activeOpacity={0.8}
+            >
               {imageError ? (
                 <View style={styles.imagePlaceholder}>
                   <Ionicons name="image-outline" size={48} color={colors.text.tertiary} />
@@ -318,23 +326,28 @@ export default function AnomalyDetailsScreen() {
                   <Text style={styles.imagePlaceholderSubtext}>403 - Access denied</Text>
                 </View>
               ) : (
-                <Image
-                  source={{ 
-                    uri: imageUrl,
-                    headers: {
-                      'Authorization': `Bearer ${accessToken}`,
-                      'ngrok-skip-browser-warning': 'true',
-                    }
-                  }}
-                  style={styles.anomalyImage}
-                  contentFit="cover"
-                  onError={(e) => {
-                    console.log('[AnomalyDetails] Image load error:', e);
-                    setImageError(true);
-                  }}
-                />
+                <>
+                  <Image
+                    source={{ 
+                      uri: imageUrl,
+                      headers: {
+                        'ngrok-skip-browser-warning': '69420',
+                      }
+                    }}
+                    style={styles.anomalyImage}
+                    contentFit="cover"
+                    onError={(e) => {
+                      console.log('[AnomalyDetails] Image load error:', e);
+                      setImageError(true);
+                    }}
+                  />
+                  <View style={styles.tapToViewOverlay}>
+                    <Ionicons name="expand-outline" size={20} color="#ffffff" />
+                    <Text style={styles.tapToViewText}>Tap to view</Text>
+                  </View>
+                </>
               )}
-            </View>
+            </TouchableOpacity>
           </Animated.View>
         )}
 
@@ -419,25 +432,11 @@ export default function AnomalyDetailsScreen() {
                   <Text style={styles.sensorValue}>{formatSensorValue(anomaly.details[0].vibration)}</Text>
                 </View>
               )}
-              {anomaly.details[0].audio_floor && (
-                <View style={styles.sensorCard}>
-                  <Ionicons name="volume-low-outline" size={24} color="#3b82f6" />
-                  <Text style={styles.sensorLabel}>Audio Floor</Text>
-                  <Text style={styles.sensorValue}>{formatSensorValue(anomaly.details[0].audio_floor)}</Text>
-                </View>
-              )}
               {anomaly.details[0].hall_effect && (
                 <View style={styles.sensorCard}>
                   <Ionicons name="magnet-outline" size={24} color="#10b981" />
                   <Text style={styles.sensorLabel}>Hall Effect</Text>
                   <Text style={styles.sensorValue}>{formatSensorValue(anomaly.details[0].hall_effect)}</Text>
-                </View>
-              )}
-              {anomaly.details[0].people_detected && (
-                <View style={styles.sensorCard}>
-                  <Ionicons name="people-outline" size={24} color="#f59e0b" />
-                  <Text style={styles.sensorLabel}>People</Text>
-                  <Text style={styles.sensorValue}>{anomaly.details[0].people_detected}</Text>
                 </View>
               )}
             </View>
@@ -523,6 +522,35 @@ export default function AnomalyDetailsScreen() {
         {/* Spacer for bottom */}
         <View style={{ height: spacing.xl }} />
       </ScrollView>
+
+      {/* Full Screen Image Modal */}
+      <Modal
+        visible={imageModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setImageModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <TouchableOpacity 
+            style={styles.modalCloseButton}
+            onPress={() => setImageModalVisible(false)}
+          >
+            <Ionicons name="close" size={28} color="#ffffff" />
+          </TouchableOpacity>
+          {imageUrl && (
+            <Image
+              source={{ 
+                uri: imageUrl,
+                headers: {
+                  'ngrok-skip-browser-warning': '69420',
+                }
+              }}
+              style={styles.fullScreenImage}
+              contentFit="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -836,5 +864,44 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text.secondary,
     fontFamily: 'monospace',
+  },
+  tapToViewOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 6,
+  },
+  tapToViewText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenImage: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.8,
   },
 });

@@ -13,14 +13,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -31,6 +31,8 @@ export default function ProfileScreen() {
   const { user, logout, refreshUser, accessToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Local override for profile picture - used when upload returns R2 URL but refreshUser() returns wrong URL
+  const [localProfilePicture, setLocalProfilePicture] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -84,11 +86,11 @@ export default function ProfileScreen() {
     try {
       // Create form data
       const formData = new FormData();
-      
+
       // Get file extension from URI
       const uriParts = imageUri.split('.');
       const fileExtension = uriParts[uriParts.length - 1];
-      
+
       // Append image to form data
       formData.append('avatar', {
         uri: imageUri,
@@ -107,11 +109,22 @@ export default function ProfileScreen() {
       });
 
       const data = await response.json();
+      console.log('[Profile] Avatar upload response:', JSON.stringify(data, null, 2));
 
       if (response.ok && data.success) {
-        Alert.alert('Success', 'Profile picture updated successfully!');
-        // Refresh user data to get the new profile photo URL
+        // Extract the R2 public URL from upload response
+        const uploadedPhotoUrl = data?.data?.profile_photo_url || data?.profile_photo_url;
+        console.log('[Profile] Uploaded photo URL:', uploadedPhotoUrl);
+
+        // Save the R2 URL locally as immediate fallback
+        if (uploadedPhotoUrl) {
+          setLocalProfilePicture(uploadedPhotoUrl);
+        }
+
+        // Refresh user data so header and other components get the new photo
         await refreshUser();
+
+        Alert.alert('Success', 'Profile picture updated successfully!');
       } else {
         throw new Error(data.message || 'Failed to upload profile photo');
       }
@@ -142,17 +155,17 @@ export default function ProfileScreen() {
 
       const result = source === 'camera'
         ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.8,
-          })
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        })
         : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.8,
-          });
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
 
       if (!result.canceled && result.assets[0]) {
         const imageUri = result.assets[0].uri;
@@ -165,15 +178,16 @@ export default function ProfileScreen() {
     }
   };
 
-  const profilePictureUri = user?.profilePicture;
+  // Use local override (R2 URL from upload) if available, otherwise fall back to user.profilePicture
+  const profilePictureUri = localProfilePicture || user?.profilePicture;
 
   if (loading && !user) {
     return (
       <SafeAreaView style={globalStyles.container} edges={['top']}>
         <View style={styles.appBar}>
           <View style={styles.appBarContent}>
-            <TouchableOpacity 
-              style={styles.backButton} 
+            <TouchableOpacity
+              style={styles.backButton}
               onPress={() => router.back()}
               activeOpacity={0.7}
             >
@@ -196,8 +210,8 @@ export default function ProfileScreen() {
     <SafeAreaView style={globalStyles.container} edges={['top']}>
       <View style={styles.appBar}>
         <View style={styles.appBarContent}>
-          <TouchableOpacity 
-            style={styles.backButton} 
+          <TouchableOpacity
+            style={styles.backButton}
             onPress={() => router.back()}
             activeOpacity={0.7}
           >

@@ -123,7 +123,7 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
     pusherClient.disconnect();
     pusherClient = null;
   }
-  
+
   // Store current token
   lastToken = authToken || null;
 
@@ -151,23 +151,23 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
           try {
             // Get fresh token from storage
             let currentToken = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-            
+
             if (!currentToken) {
               console.error('[Pusher] ❌ No access token available');
               callback(new Error('No access token available'), null);
               return;
             }
-            
+
             const authEndpoint = realtimeConfig.authEndpoint;
             console.log('[Pusher] 🔐 Authorizing channel:', channel.name);
             console.log('[Pusher] 📤 Auth endpoint:', authEndpoint);
             console.log('[Pusher] 📤 Socket ID:', socketId);
-            
+
             // Build form data - Laravel expects application/x-www-form-urlencoded
             const formData = new URLSearchParams();
             formData.append('socket_id', socketId);
             formData.append('channel_name', channel.name);
-            
+
             // First attempt with current token
             let response = await fetch(authEndpoint, {
               method: 'POST',
@@ -187,13 +187,13 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
             if (responseText && responseText.length > 0) {
               console.log('[Pusher] 📥 Initial response text:', responseText.substring(0, 200));
             }
-            
+
             const isEmpty = !responseText || responseText.trim().length === 0;
-            
+
             // Handle empty response or 401 - token expired
             if (isEmpty || response.status === 401) {
               console.log('[Pusher] 🔄 Token expired or empty response (status:', response.status, ', isEmpty:', isEmpty, '), refreshing token...');
-              
+
               // Try to refresh token
               const refreshToken = await AsyncStorage.getItem('@urbanwatch:refresh_token');
               if (!refreshToken) {
@@ -201,7 +201,7 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
                 callback(new Error('No refresh token available'), null);
                 return;
               }
-              
+
               const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
               const refreshResponse = await fetch(`${API_BASE}/api/v1/refresh-token`, {
                 method: 'POST',
@@ -236,12 +236,12 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
               }
               currentToken = newAccessToken;
               console.log('[Pusher] ✅ Token refreshed, retrying auth...');
-              
+
               // Retry auth with new token
               console.log('[Pusher] 🔄 Retrying auth request with new token...');
               console.log('[Pusher] 📤 Auth endpoint:', authEndpoint);
               console.log('[Pusher] 📤 Request body:', formData.toString());
-              
+
               response = await fetch(authEndpoint, {
                 method: 'POST',
                 headers: {
@@ -255,7 +255,7 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
 
               console.log('[Pusher] 📥 Response status:', response.status);
               console.log('[Pusher] 📥 Response headers:', JSON.stringify(Object.fromEntries(response.headers.entries())));
-              
+
               responseText = await response.text();
               console.log('[Pusher] 📥 Response text length:', responseText?.length ?? 0);
               console.log('[Pusher] 📥 Response text:', responseText?.substring(0, 500));
@@ -294,7 +294,7 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
         },
       };
     };
-    
+
     console.log('[Pusher] ✅ Custom authorizer configured for endpoint:', realtimeConfig.authEndpoint);
   } else {
     console.warn('[Pusher] ⚠️ No auth token provided - private channel subscription will fail');
@@ -352,7 +352,7 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
   // 1. Nested: concern.location.lat / concern.location.lng
   // 2. Flat: concern.latitude / concern.longitude
   let coordinates: { latitude: number; longitude: number } | undefined;
-  
+
   // Try nested location first
   if (concern.location?.lat && concern.location?.lng) {
     const lat = typeof concern.location.lat === 'string' ? parseFloat(concern.location.lat) : concern.location.lat;
@@ -383,7 +383,7 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
   }
 
   const category = concern.category?.toLowerCase() || 'other';
-  
+
   // Parse related reports (follow-ups/duplicates)
   const relatedReports: RelatedReport[] | undefined = concern.relatedReports?.map((r) => ({
     id: r.id,
@@ -392,7 +392,7 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
     created_at: r.created_at,
     images: r.images,
   }));
-  
+
   return {
     id: `PUROK-${concern.id}`, // Format: PUROK-{id} to match API format and enable status updates
     title: concern.title,
@@ -436,12 +436,12 @@ export async function subscribeToCitizenReports(
 ): Promise<() => void> {
   try {
     const client = await getPusherClient(authToken);
-    
+
     // Channel name: private-purok-leader.{userId}
     // Laravel automatically prepends 'private-' for private channels
     const channelName = `private-purok-leader.${userId}`;
     console.log('[Pusher] Subscribing to channel:', channelName);
-    
+
     const channel = client.subscribe(channelName);
 
     // Wait for subscription to be successful
@@ -459,7 +459,7 @@ export async function subscribeToCitizenReports(
         channel: channelName,
         userId: userId,
       });
-      
+
       // Status 403 means endpoint is reachable but authorization failed
       if (err?.status === 403) {
         console.error('[Pusher] 403 Forbidden - Authorization failed');
@@ -471,7 +471,7 @@ export async function subscribeToCitizenReports(
         console.error(`  Channel: ${channelName}`);
         console.error(`  User ID: ${userId}`);
       }
-      
+
       // Status 0 usually means network/CORS issue
       if (err?.status === 0) {
         console.error('[Pusher] Status 0 error - Network/CORS issue');
@@ -485,7 +485,7 @@ export async function subscribeToCitizenReports(
     // Event name: concern.assigned
     // Per documentation: Use .concern.assigned (with leading dot) for client-named events
     const eventName = '.concern.assigned'; // Note the leading dot for client-named events
-    
+
     const handler = (data: ConcernAssignedPayload) => {
       try {
         console.log('[Pusher] 🔔 New Concern Received from uw-citizen:', {
@@ -498,7 +498,7 @@ export async function subscribeToCitizenReports(
         const normalized = normalizeConcernAssigned(data);
         console.log('[Pusher] ✅ Normalized report:', normalized.id);
         onReport(normalized);
-        
+
         // Per documentation: Example usage
         // if (data.concern.audio) {
         //   playAudio(data.concern.audio);
@@ -520,7 +520,7 @@ export async function subscribeToCitizenReports(
   } catch (error) {
     console.error('[Pusher] Error setting up subscription:', error);
     // Return a no-op cleanup function
-    return () => {};
+    return () => { };
   }
 }
 
@@ -556,11 +556,11 @@ export async function subscribeToAccidentStatusUpdates(
 ): Promise<() => void> {
   try {
     const client = await getPusherClient();
-    
+
     // Public channel - no authentication needed
     const channelName = 'active-accidents';
     console.log('[Pusher] Subscribing to accident updates on channel:', channelName);
-    
+
     const channel = client.subscribe(channelName);
 
     channel.bind('pusher:subscription_succeeded', () => {
@@ -600,7 +600,7 @@ export async function subscribeToAccidentStatusUpdates(
     };
   } catch (error) {
     console.error('[Pusher] Error setting up accident subscription:', error);
-    return () => {};
+    return () => { };
   }
 }
 
@@ -625,10 +625,10 @@ export async function subscribeToStatusUpdates(
 ): Promise<() => void> {
   try {
     const client = await getPusherClient(authToken);
-    
+
     const channelName = `private-purok-leader.${userId}`;
     console.log('[Pusher] Subscribing to status updates on channel:', channelName);
-    
+
     const channel = client.subscribe(channelName);
 
     // Debug: Listen to ALL events on this channel to see what backend is broadcasting
@@ -640,12 +640,12 @@ export async function subscribeToStatusUpdates(
           data: data ? JSON.stringify(data, null, 2) : 'null',
         });
       };
-      
+
       // Bind to all events (Pusher doesn't have a wildcard, so we'll log subscription events)
       channel.bind('pusher:subscription_succeeded', () => {
         console.log('[Pusher] ✅ Status update subscription succeeded on', channelName);
       });
-      
+
       channel.bind('pusher:subscription_error', (err: any) => {
         console.error('[Pusher] ❌ Status update subscription error:', err);
       });
@@ -672,7 +672,7 @@ export async function subscribeToStatusUpdates(
         // Priority: distribution.status > concern.status (backend updates distribution_status)
         const backendStatus = data.distribution?.status || data.concern.status || 'pending';
         const frontendStatus = statusMap[backendStatus.toLowerCase()] || 'pending';
-        
+
         console.log('[Pusher] 🔄 Status Update Processed:', {
           concernId,
           backendStatus,
@@ -681,7 +681,7 @@ export async function subscribeToStatusUpdates(
           distributionStatus: data.distribution?.status,
           concernStatus: data.concern.status,
         });
-        
+
         // Call callback with report ID (format: PUROK-{id}) and frontend status
         onStatusUpdate(`PUROK-${concernId}`, frontendStatus);
       } catch (error) {
@@ -711,7 +711,7 @@ export async function subscribeToStatusUpdates(
     };
   } catch (error) {
     console.error('[Pusher] Error setting up status update subscription:', error);
-    return () => {};
+    return () => { };
   }
 }
 
@@ -770,22 +770,22 @@ export async function subscribeToAnomalyLogs(
   try {
     const pusher = await getPusherClient();
     const channelName = 'anomaly-logs';
-    
+
     console.log('[Pusher] 🔔 Subscribing to anomaly logs channel:', channelName);
-    
+
     // Subscribe to public channel (no auth required)
     const channel = pusher.subscribe(channelName);
-    
+
     // Handle subscription success
     channel.bind('pusher:subscription_succeeded', () => {
       console.log('[Pusher] ✅ Successfully subscribed to', channelName);
     });
-    
+
     // Handle subscription error
     channel.bind('pusher:subscription_error', (err: any) => {
       console.error('[Pusher] ❌ Failed to subscribe to', channelName, err);
     });
-    
+
     // Anomaly created event handler
     const anomalyCreatedHandler = (data: AnomalyCreatedPayload) => {
       try {
@@ -796,19 +796,19 @@ export async function subscribeToAnomalyLogs(
           iotBox: data.iot_box?.device_name || data.iot_box?.name || `Device ${data.iot_box?.id}`,
           location: data.iot_box?.display_location || data.location?.location_name,
         });
-        
+
         onAnomalyCreated(data);
       } catch (error) {
         console.error('[Pusher] ❌ Failed to process anomaly event:', error);
       }
     };
-    
+
     // Bind to both event name formats (with and without leading dot)
     channel.bind('.anomaly.created', anomalyCreatedHandler);
     channel.bind('anomaly.created', anomalyCreatedHandler);
-    
+
     console.log('[Pusher] ✅ Listening for anomaly events on', channelName);
-    
+
     return () => {
       console.log('[Pusher] Unsubscribing from anomaly logs channel:', channelName);
       channel.unbind('.anomaly.created', anomalyCreatedHandler);
@@ -817,10 +817,101 @@ export async function subscribeToAnomalyLogs(
     };
   } catch (error) {
     console.error('[Pusher] Error setting up anomaly subscription:', error);
-    return () => {};
+    return () => { };
   }
 }
 
 // Export the anomaly payload type for consumers
 export type { AnomalyCreatedPayload };
+
+// ============================================================================
+// Safety Post / Public Announcements Real-time Subscription
+// ============================================================================
+
+// Safety Post published event payload from WebSocket
+// Channel: public-posts (public)
+// Event: safety-post.published
+export type SafetyPostPublishedPayload = {
+  id: number;
+  title: string;
+  content: string;
+  category?: string;
+  severity?: 'low' | 'medium' | 'high' | 'critical';
+  author?: {
+    id: number;
+    name: string;
+  };
+  image?: string | null;
+  published_at: string;
+  created_at: string;
+};
+
+/**
+ * Subscribe to public safety post events on the public-posts channel
+ * 
+ * Channel: public-posts (public)
+ * Event: safety-post.published
+ * 
+ * This is a public channel, no authentication required.
+ * Used to notify users when new safety posts/announcements are published.
+ * 
+ * @param onSafetyPostPublished - Callback when a new safety post is published
+ * @returns Unsubscribe function
+ */
+export async function subscribeToPublicPosts(
+  onSafetyPostPublished: (post: SafetyPostPublishedPayload) => void
+): Promise<() => void> {
+  try {
+    const pusher = await getPusherClient();
+    const channelName = 'public-posts';
+
+    console.log('[Pusher] 📢 Subscribing to public posts channel:', channelName);
+
+    // Subscribe to public channel (no auth required)
+    const channel = pusher.subscribe(channelName);
+
+    // Handle subscription success
+    channel.bind('pusher:subscription_succeeded', () => {
+      console.log('[Pusher] ✅ Successfully subscribed to', channelName);
+    });
+
+    // Handle subscription error
+    channel.bind('pusher:subscription_error', (err: any) => {
+      console.error('[Pusher] ❌ Failed to subscribe to', channelName, err);
+    });
+
+    // Safety post published event handler
+    const safetyPostPublishedHandler = (data: SafetyPostPublishedPayload) => {
+      try {
+        console.log('[Pusher] 📢 New safety post published:', {
+          id: data.id,
+          title: data.title,
+          category: data.category,
+          severity: data.severity,
+          author: data.author?.name || 'Unknown',
+        });
+
+        onSafetyPostPublished(data);
+      } catch (error) {
+        console.error('[Pusher] ❌ Failed to process safety post event:', error);
+      }
+    };
+
+    // Bind to both event name formats (with and without leading dot)
+    channel.bind('.safety-post.published', safetyPostPublishedHandler);
+    channel.bind('safety-post.published', safetyPostPublishedHandler);
+
+    console.log('[Pusher] ✅ Listening for safety-post.published events on', channelName);
+
+    return () => {
+      console.log('[Pusher] Unsubscribing from public posts channel:', channelName);
+      channel.unbind('.safety-post.published', safetyPostPublishedHandler);
+      channel.unbind('safety-post.published', safetyPostPublishedHandler);
+      pusher.unsubscribe(channelName);
+    };
+  } catch (error) {
+    console.error('[Pusher] Error setting up safety post subscription:', error);
+    return () => { };
+  }
+}
 

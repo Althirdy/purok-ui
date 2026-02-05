@@ -77,13 +77,12 @@ export interface AnomalyLog {
   is_confirmed: boolean;
   location?: AnomalyLocation | string;  // Can be object or string
   image?: string;               // Anomaly image path
+  image_url?: string;           // Full URL to image (from API)
   details?: Array<{             // Sensor details
     vibration?: string;
     mic_left?: string;
     mic_right?: string;
     hall_effect?: string;
-    audio_floor?: string;
-    people_detected?: string;
   }>;
   latitude?: number | string | null;
   longitude?: number | string | null;
