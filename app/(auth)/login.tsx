@@ -8,7 +8,7 @@ import { globalStyles } from '@/constants/global-styles';
 import { useAuth } from '@/context/auth-context';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors, typography, spacing } = DesignSystem;
