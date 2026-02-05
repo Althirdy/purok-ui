@@ -13,6 +13,7 @@ export interface User {
   email?: string;
   phoneNumber?: string;
   address?: string;
+  profilePicture?: string;
 }
 
 // Related Report (follow-up/duplicate merged into parent concern)

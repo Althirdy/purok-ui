@@ -74,11 +74,6 @@ const styles = StyleSheet.create({
   pinBoxActive: {
     borderColor: '#000',
   },
-  forgotPin: {
-    fontSize: typography.fontSize.sm,
-    color: '#000',
-    marginTop: spacing.sm,
-  },
   numberPad: { flex: 1 },
   numberRow: {},
   numberButton: {},
@@ -152,10 +147,6 @@ export default function LoginScreen() {
     }
   };
 
-  const handleForgotPin = () => {
-    Alert.alert('Forgot PIN', 'Please contact your administrator to reset your PIN.');
-  };
-
   return (
     <>
     <SafeAreaView style={globalStyles.container}>
@@ -206,10 +197,6 @@ export default function LoginScreen() {
           {!!errorMessage && (
             <Text style={styles.errorText}>{errorMessage}</Text>
           )}
-
-          <TouchableOpacity onPress={handleForgotPin}>
-            <Text style={styles.forgotPin}>Forgot PIN?</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Spacer to retain original layout where numpad used to be */}

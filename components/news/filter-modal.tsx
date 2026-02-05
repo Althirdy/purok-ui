@@ -185,7 +185,7 @@ export function FilterModal({
                       statusFilter === 'ongoing' && styles.filterOptionTextActive,
                     ]}
                   >
-                    Ongoing
+                    Acknowledged
                   </Text>
                   <View style={[styles.filterBadge, statusFilter === 'ongoing' && styles.filterBadgeActive]}>
                     <Text style={[styles.filterBadgeText, statusFilter === 'ongoing' && styles.filterBadgeTextActive]}>

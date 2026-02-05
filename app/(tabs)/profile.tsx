@@ -9,10 +9,13 @@ import { useAuth } from '@/context/auth-context';
 import { getInitials } from '@/utils/userHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
+    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -22,10 +25,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { colors } = DesignSystem;
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
 
 export default function ProfileScreen() {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, accessToken } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -47,6 +52,120 @@ export default function ProfileScreen() {
       },
     ]);
   };
+
+  const handleEditProfilePicture = () => {
+    Alert.alert(
+      'Change Profile Picture',
+      'Choose an option',
+      [
+        {
+          text: 'Take Photo',
+          onPress: () => pickImage('camera'),
+        },
+        {
+          text: 'Choose from Gallery',
+          onPress: () => pickImage('gallery'),
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ],
+    );
+  };
+
+  const uploadProfilePhoto = async (imageUri: string) => {
+    if (!accessToken) {
+      Alert.alert('Error', 'You must be logged in to update your profile photo.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      // Create form data
+      const formData = new FormData();
+      
+      // Get file extension from URI
+      const uriParts = imageUri.split('.');
+      const fileExtension = uriParts[uriParts.length - 1];
+      
+      // Append image to form data
+      formData.append('avatar', {
+        uri: imageUri,
+        type: `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}`,
+        name: `profile_photo.${fileExtension}`,
+      } as any);
+
+      const response = await fetch(`${API_BASE}/api/v1/profile/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        Alert.alert('Success', 'Profile picture updated successfully!');
+        // Refresh user data to get the new profile photo URL
+        await refreshUser();
+      } else {
+        throw new Error(data.message || 'Failed to upload profile photo');
+      }
+    } catch (error: any) {
+      console.error('Error uploading profile photo:', error);
+      Alert.alert('Error', error.message || 'Failed to upload profile photo. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const pickImage = async (source: 'camera' | 'gallery') => {
+    try {
+      // Request permissions
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Required', 'Camera permission is needed to take a photo.');
+          return;
+        }
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Required', 'Gallery permission is needed to select a photo.');
+          return;
+        }
+      }
+
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          });
+
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        // Upload to server
+        await uploadProfilePhoto(imageUri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const profilePictureUri = user?.profilePicture;
 
   if (loading && !user) {
     return (
@@ -95,12 +214,24 @@ export default function ProfileScreen() {
         {/* Profile Header */}
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
-            </View>
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
-            </View>
+            <TouchableOpacity onPress={handleEditProfilePicture} activeOpacity={0.8} disabled={uploading}>
+              {profilePictureUri ? (
+                <Image source={{ uri: profilePictureUri }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{getInitials(user?.name)}</Text>
+                </View>
+              )}
+              {uploading ? (
+                <View style={styles.uploadingOverlay}>
+                  <ActivityIndicator size="small" color="#ffffff" />
+                </View>
+              ) : (
+                <View style={styles.editBadge}>
+                  <Ionicons name="camera" size={14} color="#ffffff" />
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
           <Text style={styles.userName}>{user?.name || 'Purok Leader'}</Text>
           <Text style={styles.userRole}>Purok Leader</Text>
@@ -127,6 +258,16 @@ export default function ProfileScreen() {
             </View>
             <Text style={styles.profileItemValue}>
               {user?.phoneNumber || 'No phone number provided'}
+            </Text>
+          </View>
+
+          <View style={styles.profileItem}>
+            <View style={styles.profileItemHeader}>
+              <Ionicons name="location-outline" size={20} color="#1e3a8a" />
+              <Text style={styles.profileItemLabel}>Purok Address</Text>
+            </View>
+            <Text style={styles.profileItemValue}>
+              {user?.address || 'No address provided'}
             </Text>
           </View>
 
@@ -216,20 +357,38 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#1e3a8a',
   },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: '#1e3a8a',
+  },
   avatarText: {
     fontSize: 36,
     fontWeight: 'bold',
     color: '#ffffff',
   },
-  verifiedBadge: {
+  editBadge: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#1e3a8a',
     borderRadius: 12,
-    padding: 2,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    padding: 6,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(30, 58, 138, 0.7)',
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   userName: {
     fontSize: 24,
