@@ -27,6 +27,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_TOKEN_KEY = '@urbanwatch:auth_token';
 const REFRESH_TOKEN_KEY = '@urbanwatch:refresh_token';
 const NOTIFICATIONS_STORAGE_KEY = '@urbanwatch:notifications';
+const WELCOME_DISMISSED_KEY = '@urbanwatch:welcome_dismissed';
 // Default to production URL
 // For development, set EXPO_PUBLIC_API_URL to ngrok URL in .env
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
@@ -222,7 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchCurrentUser]);
 
   const logout = useCallback(async () => {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, NOTIFICATIONS_STORAGE_KEY]);
+    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, NOTIFICATIONS_STORAGE_KEY, WELCOME_DISMISSED_KEY]);
     setUser(null);
     setAccessToken(null);
     setRefreshToken(null);

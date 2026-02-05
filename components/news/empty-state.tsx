@@ -7,14 +7,23 @@ const { colors, typography, spacing } = DesignSystem;
 
 interface EmptyStateProps {
   loading?: boolean;
+  feedType?: 'concerns' | 'anomalies';
 }
 
-export function EmptyState({ loading = false }: EmptyStateProps) {
+export function EmptyState({ loading = false, feedType = 'concerns' }: EmptyStateProps) {
+  const isAnomalies = feedType === 'anomalies';
+  
   return (
     <View style={styles.container}>
-      <Ionicons name="folder-open-outline" size={64} color={colors.neutral.gray600} />
+      <Ionicons 
+        name={isAnomalies ? "radio-outline" : "folder-open-outline"} 
+        size={64} 
+        color={colors.neutral.gray600} 
+      />
       <Text style={styles.text}>
-        {loading ? 'Loading concerns...' : 'No concerns available'}
+        {loading 
+          ? (isAnomalies ? 'Loading anomalies...' : 'Loading concerns...') 
+          : (isAnomalies ? 'No anomalies available' : 'No concerns available')}
       </Text>
     </View>
   );

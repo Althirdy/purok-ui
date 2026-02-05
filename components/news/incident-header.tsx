@@ -1,7 +1,7 @@
 import { DesignSystem } from '@/constants/design-system';
-import { useAuth } from '@/context/auth-context';
+import { WelcomeModal } from '@/components/common/welcome-modal';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
     Dimensions,
     Platform,
@@ -51,38 +51,12 @@ export function IncidentHeader(props: IncidentHeaderProps) {
     setReportTypeFilter,
   } = props;
 
-  const { user } = useAuth();
-
-  const displayName = useMemo(() => {
-    const name = (user?.name || '').trim();
-    const parts = name.split(/\s+/);
-    // Just use first name for a friendlier greeting
-    if (parts.length >= 1 && parts[0]) return parts[0];
-    return 'Purok Leader';
-  }, [user]);
-
   return (
     <View style={styles.headerWrapper}>
       {/* Utilities: Search + Stats */}
       <View style={styles.utilities}>
-        {/* Welcome Card */}
-        <View style={styles.welcomeContainer}>
-          <View style={styles.welcomeRow}>
-            <View style={styles.welcomeIconContainer}>
-              <Ionicons name="person-circle" size={40} color={colors.primary.blue} />
-            </View>
-            <View style={styles.welcomeTextContainer}>
-              <Text style={styles.welcomeText}>Welcome back, {displayName}!</Text>
-              <Text style={styles.welcomeSubtext}>
-                {pendingCount > 0 
-                  ? `You have ${pendingCount} pending concern${pendingCount > 1 ? 's' : ''}`
-                  : acknowledgedCount > 0
-                    ? `${acknowledgedCount} concern${acknowledgedCount > 1 ? 's' : ''} in progress`
-                    : 'All concerns are resolved'}
-              </Text>
-            </View>
-          </View>
-        </View>
+        {/* Welcome Banner - Dismissible popup above search */}
+        <WelcomeModal pendingCount={pendingCount} acknowledgedCount={acknowledgedCount} />
 
         <View style={styles.searchRow}>
           <View style={styles.searchBar}>
@@ -186,26 +160,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border.light,
-  },
-  welcomeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  welcomeIconContainer: {
-    marginRight: spacing.md,
-  },
-  welcomeTextContainer: {
-    flex: 1,
-  },
-  welcomeText: {
-    fontSize: isTablet ? typography.fontSize.lg : typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  welcomeSubtext: {
-    fontSize: isTablet ? typography.fontSize.sm : typography.fontSize.xs,
-    color: colors.text.secondary,
   },
   searchRow: {
     flexDirection: 'row',

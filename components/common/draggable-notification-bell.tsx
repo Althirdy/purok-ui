@@ -9,14 +9,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated,
-  Dimensions,
-  GestureResponderEvent,
-  PanResponder,
-  PanResponderGestureState,
-  StyleSheet,
-  Text,
-  View,
+    Animated,
+    Dimensions,
+    PanResponder,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
 
 const { colors, spacing } = DesignSystem;

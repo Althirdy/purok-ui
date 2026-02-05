@@ -614,7 +614,7 @@ export default function NewsFeedScreen() {
         ListEmptyComponent={
           isLoading
             ? <ReportCardSkeleton count={4} />
-            : <EmptyState loading={false} />
+            : <EmptyState loading={false} feedType={feedType} />
         }
         // Performance optimizations for rapid data
         removeClippedSubviews={true}

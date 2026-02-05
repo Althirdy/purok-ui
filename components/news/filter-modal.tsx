@@ -224,7 +224,7 @@ export function FilterModal({
             {/* Type Filter - Only show when viewing concerns */}
             {feedType !== 'anomalies' && (
             <View style={styles.filterSection}>
-              <Text style={styles.filterSectionTitle}>Report Type</Text>
+              <Text style={styles.filterSectionTitle}>Concern Type</Text>
               <View style={styles.filterOptions}>
                 <TouchableOpacity
                   style={[
