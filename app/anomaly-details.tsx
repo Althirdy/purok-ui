@@ -4,7 +4,7 @@
 
 import { DesignSystem } from '@/constants/design-system';
 import { useAuth } from '@/context/auth-context';
-import { confirmAnomaly, dismissAnomaly, fetchAnomalyById } from '@/services/anomaly-service';
+import { fetchAnomalyById } from '@/services/anomaly-service';
 import type { AnomalyLog, AnomalyType } from '@/types/anomaly';
 import { getIoTBoxDisplayName, getIoTBoxLocation, getLocationDisplay } from '@/types/anomaly';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,16 +12,15 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Modal,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -86,7 +85,7 @@ export default function AnomalyDetailsScreen() {
   const [anomaly, setAnomaly] = useState<AnomalyLog | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+
   const [imageError, setImageError] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
 
@@ -117,68 +116,7 @@ export default function AnomalyDetailsScreen() {
     fetchDetails();
   }, [fetchDetails]);
 
-  // Handle confirm action
-  const handleConfirm = useCallback(async () => {
-    if (!accessToken || !anomaly) return;
 
-    Alert.alert(
-      'Confirm Anomaly',
-      'Are you sure you want to confirm this anomaly as a valid detection?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          style: 'default',
-          onPress: async () => {
-            setActionLoading(true);
-            try {
-              const updatedAnomaly = await confirmAnomaly(accessToken, anomaly.id);
-              if (updatedAnomaly) {
-                setAnomaly(prev => prev ? { ...prev, is_confirmed: true } : null);
-                Alert.alert('Success', 'Anomaly has been confirmed.');
-              }
-            } catch (error) {
-              console.error('[AnomalyDetails] Error confirming:', error);
-              Alert.alert('Error', 'Failed to confirm anomaly.');
-            } finally {
-              setActionLoading(false);
-            }
-          },
-        },
-      ]
-    );
-  }, [accessToken, anomaly]);
-
-  // Handle dismiss action
-  const handleDismiss = useCallback(async () => {
-    if (!accessToken || !anomaly) return;
-
-    Alert.alert(
-      'Dismiss Anomaly',
-      'Are you sure you want to dismiss this anomaly? This indicates it was a false positive.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Dismiss',
-          style: 'destructive',
-          onPress: async () => {
-            setActionLoading(true);
-            try {
-              await dismissAnomaly(accessToken, anomaly.id);
-              Alert.alert('Success', 'Anomaly has been dismissed.', [
-                { text: 'OK', onPress: () => router.back() },
-              ]);
-            } catch (error) {
-              console.error('[AnomalyDetails] Error dismissing:', error);
-              Alert.alert('Error', 'Failed to dismiss anomaly.');
-            } finally {
-              setActionLoading(false);
-            }
-          },
-        },
-      ]
-    );
-  }, [accessToken, anomaly]);
 
   if (loading) {
     return (
@@ -222,36 +160,36 @@ export default function AnomalyDetailsScreen() {
   // Safe to access anomaly properties after null check
   const iconColor = getAnomalyColor(anomaly.anomaly_type);
   const isPending = !anomaly.is_confirmed;
-  
+
   // Get location from various possible sources
-  const locationDisplay = getLocationDisplay(anomaly.location) || 
-    getIoTBoxLocation(anomaly.iot_box) || 
+  const locationDisplay = getLocationDisplay(anomaly.location) ||
+    getIoTBoxLocation(anomaly.iot_box) ||
     (anomaly.iot_box as any)?.display_location ||
     (anomaly.iot_box as any)?.location_name ||
     (anomaly as any)?.location_name ||
     null;
-  
+
   // Get device name from various possible fields
   // Check iot_box relation first, then direct fields on anomaly
-  const deviceName = getIoTBoxDisplayName(anomaly.iot_box) || 
+  const deviceName = getIoTBoxDisplayName(anomaly.iot_box) ||
     (anomaly.iot_box as any)?.device_name ||
     (anomaly.iot_box as any)?.name ||
     (anomaly as any)?.device_name ||
     anomaly.device_id ||  // Use device_id directly (e.g., "Device_01")
     (anomaly.iot_box_id ? `IoT Box #${anomaly.iot_box_id}` : 'Unknown Device');
-  
+
   // Get anomaly type label (API may or may not provide it)
-  const anomalyTypeLabel = anomaly.anomaly_type_label || 
+  const anomalyTypeLabel = anomaly.anomaly_type_label ||
     (anomaly.anomaly_type === 'sound_anomaly' ? 'Sound Anomaly' :
-     anomaly.anomaly_type === 'anti_tampering' ? 'Anti-Tampering Alert' : 'Unknown Anomaly');
-  
-  const anomalyTypeDisplay = anomaly.anomaly_type ? 
+      anomaly.anomaly_type === 'anti_tampering' ? 'Anti-Tampering Alert' : 'Unknown Anomaly');
+
+  const anomalyTypeDisplay = anomaly.anomaly_type ?
     anomaly.anomaly_type.replace(/_/g, ' ').toUpperCase() : 'IOT ANOMALY';
 
   // Use image_url from API if available, otherwise construct from image path
-  const imageUrl = anomaly.image_url || 
+  const imageUrl = anomaly.image_url ||
     (anomaly.image ? `${process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me'}/storage/${anomaly.image}` : null);
-  
+
   // Format timestamp safely
   const formattedTimestamp = anomaly.created_at ? formatTimestamp(anomaly.created_at) : 'Unknown time';
 
@@ -314,7 +252,7 @@ export default function AnomalyDetailsScreen() {
             style={styles.section}
           >
             <Text style={styles.sectionLabel}>CAPTURED IMAGE</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.imageContainer}
               onPress={() => !imageError && setImageModalVisible(true)}
               activeOpacity={0.8}
@@ -328,7 +266,7 @@ export default function AnomalyDetailsScreen() {
               ) : (
                 <>
                   <Image
-                    source={{ 
+                    source={{
                       uri: imageUrl,
                       headers: {
                         'ngrok-skip-browser-warning': '69420',
@@ -357,7 +295,7 @@ export default function AnomalyDetailsScreen() {
           style={styles.section}
         >
           <Text style={styles.sectionLabel}>DEVICE INFORMATION</Text>
-          
+
           <View style={styles.infoRow}>
             <View style={styles.infoIconContainer}>
               <Ionicons name="hardware-chip-outline" size={20} color={colors.primary.blue} />
@@ -455,18 +393,18 @@ export default function AnomalyDetailsScreen() {
             </View>
             <View style={styles.relatedList}>
               {anomaly.related_anomalies.map((related, index) => (
-                <View 
-                  key={related.id} 
+                <View
+                  key={related.id}
                   style={[
                     styles.relatedItem,
                     index < anomaly.related_anomalies!.length - 1 && styles.relatedItemBorder
                   ]}
                 >
                   <View style={[styles.relatedIconContainer, { backgroundColor: getAnomalyColor(related.anomaly_type) + '15' }]}>
-                    <Ionicons 
-                      name={getAnomalyIcon(related.anomaly_type)} 
-                      size={18} 
-                      color={getAnomalyColor(related.anomaly_type)} 
+                    <Ionicons
+                      name={getAnomalyIcon(related.anomaly_type)}
+                      size={18}
+                      color={getAnomalyColor(related.anomaly_type)}
                     />
                   </View>
                   <View style={styles.relatedContent}>
@@ -482,42 +420,7 @@ export default function AnomalyDetailsScreen() {
           </Animated.View>
         )}
 
-        {/* Action Buttons */}
-        {isPending && (
-          <Animated.View
-            entering={FadeInDown.delay(350).duration(400)}
-            style={styles.actionsSection}
-          >
-            <TouchableOpacity
-              style={[styles.actionButton, styles.dismissButton]}
-              onPress={handleDismiss}
-              disabled={actionLoading}
-            >
-              {actionLoading ? (
-                <ActivityIndicator size="small" color="#64748b" />
-              ) : (
-                <>
-                  <Ionicons name="close-outline" size={22} color="#64748b" />
-                  <Text style={styles.dismissButtonText}>Dismiss</Text>
-                </>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.confirmButton]}
-              onPress={handleConfirm}
-              disabled={actionLoading}
-            >
-              {actionLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-outline" size={22} color="#fff" />
-                  <Text style={styles.confirmButtonText}>Confirm Anomaly</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-        )}
+
 
         {/* Spacer for bottom */}
         <View style={{ height: spacing.xl }} />
@@ -531,7 +434,7 @@ export default function AnomalyDetailsScreen() {
         onRequestClose={() => setImageModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.modalCloseButton}
             onPress={() => setImageModalVisible(false)}
           >
@@ -539,7 +442,7 @@ export default function AnomalyDetailsScreen() {
           </TouchableOpacity>
           {imageUrl && (
             <Image
-              source={{ 
+              source={{
                 uri: imageUrl,
                 headers: {
                   'ngrok-skip-browser-warning': '69420',
@@ -778,39 +681,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text.primary,
   },
-  actionsSection: {
-    flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    gap: spacing.md,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    borderRadius: 12,
-    gap: spacing.xs,
-  },
-  dismissButton: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  dismissButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  confirmButton: {
-    backgroundColor: '#10b981',
-  },
-  confirmButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: '600',
-    color: '#fff',
-  },
+
   // Related anomalies styles
   relatedHeader: {
     flexDirection: 'row',
