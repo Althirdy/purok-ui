@@ -4,11 +4,11 @@ import { ImageViewer } from '@/components/ui/image-viewer';
 import { DesignSystem } from '@/constants/design-system';
 import type { EmergencyReport } from '@/types';
 import {
-    cleanTitle,
-    formatDateReadable,
-    formatReportId,
-    formatTime12Hour,
-    getStatusColor,
+  cleanTitle,
+  formatDateReadable,
+  formatReportId,
+  formatTime12Hour,
+  getStatusColor,
 } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
@@ -31,13 +31,13 @@ interface ReportDetailsBodyProps {
   isPlaying: boolean;
   coords: { latitude: number; longitude: number } | null;
   mapRegion:
-    | {
-        latitude: number;
-        longitude: number;
-        latitudeDelta: number;
-        longitudeDelta: number;
-      }
-    | null;
+  | {
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  }
+  | null;
   onAcknowledge: (remarks?: string) => void;
   onResolve: (remarks?: string) => void;
   onReject: (reason: string) => void;
@@ -98,9 +98,9 @@ export function ReportDetailsBody({
   }) || [];
 
   // Check if transcript is a valid transcript (not an error message)
-  const isTranscriptError = report.transcript?.toLowerCase().includes('unavailable') || 
-                            report.transcript?.toLowerCase().includes('error') ||
-                            report.transcript?.toLowerCase().includes('failed');
+  const isTranscriptError = report.transcript?.toLowerCase().includes('unavailable') ||
+    report.transcript?.toLowerCase().includes('error') ||
+    report.transcript?.toLowerCase().includes('failed');
 
   return (
     <ScrollView
@@ -145,82 +145,82 @@ export function ReportDetailsBody({
         report.reportType === 'voice' ||
         report.title?.toLowerCase().includes('voice concern') ||
         report.description?.toLowerCase().includes('audio recording')) && (
-        <>
-          {/* Voice Recording */}
-          <Animated.View entering={FadeInDown.delay(250).duration(500)} style={styles.section}>
-            <Text style={styles.sectionLabel}>Voice Recording</Text>
-            <View style={styles.audioSection}>
-              <View style={styles.audioPlayer}>
-                {report.audio ? (
-                  <>
-                    <TouchableOpacity
-                      style={styles.audioButton}
-                      onPress={isPlaying ? onStopAudio : onPlayAudio}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons
-                        name={isPlaying ? 'pause' : 'play'}
-                        size={24}
-                        color={colors.text.inverse}
-                      />
-                    </TouchableOpacity>
-                    <View style={styles.audioInfo}>
-                      <Text style={styles.audioLabel}>Voice Recording</Text>
-                      <Text style={styles.audioUrl} numberOfLines={1}>
-                        {report.audio}
-                      </Text>
-                    </View>
-                  </>
-                ) : (
-                  <>
-                    <View
-                      style={[styles.audioButton, { backgroundColor: colors.neutral.gray600 }]}
-                    >
-                      <Ionicons name="mic" size={24} color={colors.text.inverse} />
-                    </View>
-                    <View style={styles.audioInfo}>
-                      <Text style={styles.audioLabel}>Voice Recording</Text>
-                      <Text style={styles.audioUrl}>Audio file not available yet</Text>
-                    </View>
-                  </>
-                )}
-              </View>
-            </View>
-          </Animated.View>
-
-          {/* Voice Transcript */}
-          <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.section}>
-            <View style={styles.transcriptHeader}>
-              <Ionicons name="document-text-outline" size={18} color={colors.primary.blue} />
-              <Text style={styles.sectionLabel}>Voice Transcript</Text>
-            </View>
-            {report.transcript && !isTranscriptError ? (
-              <View style={styles.transcriptBox}>
-                <Text style={styles.transcriptText}>{report.transcript}</Text>
-              </View>
-            ) : report.transcriptionStatus === 'failed' || isTranscriptError ? (
-              <View style={styles.transcriptErrorBox}>
-                <Ionicons name="alert-circle-outline" size={24} color={colors.semantic.error} />
-                <Text style={styles.transcriptErrorText}>
-                  We were unable to transcribe this audio recording.
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.transcriptProcessingBox}>
-                <View style={styles.transcriptProcessingIcon}>
-                  <ActivityIndicator size="small" color={colors.primary.blue} />
+          <>
+            {/* Voice Recording */}
+            <Animated.View entering={FadeInDown.delay(250).duration(500)} style={styles.section}>
+              <Text style={styles.sectionLabel}>Voice Recording</Text>
+              <View style={styles.audioSection}>
+                <View style={styles.audioPlayer}>
+                  {report.audio ? (
+                    <>
+                      <TouchableOpacity
+                        style={styles.audioButton}
+                        onPress={isPlaying ? onStopAudio : onPlayAudio}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons
+                          name={isPlaying ? 'pause' : 'play'}
+                          size={24}
+                          color={colors.text.inverse}
+                        />
+                      </TouchableOpacity>
+                      <View style={styles.audioInfo}>
+                        <Text style={styles.audioLabel}>Voice Recording</Text>
+                        <Text style={styles.audioUrl} numberOfLines={1}>
+                          {report.audio}
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View
+                        style={[styles.audioButton, { backgroundColor: colors.neutral.gray600 }]}
+                      >
+                        <Ionicons name="mic" size={24} color={colors.text.inverse} />
+                      </View>
+                      <View style={styles.audioInfo}>
+                        <Text style={styles.audioLabel}>Voice Recording</Text>
+                        <Text style={styles.audioUrl}>Audio file not available yet</Text>
+                      </View>
+                    </>
+                  )}
                 </View>
-                <View style={styles.transcriptProcessingContent}>
-                  <Text style={styles.transcriptProcessingTitle}>Processing Transcript</Text>
-                  <Text style={styles.transcriptProcessingText}>
-                    Your voice recording is being transcribed. This usually takes a few moments...
+              </View>
+            </Animated.View>
+
+            {/* Voice Transcript */}
+            <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.section}>
+              <View style={styles.transcriptHeader}>
+                <Ionicons name="document-text-outline" size={18} color={colors.primary.blue} />
+                <Text style={styles.sectionLabel}>Voice Transcript</Text>
+              </View>
+              {report.transcript && !isTranscriptError ? (
+                <View style={styles.transcriptBox}>
+                  <Text style={styles.transcriptText}>{report.transcript}</Text>
+                </View>
+              ) : report.transcriptionStatus === 'failed' || isTranscriptError ? (
+                <View style={styles.transcriptErrorBox}>
+                  <Ionicons name="alert-circle-outline" size={24} color={colors.semantic.error} />
+                  <Text style={styles.transcriptErrorText}>
+                    We were unable to transcribe this audio recording.
                   </Text>
                 </View>
-              </View>
-            )}
-          </Animated.View>
-        </>
-      )}
+              ) : (
+                <View style={styles.transcriptProcessingBox}>
+                  <View style={styles.transcriptProcessingIcon}>
+                    <ActivityIndicator size="small" color={colors.primary.blue} />
+                  </View>
+                  <View style={styles.transcriptProcessingContent}>
+                    <Text style={styles.transcriptProcessingTitle}>Processing Transcript</Text>
+                    <Text style={styles.transcriptProcessingText}>
+                      Your voice recording is being transcribed. This usually takes a few moments...
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </Animated.View>
+          </>
+        )}
 
       {/* Images Gallery */}
       <Animated.View entering={FadeInDown.delay(350).duration(500)} style={styles.section}>
@@ -233,8 +233,8 @@ export function ReportDetailsBody({
             contentContainerStyle={styles.imageGalleryContent}
           >
             {validImages.map((imageUrl, index) => (
-              <Pressable 
-                key={index} 
+              <Pressable
+                key={index}
                 style={styles.imageContainer}
                 onPress={() => handleImagePress(index)}
               >
@@ -347,16 +347,16 @@ export function ReportDetailsBody({
             <Text style={styles.sectionLabel}>Follow-up Activity ({report.relatedReports.length})</Text>
           </View>
           <View style={followUpStyles.updatesContainer}>
-            {(showAllUpdates 
-              ? report.relatedReports 
+            {(showAllUpdates
+              ? report.relatedReports
               : report.relatedReports.slice(0, FOLLOW_UP_LIMIT)
             ).map((update, index) => (
-              <View 
-                key={update.id} 
+              <View
+                key={update.id}
                 style={[
                   followUpStyles.updateCard,
-                  (showAllUpdates 
-                    ? index < report.relatedReports!.length - 1 
+                  (showAllUpdates
+                    ? index < report.relatedReports!.length - 1
                     : index < FOLLOW_UP_LIMIT - 1 && index < report.relatedReports!.length - 1
                   ) && followUpStyles.updateCardWithBorder
                 ]}
@@ -484,8 +484,8 @@ export function ReportDetailsBody({
               <TextInput
                 style={remarksStyles.remarksInput}
                 placeholder={
-                  report.status === 'pending' 
-                    ? "Add any notes or observations about this report..." 
+                  report.status === 'pending'
+                    ? "Add any notes or observations about this report..."
                     : "Describe how the concern was resolved..."
                 }
                 placeholderTextColor={colors.text.tertiary}
@@ -512,15 +512,15 @@ export function ReportDetailsBody({
                 onPress={() => setRejectSheetVisible(true)}
               >
                 <Ionicons name="close-circle" size={18} color={colors.semantic.error} />
-                <Text style={actionButtonStyles.rejectButtonText}>Reject</Text>
+                <Text style={actionButtonStyles.rejectButtonText}>False Alarm</Text>
               </TouchableOpacity>
             )}
 
             {/* Primary Action Button */}
             {report.status === 'pending' && (
-              <TouchableOpacity 
-                style={actionButtonStyles.primaryButton} 
-                activeOpacity={0.8} 
+              <TouchableOpacity
+                style={actionButtonStyles.primaryButton}
+                activeOpacity={0.8}
                 onPress={() => {
                   onAcknowledge(remarks.trim() || undefined);
                   setRemarks('');

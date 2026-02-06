@@ -287,21 +287,7 @@ export default function ProfileScreen() {
 
         </View>
 
-        {/* Help & Support */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.settingItemNoBorder}
-            onPress={() =>
-              Alert.alert('Help & Support', 'This option will be available in a future update.')
-            }
-          >
-            <View style={styles.settingItemLeft}>
-              <Ionicons name="help-circle-outline" size={20} color="#1e3a8a" />
-              <Text style={styles.settingItemText}>Help & Support</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-          </TouchableOpacity>
-        </View>
+
 
         {/* Logout */}
         <View style={styles.logoutSection}>

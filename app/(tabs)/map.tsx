@@ -16,11 +16,14 @@
  */
 
 import { InfoCard } from '@/components/map/info-card';
+import { MapLegend } from '@/components/map/map-legend';
+import { PurokInfoCard } from '@/components/map/purok-info-card';
 import { BARANGAY_176E_REGION } from '@/constants/barangay-boundary';
 import { DesignSystem } from '@/constants/design-system';
 import purokBoundaries from '@/constants/geojson.json';
 import { globalStyles } from '@/constants/global-styles';
 import { mapStyles as styles } from '@/constants/map-screen.styles';
+import { PUROK_COLORS } from '@/constants/purok-colors';
 import { useAuth } from '@/context/auth-context';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
 import { fetchActiveAccidentDetail, fetchActiveAccidentMarkers, markerToEmergencyReport } from '@/services/active-accidents-service';
@@ -31,25 +34,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Marker, Polygon } from 'react-native-maps';
 
 const { colors } = DesignSystem;
 
 export default function MapScreen() {
   // Get auth token for authenticated requests
   const { accessToken } = useAuth();
-  
+
   // Citizen concerns from Pusher/API
   const { reports, loading: loadingConcerns, fetchReports } = useReportsFeed();
-  
+
   // CCTV accidents (ongoing)
   const [cctvAccidents, setCctvAccidents] = useState<EmergencyReport[]>([]);
   const [loadingAccidents, setLoadingAccidents] = useState(false);
-  
+
   const mapRef = useRef<MapView | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [selectedMarker, setSelectedMarker] = useState<SelectedMarker>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPurok, setSelectedPurok] = useState<{ name: string; description?: string } | null>(null);
 
   // Fetch citizen concerns on mount
   useEffect(() => {
@@ -98,23 +102,23 @@ export default function MapScreen() {
       try {
         unsubscribe = await subscribeToAccidentStatusUpdates((accident) => {
           console.log('[MapScreen] 🔔 Real-time accident update:', accident);
-          
+
           // If status changed to "In Progress", add/update marker
           if (accident.status === 'In Progress') {
             setCctvAccidents(prev => {
               const existing = prev.find(a => a.id === `accident-${accident.id}`);
               if (existing) {
                 // Update existing
-                return prev.map(a => 
-                  a.id === `accident-${accident.id}` 
+                return prev.map(a =>
+                  a.id === `accident-${accident.id}`
                     ? {
-                        ...a,
-                        title: accident.title,
-                        coordinates: {
-                          latitude: typeof accident.latitude === 'string' ? parseFloat(accident.latitude) : accident.latitude,
-                          longitude: typeof accident.longitude === 'string' ? parseFloat(accident.longitude) : accident.longitude,
-                        },
-                      }
+                      ...a,
+                      title: accident.title,
+                      coordinates: {
+                        latitude: typeof accident.latitude === 'string' ? parseFloat(accident.latitude) : accident.latitude,
+                        longitude: typeof accident.longitude === 'string' ? parseFloat(accident.longitude) : accident.longitude,
+                      },
+                    }
                     : a
                 );
               }
@@ -135,7 +139,7 @@ export default function MapScreen() {
               }];
             });
           }
-          
+
           // If status changed to "Resolved", remove marker from active
           if (accident.status === 'Resolved') {
             setCctvAccidents(prev => prev.filter(a => a.id !== `accident-${accident.id}`));
@@ -222,14 +226,14 @@ export default function MapScreen() {
 
   const handleMarkerPress = async (marker: typeof displayedMarkers[0]) => {
     const color = getMarkerColor(marker.type as EmergencyReport['type'], marker.severity as EmergencyReport['severity']);
-    
+
     // Check if this is a CCTV accident (id starts with 'accident-')
     const isCctvAccident = marker.id.startsWith('accident-');
-    
+
     if (isCctvAccident && accessToken) {
       // Fetch full details from backend for CCTV accidents
       const accidentId = parseInt(marker.id.replace('accident-', ''), 10);
-      
+
       // Show loading state with basic info first
       setSelectedMarker({
         id: marker.id,
@@ -241,7 +245,7 @@ export default function MapScreen() {
         timestamp: marker.timestamp,
         color,
       });
-      
+
       setLoadingDetails(true);
       try {
         const details = await fetchActiveAccidentDetail(accidentId, accessToken);
@@ -258,7 +262,7 @@ export default function MapScreen() {
               locationStr = parts.join(', ');
             }
           }
-          
+
           // Extract images from details (same logic as citizen concerns)
           // Images shown only if verified (handled by InfoCard privacy logic)
           let images: string[] | undefined;
@@ -376,24 +380,47 @@ export default function MapScreen() {
           showsCompass
           onMapReady={() => setMapReady(true)}
         >
-{/* Purok Boundaries */}
-{purokBoundaries.features
-  .filter((feature) => 
-    feature.geometry.type === 'LineString' && 
-    Array.isArray(feature.geometry.coordinates) && 
-    feature.geometry.coordinates.length > 0
-  )
-  .map((feature, index) => (
-  <Polyline
-    key={`purok-${index}`}
-    coordinates={(feature.geometry.coordinates as number[][]).map((coord) => ({
-      latitude: coord[1],
-      longitude: coord[0],
-    }))}
-    strokeColor={feature.properties.color || '#FF6B6B'}
-    strokeWidth={2}
-  />
-))}
+          {/* Purok Territories (Interactive Polygons) */}
+          {purokBoundaries.features
+            .filter((feature) =>
+              feature.geometry.type === 'LineString' &&
+              Array.isArray(feature.geometry.coordinates) &&
+              feature.geometry.coordinates.length > 0
+            )
+            .map((feature, index) => {
+              const purokName = feature.properties.name || 'Unknown Purok';
+              const isSelected = selectedPurok?.name === purokName;
+              const isBoundary = purokName.toLowerCase().includes('boundary');
+
+              // Determine colors based on selection state
+              const colorConfig = isBoundary
+                ? PUROK_COLORS.boundary
+                : isSelected
+                  ? PUROK_COLORS.selected
+                  : PUROK_COLORS.default;
+
+              return (
+                <Polygon
+                  key={`purok-${index}`}
+                  coordinates={(feature.geometry.coordinates as number[][]).map((coord) => ({
+                    latitude: coord[1],
+                    longitude: coord[0],
+                  }))}
+                  fillColor={colorConfig.fill}
+                  strokeColor={colorConfig.stroke}
+                  strokeWidth={colorConfig.strokeWidth}
+                  tappable={!isBoundary}
+                  onPress={() => {
+                    if (!isBoundary) {
+                      setSelectedPurok({
+                        name: purokName,
+                        description: feature.properties.description,
+                      });
+                    }
+                  }}
+                />
+              );
+            })}
           {/* Incident Markers (Citizen Concerns + CCTV Accidents) */}
           {mapReady && displayedMarkers.map((m) => (
             <Marker
@@ -422,7 +449,7 @@ export default function MapScreen() {
 
         {/* Floating Stats Card */}
         <View style={styles.floatingStatsCard}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.floatingStatItem}
             onPress={handleCitizenBadgePress}
             activeOpacity={0.7}
@@ -436,10 +463,10 @@ export default function MapScreen() {
               <Text style={styles.floatingStatLabel}>Citizen</Text>
             </View>
           </TouchableOpacity>
-          
+
           <View style={styles.floatingStatDivider} />
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={styles.floatingStatItem}
             onPress={handleCctvBadgePress}
             activeOpacity={0.7}
@@ -453,9 +480,9 @@ export default function MapScreen() {
               <Text style={styles.floatingStatLabel}>CCTV</Text>
             </View>
           </TouchableOpacity>
-          
+
           <View style={styles.floatingStatDivider} />
-          
+
           <View style={styles.floatingStatItem}>
             <View style={[styles.floatingStatIcon, { backgroundColor: '#D1FAE5' }]}>
               <Ionicons name="shield-checkmark" size={12} color="#059669" />
@@ -465,18 +492,30 @@ export default function MapScreen() {
         </View>
 
         {/* Floating Refresh Button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.floatingRefreshButton}
           onPress={handleRefresh}
           disabled={loading || refreshing}
           activeOpacity={0.8}
         >
-          <Ionicons 
-            name="refresh" 
-            size={20} 
-            color={loading || refreshing ? '#94a3b8' : '#1e3a8a'} 
+          <Ionicons
+            name="refresh"
+            size={20}
+            color={loading || refreshing ? '#94a3b8' : '#1e3a8a'}
           />
         </TouchableOpacity>
+
+        {/* Purok Info Card */}
+        {selectedPurok && (
+          <PurokInfoCard
+            name={selectedPurok.name}
+            description={selectedPurok.description}
+            onClose={() => setSelectedPurok(null)}
+          />
+        )}
+
+        {/* Map Legend */}
+        <MapLegend />
 
       </View>
     </View>
