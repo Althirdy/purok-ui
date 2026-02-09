@@ -55,7 +55,7 @@ export interface BackendNotification {
   type: string;
   title: string;
   message: string;
-  data: (ConcernNotificationData | AnomalyDetectedData | AnomalyConfirmedData | Record<string, any>) | null;
+  data: (ConcernNotificationData | AnomalyDetectedData | Record<string, any>) | null;
   read_at: string | null;
   created_at: string;
 }
@@ -106,14 +106,14 @@ export async function fetchNotifications(
 ): Promise<FetchNotificationsResponse> {
   try {
     console.log('[NotificationAPI] 📥 Fetching notifications, page:', page, type ? `type: ${type}` : '');
-    
+
     let url = `/api/v1/notifications?page=${page}&per_page=${perPage}`;
     if (type) {
       url += `&type=${encodeURIComponent(type)}`;
     }
-    
+
     const response = await httpGet<FetchNotificationsResponse>(url);
-    
+
     console.log('[NotificationAPI] ✅ Fetched', response.data?.notifications?.length || 0, 'notifications');
     return response;
   } catch (error) {
@@ -128,11 +128,11 @@ export async function fetchNotifications(
 export async function getUnreadCount(): Promise<number> {
   try {
     console.log('[NotificationAPI] 📊 Fetching unread count...');
-    
+
     const response = await httpGet<UnreadCountResponse>(
       '/api/v1/notifications/unread-count'
     );
-    
+
     const count = response.data?.unread_count || 0;
     console.log('[NotificationAPI] ✅ Unread count:', count);
     return count;
@@ -151,11 +151,11 @@ export async function markNotificationAsRead(
 ): Promise<void> {
   try {
     console.log('[NotificationAPI] ✓ Marking notification as read:', notificationId);
-    
+
     await httpPut<MarkAsReadResponse>(
       `/api/v1/notifications/${notificationId}/read`
     );
-    
+
     console.log('[NotificationAPI] ✅ Notification marked as read');
   } catch (error) {
     console.error('[NotificationAPI] ❌ Error marking notification as read:', error);
@@ -169,11 +169,11 @@ export async function markNotificationAsRead(
 export async function markAllNotificationsAsRead(): Promise<void> {
   try {
     console.log('[NotificationAPI] ✓ Marking all notifications as read...');
-    
+
     await httpPut<MarkAsReadResponse>(
       '/api/v1/notifications/mark-all-read'
     );
-    
+
     console.log('[NotificationAPI] ✅ All notifications marked as read');
   } catch (error) {
     console.error('[NotificationAPI] ❌ Error marking all as read:', error);
@@ -190,7 +190,7 @@ export async function deleteNotification(
 ): Promise<void> {
   try {
     console.log('[NotificationAPI] 🗑️ Deleting notification:', notificationId);
-    
+
     // Note: Using httpPut with DELETE method - you may need httpDelete if available
     // For now, assuming DELETE endpoint exists
     const response = await fetch(
@@ -203,11 +203,11 @@ export async function deleteNotification(
         },
       }
     );
-    
+
     if (!response.ok) {
       throw new Error(`Delete failed: ${response.status}`);
     }
-    
+
     console.log('[NotificationAPI] ✅ Notification deleted');
   } catch (error) {
     console.error('[NotificationAPI] ❌ Error deleting notification:', error);
@@ -221,7 +221,7 @@ export async function deleteNotification(
 export async function clearAllNotifications(): Promise<void> {
   try {
     console.log('[NotificationAPI] 🗑️ Clearing all notifications...');
-    
+
     const response = await fetch(
       `${process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me'}/api/v1/notifications/clear`,
       {
@@ -232,11 +232,11 @@ export async function clearAllNotifications(): Promise<void> {
         },
       }
     );
-    
+
     if (!response.ok) {
       throw new Error(`Clear all failed: ${response.status}`);
     }
-    
+
     console.log('[NotificationAPI] ✅ All notifications cleared');
   } catch (error) {
     console.error('[NotificationAPI] ❌ Error clearing all notifications:', error);
@@ -261,7 +261,7 @@ export interface NormalizedNotification {
   timestamp: Date;
   read: boolean;
   severity?: 'low' | 'medium' | 'high' | 'critical';
-  reportType?: string;
+  reportType?: 'accident' | 'crime' | 'fire' | 'medical' | 'suspicious' | 'other';
   anomalyType?: string; // For anomaly notifications
   backendId: number;
   // Additional anomaly data
@@ -294,14 +294,14 @@ export function normalizeBackendNotification(
 
   const data = backendNotification.data;
   const notifType = backendNotification.type;
-  
+
   // Build the reportId with PUROK- prefix for concern notifications
   const concernId = (data as ConcernNotificationData)?.concern_id;
   const reportId = concernId ? `PUROK-${concernId}` : undefined;
-  
+
   // Extract anomaly log ID for anomaly notifications
-  const anomalyLogId = (data as AnomalyDetectedData | AnomalyConfirmedData)?.anomaly_log_id;
-  const anomalyType = (data as AnomalyDetectedData | AnomalyConfirmedData)?.anomaly_type;
+  const anomalyLogId = (data as AnomalyDetectedData)?.anomaly_log_id;
+  const anomalyType = (data as AnomalyDetectedData)?.anomaly_type;
 
   // Override title based on notification type for cleaner display
   let title = backendNotification.title;
@@ -322,11 +322,11 @@ export function normalizeBackendNotification(
     timestamp: new Date(backendNotification.created_at),
     read: backendNotification.read_at !== null,
     severity: (data as ConcernNotificationData)?.severity as any,
-    reportType: (data as ConcernNotificationData)?.category,
+    reportType: (data as ConcernNotificationData)?.category as NormalizedNotification['reportType'],
     anomalyType,
     backendId: backendNotification.id,
-    anomalyData: notifType === 'anomaly_detected' 
-      ? data as AnomalyDetectedData 
+    anomalyData: notifType === 'anomaly_detected'
+      ? data as AnomalyDetectedData
       : undefined,
   };
 }

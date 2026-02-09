@@ -18,12 +18,12 @@ export function formatTimestamp(date: Date): string {
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
-  
+
   if (minutes < 1) return 'just now';
   if (minutes < 60) return `${minutes}m ago`;
   if (hours < 24) return `${hours}h ago`;
   if (days === 1) return 'yesterday';
-  
+
   // Format date: MM/DD/YYYY
   const month = reportDate.getMonth() + 1;
   const day = reportDate.getDate();
@@ -95,7 +95,7 @@ export function getCategory(type: EmergencyReport['type'], originalCategory?: st
     };
     return categoryLabels[originalCategory.toLowerCase()] || 'Other';
   }
-  
+
   // Fallback to type-based mapping
   switch (type) {
     case 'accident':
@@ -186,7 +186,12 @@ export function formatReportId(id: string): string {
 /**
  * Clean title by removing date patterns (e.g., "Voice Concern - Nov 27, 2025 13:26" -> "Voice Concern")
  */
-export function cleanTitle(title: string): string {
+export function cleanTitle(title: string | undefined | null): string {
+  // Handle undefined/null title to prevent crashes
+  if (!title) {
+    return 'Untitled Report';
+  }
+
   // Remove patterns like " - Nov 27, 2025" or " - Nov 27, 2025 13:26" or similar date formats
   // Match: " - " followed by date patterns
   const datePatterns = [
@@ -194,12 +199,12 @@ export function cleanTitle(title: string): string {
     / - \d{1,2}\/\d{1,2}\/\d{4}.*$/, // " - 11/27/2025"
     / - \d{4}-\d{2}-\d{2}.*$/, // " - 2025-11-27"
   ];
-  
+
   let cleaned = title;
   for (const pattern of datePatterns) {
     cleaned = cleaned.replace(pattern, '').trim();
   }
-  
+
   return cleaned;
 }
 

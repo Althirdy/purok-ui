@@ -108,10 +108,10 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
     // Pusher subscription for citizen reports
     let syncTimer: ReturnType<typeof setInterval> | null = null;
     let statusUpdateUnsubscribe: (() => void) | null = null;
-    
+
     if (accessToken) {
       let unsubscribePusher: (() => void) | null = null;
-      
+
       // Subscribe to new concern assignments
       subscribeToCitizenReports(
         user.id,
@@ -150,6 +150,12 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
 
           // Add to reports list
           setReports(prev => {
+            // Validate report - skip if it has invalid ID
+            if (!report.id || report.id === 'PUROK-undefined' || report.id.includes('undefined')) {
+              console.warn('[ReportsFeed] ⚠️ Skipping report with invalid ID:', report.id);
+              return prev;
+            }
+
             // Check if report already exists
             if (prev.some(r => r.id === report.id)) {
               console.log('[ReportsFeed] Report already in list, skipping:', report.id);
@@ -220,10 +226,10 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
                   oldStatus,
                   newStatus,
                 });
-                
+
                 // Note: We don't add notifications for status updates
                 // Only NEW concerns should appear in the notifications list
-                
+
                 return { ...report, status: newStatus };
               }
               return report;
@@ -247,16 +253,16 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
         try {
           syncInProgressRef.current = true;
           const concerns = await fetchAssignedConcerns(accessToken);
-          
+
           setReports(prev => {
             const existingMap = new Map(prev.map(r => [r.id, r]));
             let hasUpdates = false;
-            
+
             // Update existing reports and add new ones
             concerns.forEach(concern => {
               const reportId = concern.id;
               const existing = existingMap.get(reportId);
-              
+
               if (existing) {
                 // Update existing report if status changed
                 if (existing.status !== concern.status) {
@@ -274,13 +280,13 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
                 hasUpdates = true;
               }
             });
-            
+
             if (hasUpdates) {
               const updated = Array.from(existingMap.values()).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
               console.log(`[ReportsFeed] ✅ Sync complete: ${updated.length} total reports`);
               return updated;
             }
-            
+
             return prev;
           });
         } catch (error) {
@@ -341,7 +347,7 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
         if (!authToken) {
           authToken = await AsyncStorage.getItem('@urbanwatch:auth_token');
         }
-        
+
         if (!authToken) {
           console.error('[ReportsFeed] ❌ No auth token available for status update');
           // Rollback
@@ -352,7 +358,7 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
           );
           return;
         }
-        
+
         // Log token info for debugging (first 20 chars only)
         console.log('[ReportsFeed] Using auth token:', {
           tokenLength: authToken.length,
@@ -363,9 +369,9 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
         const numericId = reportId.replace('PUROK-', '');
         const apiStatus: 'pending' | 'ongoing' | 'escalated' | 'resolved' | 'rejected' =
           status === 'acknowledged' ? 'ongoing' :
-          status === 'resolved' ? 'resolved' :
-          status === 'rejected' ? 'rejected' :
-          'pending';
+            status === 'resolved' ? 'resolved' :
+              status === 'rejected' ? 'rejected' :
+                'pending';
 
         console.log('[ReportsFeed] Updating concern status via API:', {
           reportId,
@@ -383,10 +389,10 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
           apiStatus,
           response: updateResponse,
         });
-        
+
         // Trust the API response - it confirms the status was updated
         const responseStatus = updateResponse?.data?.new_status;
-        
+
         if (responseStatus) {
           // Map backend status from response to frontend status
           const responseStatusMap: Record<string, EmergencyReport['status']> = {
@@ -396,15 +402,15 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
             'resolved': 'resolved',
             'rejected': 'rejected',
           };
-          
+
           const mappedStatus = responseStatusMap[responseStatus.toLowerCase()] || status;
-          
+
           console.log('[ReportsFeed] ✅ API confirmed status update:', {
             reportId,
             apiResponse: responseStatus,
             mappedStatus,
           });
-          
+
           // Ensure the status is correctly set
           setReports(prevReports =>
             prevReports.map(report =>
@@ -412,18 +418,18 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
             )
           );
         }
-        
+
         // Refresh report after update to get the latest status from backend
         let retryCount = 0;
         const maxRetries = 5;
         const retryDelay = 1000;
-        
+
         const refreshReport = async () => {
           try {
             console.log(`[ReportsFeed] Refreshing report after status update (attempt ${retryCount + 1}/${maxRetries}):`, reportId);
             const refreshedConcerns = await fetchAssignedConcerns(authToken);
             const refreshedReport = refreshedConcerns.find(r => r.id === reportId);
-            
+
             if (refreshedReport) {
               const statusMatches = refreshedReport.status === status;
               console.log('[ReportsFeed] Refreshed report status from backend:', {
@@ -432,19 +438,19 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
                 expectedStatus: status,
                 matches: statusMatches,
               });
-              
+
               // Update with backend data
               setReports(prevReports =>
                 prevReports.map(report =>
                   report.id === reportId ? refreshedReport : report
                 )
               );
-              
+
               if (statusMatches) {
                 console.log('[ReportsFeed] ✅ Status update confirmed by backend');
                 return;
               }
-              
+
               if (retryCount < maxRetries - 1) {
                 retryCount++;
                 setTimeout(refreshReport, retryDelay);
@@ -463,9 +469,9 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
             }
           }
         };
-        
+
         setTimeout(refreshReport, 1000);
-        
+
       } catch (error) {
         console.error('[ReportsFeed] Error updating concern status via API:', error);
         // Rollback on error

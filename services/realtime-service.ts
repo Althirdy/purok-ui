@@ -325,6 +325,12 @@ async function getPusherClient(authToken?: string): Promise<Pusher> {
 function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyReport {
   const { concern, citizen } = payload;
 
+  // Validate essential fields to prevent corrupted reports (e.g., PUROK-undefined)
+  if (!concern?.id) {
+    console.error('[Pusher] ❌ Invalid concern payload: missing concern.id', payload);
+    throw new Error('Invalid concern payload: missing concern.id');
+  }
+
   // Log raw payload for debugging
   console.log('[Pusher] 📦 Raw concern payload:', JSON.stringify(concern, null, 2));
 
@@ -621,7 +627,7 @@ export async function subscribeToAccidentStatusUpdates(
 export async function subscribeToStatusUpdates(
   userId: number | string,
   authToken: string,
-  onStatusUpdate: (reportId: string, status: 'pending' | 'acknowledged' | 'resolved') => void
+  onStatusUpdate: (reportId: string, status: 'pending' | 'acknowledged' | 'resolved' | 'rejected') => void
 ): Promise<() => void> {
   try {
     const client = await getPusherClient(authToken);
