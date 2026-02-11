@@ -25,6 +25,7 @@ export const realtimeConfig = {
   citizenReportEvent: 'report.created',
   purokChannelPrefix: 'private-purok-leader.',
   purokAssignmentEvent: 'concern.assigned',
+  purokFollowupDigestEvent: 'concern.followup.digest',
   authEndpoint: (process.env.EXPO_PUBLIC_PUSHER_AUTH_ENDPOINT ?? DEFAULT_AUTH_ENDPOINT),
   // IoT Box / Anomaly Logs
   anomalyChannel: 'anomaly-logs',

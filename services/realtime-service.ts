@@ -84,6 +84,17 @@ type ConcernStatusUpdatedPayload = {
   };
 };
 
+type ConcernFollowupDigestPayload = {
+  concern: {
+    id: number;
+    tracking_code: string;
+    title: string;
+  };
+  new_followups: number;
+  total_followups: number;
+  message?: string;
+};
+
 let pusherClient: Pusher | null = null;
 let connectionHandlersBound = false;
 let lastToken: string | null = null;
@@ -438,7 +449,8 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
 export async function subscribeToCitizenReports(
   userId: number | string,
   authToken: string,
-  onReport: (report: EmergencyReport) => void
+  onReport: (report: EmergencyReport) => void,
+  onFollowupDigest?: (reportId: string, newFollowups: number, totalFollowups: number) => void
 ): Promise<() => void> {
   try {
     const client = await getPusherClient(authToken);
@@ -490,7 +502,8 @@ export async function subscribeToCitizenReports(
 
     // Event name: concern.assigned
     // Per documentation: Use .concern.assigned (with leading dot) for client-named events
-    const eventName = '.concern.assigned'; // Note the leading dot for client-named events
+    const eventName = `.${realtimeConfig.purokAssignmentEvent}`; // Note the leading dot for client-named events
+    const digestEventName = `.${realtimeConfig.purokFollowupDigestEvent}`;
 
     const handler = (data: ConcernAssignedPayload) => {
       try {
@@ -518,9 +531,26 @@ export async function subscribeToCitizenReports(
     // Bind to client-named event (per documentation)
     channel.bind(eventName, handler);
 
+    const digestHandler = (data: ConcernFollowupDigestPayload) => {
+      try {
+        const reportId = `PUROK-${data.concern.id}`;
+        console.log('[Pusher] 📊 Follow-up digest received:', {
+          reportId,
+          new_followups: data.new_followups,
+          total_followups: data.total_followups,
+        });
+        onFollowupDigest?.(reportId, data.new_followups, data.total_followups);
+      } catch (error) {
+        console.error('[Pusher] ❌ Failed to process follow-up digest:', error, data);
+      }
+    };
+
+    channel.bind(digestEventName, digestHandler);
+
     return () => {
       console.log('[Pusher] Unsubscribing from', channelName);
       channel.unbind(eventName, handler);
+      channel.unbind(digestEventName, digestHandler);
       client.unsubscribe(channelName);
     };
   } catch (error) {

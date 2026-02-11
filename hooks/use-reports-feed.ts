@@ -190,6 +190,35 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
             }
           );
           console.log('[ReportsFeed] 🔔 Notification triggered for:', report.id);
+        },
+        (reportId, newFollowups, totalFollowups) => {
+          setReports(prevReports =>
+            prevReports.map(report =>
+              report.id === reportId
+                ? {
+                    ...report,
+                    relatedReportsCount: totalFollowups,
+                  }
+                : report
+            )
+          );
+
+          const digestNotification = {
+            id: `followup-digest-${reportId}-${Date.now()}`,
+            type: 'status_update' as const,
+            title: 'Concern Follow-up Digest',
+            message: `${newFollowups} new follow-up report(s). Total reporters: ${totalFollowups}.`,
+            reportId,
+            timestamp: new Date(),
+            read: false,
+          };
+          addNotificationRef.current?.(digestNotification as any);
+
+          console.log('[ReportsFeed] 📊 Follow-up digest applied:', {
+            reportId,
+            newFollowups,
+            totalFollowups,
+          });
         }
       ).then((unsubscribe) => {
         unsubscribePusher = unsubscribe;
