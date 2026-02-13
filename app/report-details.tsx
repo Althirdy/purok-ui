@@ -29,7 +29,7 @@ export default function ReportDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  
+
 
   // Fetch reports on mount to ensure we have the latest data
   useEffect(() => {
@@ -111,28 +111,32 @@ export default function ReportDetailsScreen() {
 
   const severityColor = report ? getSeverityColor(report.severity) : colors.accent.orange;
 
-  // Simple status timeline steps (Pending -> Acknowledged -> Resolved)
   const statusSteps: Array<{
     key: EmergencyReport['status'];
     label: string;
     description: string;
   }> = [
-    {
-      key: 'pending',
-      label: 'Pending',
-      description: 'Concern submitted and automatically distributed to Purok Leader.',
-    },
-    {
-      key: 'acknowledged',
-      label: 'Ongoing',
-      description: 'The concern is being handled by the Purok Leader.',
-    },
-    {
-      key: 'resolved',
-      label: 'Resolved',
-      description: 'The concern has been resolved.',
-    },
-  ];
+      {
+        key: 'pending',
+        label: 'Pending',
+        description: 'Concern submitted and automatically distributed to Purok Leader.',
+      },
+      {
+        key: 'acknowledged',
+        label: 'Ongoing',
+        description: 'The concern is being handled by the Purok Leader.',
+      },
+      {
+        key: 'awaiting_confirmation',
+        label: 'Awaiting Confirmation',
+        description: 'Waiting for the citizen to confirm the resolution.',
+      },
+      {
+        key: 'resolved',
+        label: 'Resolved',
+        description: 'The concern has been resolved and confirmed by the citizen.',
+      },
+    ];
 
   // Handle acknowledge with remarks (called from body)
   const handleAcknowledge = useCallback(async (remarks?: string) => {
@@ -147,11 +151,16 @@ export default function ReportDetailsScreen() {
   }, [report, updateReportStatus]);
 
   // Handle resolve with remarks (called from body)
+  // Sends 'resolved' to backend, but optimistically shows 'awaiting_confirmation' in UI
+  // The backend will handle changing the status and notifying the citizen
   const handleResolve = useCallback(async (remarks?: string) => {
-    if (report && report.status === 'acknowledged') {
+    if (report && (report.status === 'acknowledged' || report.status === 'awaiting_confirmation')) {
       try {
         await updateReportStatus(report.id, 'resolved', remarks);
-        setReport(prev => (prev ? { ...prev, status: 'resolved' } : prev));
+        // If re-resolving from awaiting_confirmation (citizen confirmed or 2h passed),
+        // optimistically show resolved. Otherwise show awaiting_confirmation.
+        const nextStatus = report.status === 'awaiting_confirmation' ? 'resolved' : 'awaiting_confirmation';
+        setReport(prev => (prev ? { ...prev, status: nextStatus } : prev));
       } catch (error) {
         console.error('Failed to resolve report:', error);
       }

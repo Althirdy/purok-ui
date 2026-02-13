@@ -54,6 +54,9 @@ export interface AssignedConcern {
   // Related reports (follow-ups/duplicates merged into this concern)
   relatedReportsCount?: number;
   relatedReports?: ApiRelatedReport[];
+  // Resolution confirmation timestamps
+  resolution_requested_at?: string | null;
+  resolution_confirmed_at?: string | null;
 }
 
 export async function fetchAssignedConcerns(token: string): Promise<EmergencyReport[]> {
@@ -63,7 +66,7 @@ export async function fetchAssignedConcerns(token: string): Promise<EmergencyRep
     },
   });
   const concerns = response?.data?.concerns ?? [];
-  
+
   // Log raw status data for debugging
   if (concerns.length > 0) {
     const statusDebug = concerns.slice(0, 3).map(c => ({
@@ -74,9 +77,9 @@ export async function fetchAssignedConcerns(token: string): Promise<EmergencyRep
     }));
     console.log('[PurokLeaderService] Sample raw status data:', statusDebug);
   }
-  
+
   const normalized = concerns.map(normalizeAssignedConcern);
-  
+
   // Log summary instead of full array
   if (concerns.length > 0) {
     const statusCounts = normalized.reduce((acc, r) => {
@@ -85,7 +88,7 @@ export async function fetchAssignedConcerns(token: string): Promise<EmergencyRep
     }, {} as Record<string, number>);
     console.log(`[PurokLeaderService] Fetched ${concerns.length} concerns:`, statusCounts);
   }
-  
+
   return normalized;
 }
 
@@ -103,16 +106,16 @@ export async function fetchAssignedConcernDetail(token: string, id: number | str
       Authorization: `Bearer ${token}`,
     },
   });
-  
+
   const concern = response?.data?.concern;
   const normalized = normalizeAssignedConcern(concern);
   console.log(`[PurokLeaderService] Fetched concern ${id}: ${normalized.status}`);
-  
+
   return normalized;
 }
 
 interface UpdateStatusRequest {
-  status: 'pending' | 'ongoing' | 'escalated' | 'resolved' | 'rejected';
+  status: 'pending' | 'ongoing' | 'escalated' | 'resolved' | 'rejected' | 'awaiting_confirmation';
   remarks?: string; // Optional remarks/notes about the status update
   rejection_reason?: string; // Required when status is 'rejected'
 }
@@ -134,11 +137,11 @@ export async function updateAssignedConcernStatus(
 ): Promise<UpdateStatusResponse> {
   try {
     // Validate status value (must be one of the allowed values)
-    const allowedStatuses: Array<UpdateStatusRequest['status']> = ['pending', 'ongoing', 'escalated', 'resolved', 'rejected'];
+    const allowedStatuses: Array<UpdateStatusRequest['status']> = ['pending', 'ongoing', 'escalated', 'resolved', 'rejected', 'awaiting_confirmation'];
     if (!allowedStatuses.includes(status)) {
       throw new Error(`Invalid status: ${status}. Must be one of: ${allowedStatuses.join(', ')}`);
     }
-    
+
     // Generate default remarks based on status if not provided
     const defaultRemarks: Record<string, string> = {
       'ongoing': 'The concern is ongoing',
@@ -147,12 +150,12 @@ export async function updateAssignedConcernStatus(
       'pending': 'The concern is pending',
       'rejected': 'The concern has been rejected',
     };
-    
+
     const requestBody: UpdateStatusRequest = {
       status,
       remarks: remarks || defaultRemarks[status] || `Status updated to ${status}`,
     };
-    
+
     // Add rejection_reason if status is rejected (required by backend validation)
     if (status === 'rejected') {
       // Ensure rejection_reason is always a non-empty string
@@ -171,23 +174,23 @@ export async function updateAssignedConcernStatus(
         willBeSent: !!requestBody.rejection_reason,
       });
     }
-    
+
     // Validate token format (should be like "43|49p1hlHznzJlbnq0M67IIVH5JGht6ituU3QSYEI97e4e4a12")
     if (!token || token.trim().length === 0) {
       throw new Error('Authentication token is required');
     }
-    
+
     // Check if token has the expected format (contains pipe separator)
     if (!token.includes('|')) {
       console.warn('[PurokLeaderService] Token format may be incorrect - expected format: "id|token"');
     }
-    
+
     const endpoint = `/api/v1/purok-leader/concerns/${id}/status`;
     const fullUrl = `https://www.urbanwatch.me${endpoint}`;
-    
+
     // Ensure token doesn't already have "Bearer " prefix
     const cleanToken = token.startsWith('Bearer ') ? token.substring(7).trim() : token.trim();
-    
+
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📤 [PurokLeaderService] SENDING STATUS UPDATE REQUEST');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -211,7 +214,7 @@ export async function updateAssignedConcernStatus(
       'Authorization': `Bearer ${cleanToken.substring(0, 20)}...` // Show only first 20 chars for security
     });
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
+
     const response = await httpPut<UpdateStatusResponse>(
       endpoint,
       requestBody,
@@ -221,7 +224,7 @@ export async function updateAssignedConcernStatus(
         },
       },
     );
-    
+
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📥 [PurokLeaderService] STATUS UPDATE RESPONSE');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -258,7 +261,7 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
   // 2. Flat: concern.latitude / concern.longitude
   let latitude: number | null = null;
   let longitude: number | null = null;
-  
+
   // Try nested location first
   if (concern.location?.lat != null && concern.location?.lng != null) {
     latitude = Number(concern.location.lat);
@@ -269,7 +272,7 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
     latitude = Number(concern.latitude);
     longitude = Number(concern.longitude);
   }
-  
+
   // Map backend status to frontend status (same mapping as in realtime-service.ts)
   // Backend uses: 'pending' | 'ongoing' | 'escalated' | 'resolved' | 'rejected'
   // Frontend uses: 'pending' | 'acknowledged' | 'resolved' | 'rejected'
@@ -279,8 +282,9 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
     'escalated': 'acknowledged',
     'resolved': 'resolved',
     'rejected': 'rejected',
+    'awaiting_confirmation': 'awaiting_confirmation',
   };
-  
+
   // Map backend category to frontend type (same mapping as in realtime-service.ts)
   // Citizen categories: 'safety', 'security', 'infrastructure', 'environment', 'noise', 'other', 'voice_concern'
   // Frontend types: 'accident' | 'crime' | 'fire' | 'medical' | 'suspicious' | 'other'
@@ -293,13 +297,13 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
     'other': 'other',             // Other -> Other
     'voice_concern': 'other',     // Voice concern -> Other
   };
-  
+
   // Get status from various sources with priority
   // Backend updates BOTH concern.status AND distribution.status
   // Priority: distribution_status > concern.status > distribution.status
   // Backend mapping: 'ongoing' → distribution.status = 'in_progress', 'resolved' → 'resolved'
   let backendStatus: string = 'pending';
-  
+
   // Priority 1: distribution_status (this is the distribution-level status)
   // Values: 'assigned' (pending), 'in_progress' (ongoing), 'resolved' (resolved), 'rejected' (rejected)
   if (concern.distribution_status) {
@@ -308,6 +312,7 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
       'in_progress': 'ongoing',
       'resolved': 'resolved',
       'rejected': 'rejected',
+      'awaiting_confirmation': 'awaiting_confirmation',
     };
     const mapped = distributionStatusMap[concern.distribution_status.toLowerCase()];
     if (mapped) {
@@ -328,17 +333,18 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
       'in_progress': 'ongoing',
       'resolved': 'resolved',
       'rejected': 'rejected',
+      'awaiting_confirmation': 'awaiting_confirmation',
     };
     const mapped = distStatusMap[concern.distribution.status.toLowerCase()];
     backendStatus = mapped || concern.distribution.status;
   }
-  
+
   // If both concern.status and distribution_status exist, prefer the one that's more recent
   // Check if concern.status is "resolved" but distribution_status is not - use concern.status
   if (concern.status === 'resolved' && concern.distribution_status !== 'resolved') {
     backendStatus = 'resolved'; // concern.status is more up-to-date
   }
-  
+
   // Log status resolution for debugging (only for specific IDs to reduce noise)
   if (concern.id === 12 || concern.id === 14) {
     console.log(`[PurokLeaderService] Status resolution for concern ${concern.id}:`, {
@@ -349,14 +355,14 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
       final_frontend_status: statusMap[backendStatus.toLowerCase()] ?? 'pending',
     });
   }
-  
+
   // Map backend status to frontend status
   const frontendStatus = statusMap[backendStatus.toLowerCase()] ?? 'pending';
-  
+
   // Map category to type
   const category = concern.category?.toLowerCase() || 'other';
   const reportType = categoryMap[category] ?? 'other';
-  
+
   // Determine location display - prefer address if available
   let locationDisplay = 'Location not available';
   if (concern.address) {
@@ -382,6 +388,7 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
     severity: (concern.severity as EmergencyReport['severity']) ?? 'medium',
     status: frontendStatus,
     timestamp: new Date(concern.created_at),
+    lastUpdated: concern.updated_at ? new Date(concern.updated_at) : undefined,
     location: locationDisplay,
     source: 'citizen',
     reportedBy: concern.citizen?.name ?? 'citizen',
@@ -395,5 +402,8 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
     // Related reports (follow-ups/duplicates)
     relatedReportsCount: concern.relatedReportsCount ?? 0,
     relatedReports: relatedReports,
+    // Resolution confirmation timestamps
+    resolutionRequestedAt: concern.resolution_requested_at ? new Date(concern.resolution_requested_at) : undefined,
+    resolutionConfirmedAt: concern.resolution_confirmed_at ? new Date(concern.resolution_confirmed_at) : undefined,
   };
 }

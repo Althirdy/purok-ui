@@ -401,6 +401,7 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
             'escalated': 'acknowledged',
             'resolved': 'resolved',
             'rejected': 'rejected',
+            'awaiting_confirmation': 'awaiting_confirmation',
           };
 
           const mappedStatus = responseStatusMap[responseStatus.toLowerCase()] || status;

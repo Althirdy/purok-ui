@@ -352,6 +352,7 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
     'escalated': 'acknowledged',
     'resolved': 'resolved',
     'rejected': 'rejected',
+    'awaiting_confirmation': 'awaiting_confirmation',
   };
 
   // Parse coordinates - support both formats:
@@ -627,7 +628,7 @@ export async function subscribeToAccidentStatusUpdates(
 export async function subscribeToStatusUpdates(
   userId: number | string,
   authToken: string,
-  onStatusUpdate: (reportId: string, status: 'pending' | 'acknowledged' | 'resolved' | 'rejected') => void
+  onStatusUpdate: (reportId: string, status: 'pending' | 'acknowledged' | 'resolved' | 'rejected' | 'awaiting_confirmation') => void
 ): Promise<() => void> {
   try {
     const client = await getPusherClient(authToken);
@@ -664,6 +665,7 @@ export async function subscribeToStatusUpdates(
       'escalated': 'acknowledged',
       'resolved': 'resolved',
       'rejected': 'rejected',
+      'awaiting_confirmation': 'awaiting_confirmation',
     };
 
     // Listen for concern.status.updated event

@@ -33,7 +33,8 @@ export interface EmergencyReport {
   description: string;
   location: string;
   timestamp: Date;
-  status: 'pending' | 'acknowledged' | 'resolved' | 'rejected';
+  lastUpdated?: Date;
+  status: 'pending' | 'acknowledged' | 'resolved' | 'rejected' | 'awaiting_confirmation';
   severity: 'low' | 'medium' | 'high' | 'critical';
   reportedBy?: string;
   source?: 'cctv' | 'sensor' | 'citizen' | 'official';
@@ -54,6 +55,9 @@ export interface EmergencyReport {
   // Related reports (follow-ups/duplicates merged into this concern)
   relatedReportsCount?: number;
   relatedReports?: RelatedReport[];
+  // Resolution confirmation timestamps (for awaiting_confirmation flow)
+  resolutionRequestedAt?: Date;  // When PL first clicked resolve
+  resolutionConfirmedAt?: Date;  // When citizen confirmed (null = not yet confirmed)
 }
 
 // Feed Types

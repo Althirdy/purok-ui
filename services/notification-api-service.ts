@@ -18,6 +18,8 @@ export const NOTIFICATION_TYPES = {
   TYPE_CONCERN_ACKNOWLEDGED: 'concern_acknowledged',
   TYPE_CONCERN_RESOLVED: 'concern_resolved',
   TYPE_CONCERN_STATUS_UPDATE: 'concern_status_update',
+  TYPE_RESOLUTION_CONFIRMED: 'resolution_confirmed',
+  TYPE_RESOLUTION_DISPUTED: 'resolution_disputed',
   // Anomaly notification types
   TYPE_ANOMALY_DETECTED: 'anomaly_detected',
   // System notification types
@@ -287,6 +289,8 @@ export function normalizeBackendNotification(
     'concern_acknowledged': 'report_update', // Status update - filtered out
     'concern_resolved': 'report_update',     // Status update - filtered out
     'concern_status_update': 'report_update',// Status update - filtered out
+    'resolution_confirmed': 'report_update',  // Citizen confirmed resolution - filtered out
+    'resolution_disputed': 'report_update',   // Citizen disputed resolution - filtered out
     'anomaly_detected': 'anomaly_detected',  // New anomaly from IoT box - SHOW
     'new_safety_post': 'system',
     'system_announcement': 'system',

@@ -6,12 +6,12 @@ import { Card } from '@/components/common/card';
 import { DesignSystem } from '@/constants/design-system';
 import type { EmergencyReport } from '@/types';
 import {
-    formatReportId,
-    formatTimestamp,
-    getCategory,
-    getSeverityColor,
-    getStatusColor,
-    getStatusText,
+  formatReportId,
+  formatTimestamp,
+  getCategory,
+  getSeverityColor,
+  getStatusColor,
+  getStatusText,
 } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
@@ -55,7 +55,7 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
       };
       return categoryIcons[originalCategory.toLowerCase()] || 'alert-circle-outline';
     }
-    
+
     // Fallback to type-based icons
     switch (type) {
       case 'accident':
@@ -134,10 +134,10 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
       <View style={styles.header}>
         {/* Icon on Left */}
         <View style={styles.iconContainer}>
-          <Ionicons 
-            name={getCategoryIcon(report.originalCategory, report.type)} 
-            size={24} 
-            color={getCategoryIconColor(report.originalCategory)} 
+          <Ionicons
+            name={getCategoryIcon(report.originalCategory, report.type)}
+            size={24}
+            color={getCategoryIconColor(report.originalCategory)}
           />
         </View>
 
@@ -172,7 +172,7 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
           <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
           <Text style={styles.timestampText}>{formatTimestamp(report.timestamp)}</Text>
         </View>
-        
+
         <View style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
           <Text style={[styles.statusText, { color: statusBadgeStyle.borderColor }]}>
             {getStatusText(report.status)}
@@ -198,7 +198,7 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
       {report.status === 'pending' && (onPress || onAcknowledge) && (
         <View style={styles.actionsContainer}>
           {onPress && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.seeMoreButton}
               onPress={(e) => {
                 e.stopPropagation();
@@ -210,8 +210,8 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
             </TouchableOpacity>
           )}
           {onAcknowledge && (
-            <TouchableOpacity 
-              style={styles.acknowledgeButton} 
+            <TouchableOpacity
+              style={styles.acknowledgeButton}
               onPress={(e) => {
                 e.stopPropagation();
                 onAcknowledge(report.id);
@@ -224,18 +224,30 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
         </View>
       )}
 
-      {/* Resolve Button (shown after acknowledging) */}
-      {report.status === 'acknowledged' && onResolve && (
+      {/* Resolve Button (shown after acknowledging or during awaiting_confirmation) */}
+      {(report.status === 'acknowledged' || report.status === 'awaiting_confirmation') && onResolve && (
         <View style={styles.actionsContainer}>
-          <TouchableOpacity 
-            style={styles.resolveButton} 
+          <TouchableOpacity
+            style={[
+              styles.resolveButton,
+              // Locked styling when awaiting_confirmation
+              report.status === 'awaiting_confirmation'
+                ? { opacity: 0.5, backgroundColor: '#94a3b8' }
+                : {}
+            ]}
+            disabled={report.status === 'awaiting_confirmation'}
             onPress={(e) => {
               e.stopPropagation();
               onResolve(report.id);
             }}
             activeOpacity={0.7}
           >
-            <Ionicons name="checkmark-done-circle" size={18} color={colors.text.inverse} style={{ marginRight: 6 }} />
+            <Ionicons
+              name={report.status === 'awaiting_confirmation' ? "lock-closed" : "checkmark-done-circle"}
+              size={18}
+              color={colors.text.inverse}
+              style={{ marginRight: 6 }}
+            />
             <Text style={styles.resolveText}>Mark as Resolved</Text>
           </TouchableOpacity>
         </View>
@@ -256,7 +268,7 @@ export const ReportCard: React.MemoExoticComponent<React.NamedExoticComponent<Re
   if (prevProps.report.timestamp.getTime() !== nextProps.report.timestamp.getTime()) return false;
   // Compare related reports count (new field)
   if (prevProps.report.relatedReportsCount !== nextProps.report.relatedReportsCount) return false;
-  
+
   // Compare callbacks by reference (they should be stable with useCallback)
   // Handle undefined callbacks properly
   if (!!prevProps.onPress !== !!nextProps.onPress) return false;
@@ -265,7 +277,7 @@ export const ReportCard: React.MemoExoticComponent<React.NamedExoticComponent<Re
   if (prevProps.onAcknowledge && prevProps.onAcknowledge !== nextProps.onAcknowledge) return false;
   if (!!prevProps.onResolve !== !!nextProps.onResolve) return false;
   if (prevProps.onResolve && prevProps.onResolve !== nextProps.onResolve) return false;
-  
+
   // Props are equal, skip re-render
   return true;
 });
@@ -318,27 +330,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
-  
+
   info: {
     flex: 1,
   },
-  
+
   title: {
     fontSize: 18, // Same as citizen (was 16)
     fontWeight: '700',
     color: '#1e293b',
     marginBottom: 4,
   },
-  
+
   category: {
     fontSize: 14,
     fontWeight: '600',
   },
-  
+
   meta: {
     alignItems: 'flex-end',
   },
-  
+
   severityBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -346,12 +358,12 @@ const styles = StyleSheet.create({
     minWidth: 60,
     alignItems: 'center',
   },
-  
+
   severityBadgeText: {
     fontSize: 12,
     fontWeight: '600',
   },
-  
+
   description: {
     fontSize: 15, // Same as citizen (was 14)
     color: '#475569',
@@ -359,32 +371,32 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginLeft: 52, // Same as citizen (was 64) - icon 40px + margin 12px
   },
-  
+
   location: {
     fontSize: 14,
     color: '#475569',
     marginBottom: 12,
     marginLeft: 52, // Same as citizen (was 64)
   },
-  
+
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginLeft: 52, // Same as citizen (was 64)
   },
-  
+
   timestampRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6, // Same as citizen (was 4)
   },
-  
+
   timestampText: {
     fontSize: 13, // Same as citizen (was 12)
     color: '#64748b',
   },
-  
+
   // Follow-up Banner - Full width, below footer
   followUpBanner: {
     flexDirection: 'row',
@@ -400,7 +412,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: '#0284c7', // sky-600
   },
-  
+
   followUpIconContainer: {
     width: 28,
     height: 28,
@@ -410,25 +422,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 10,
   },
-  
+
   followUpBannerText: {
     flex: 1,
     fontSize: 13,
     color: '#475569', // slate-600
   },
-  
+
   followUpCount: {
     fontWeight: '700',
     color: '#1e40af', // blue-800
   },
-  
+
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     alignItems: 'center',
   },
-  
+
   statusText: {
     fontSize: 12,
     fontWeight: '600',
@@ -455,7 +467,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1e293b',
   },
-  
+
   acknowledgeButton: {
     flex: 1,
     backgroundColor: colors.primary.blue,
@@ -463,7 +475,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-  
+
   acknowledgeText: {
     fontSize: 14,
     fontWeight: '600',

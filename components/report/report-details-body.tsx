@@ -11,7 +11,7 @@ import {
   getStatusColor,
 } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
@@ -67,6 +67,42 @@ export function ReportDetailsBody({
   const [showAllUpdates, setShowAllUpdates] = useState(false);
   const [remarks, setRemarks] = useState('');
   const [rejectSheetVisible, setRejectSheetVisible] = useState(false);
+  const [canForceResolve, setCanForceResolve] = useState(false);
+
+  // Check for resolve unlock on awaiting_confirmation status
+  // Unlock when: citizen confirmed (resolutionConfirmedAt set) OR 2 hours passed
+  useEffect(() => {
+    if (report.status === 'awaiting_confirmation') {
+      // Immediate unlock if citizen already confirmed
+      if (report.resolutionConfirmedAt) {
+        setCanForceResolve(true);
+        return;
+      }
+
+      // Use resolutionRequestedAt for accurate timing, fallback to lastUpdated
+      const referenceTime = report.resolutionRequestedAt || report.lastUpdated;
+      if (!referenceTime) {
+        setCanForceResolve(false);
+        return;
+      }
+
+      const checkTime = () => {
+        const diff = Date.now() - new Date(referenceTime).getTime();
+        // 2 hours in milliseconds
+        const twoHoursMs = 2 * 60 * 60 * 1000;
+        setCanForceResolve(diff >= twoHoursMs);
+      };
+
+      // Initial check
+      checkTime();
+
+      // Check every minute
+      const interval = setInterval(checkTime, 60000);
+      return () => clearInterval(interval);
+    } else {
+      setCanForceResolve(false);
+    }
+  }, [report.status, report.lastUpdated, report.resolutionRequestedAt, report.resolutionConfirmedAt]);
 
   const handleImagePress = (index: number) => {
     setSelectedImageIndex(index);
@@ -281,7 +317,10 @@ export function ReportDetailsBody({
                 return step.key === 'pending' || step.key === 'acknowledged';
               }
               if (report.status === 'resolved') {
-                return step.key === 'pending' || step.key === 'acknowledged' || step.key === 'resolved';
+                return step.key === 'pending' || step.key === 'acknowledged' || step.key === 'resolved' || step.key === 'awaiting_confirmation';
+              }
+              if (report.status === 'awaiting_confirmation') {
+                return step.key === 'pending' || step.key === 'acknowledged' || step.key === 'awaiting_confirmation';
               }
               // For rejected status, show pending + rejected
               if (report.status === 'rejected') {
@@ -470,7 +509,7 @@ export function ReportDetailsBody({
       </Animated.View>
 
       {/* Remarks Input + Action Buttons */}
-      {(report.status === 'pending' || report.status === 'acknowledged') && (
+      {(report.status === 'pending' || report.status === 'acknowledged' || report.status === 'awaiting_confirmation') && (
         <Animated.View
           entering={FadeInUp.delay(580).duration(500)}
           style={[styles.section, { marginBottom: spacing.lg }]}
@@ -486,7 +525,9 @@ export function ReportDetailsBody({
                 placeholder={
                   report.status === 'pending'
                     ? "Add any notes or observations about this report..."
-                    : "Describe how the concern was resolved..."
+                    : report.status === 'awaiting_confirmation'
+                      ? "Reason for forcing resolution..."
+                      : "Describe how the concern was resolved..."
                 }
                 placeholderTextColor={colors.text.tertiary}
                 value={remarks}
@@ -530,17 +571,37 @@ export function ReportDetailsBody({
                 <Text style={actionButtonStyles.primaryButtonText}>Acknowledge</Text>
               </TouchableOpacity>
             )}
-            {report.status === 'acknowledged' && (
+            {/* Resolve Button - Show if Acknowledged or Awaiting Confirmation */}
+            {(report.status === 'acknowledged' || report.status === 'awaiting_confirmation') && (
               <TouchableOpacity
-                style={[actionButtonStyles.primaryButton, actionButtonStyles.resolveButton]}
+                style={[
+                  actionButtonStyles.primaryButton,
+                  actionButtonStyles.resolveButton,
+                  // Locked styling when awaiting_confirmation and not yet unlocked
+                  report.status === 'awaiting_confirmation' && !canForceResolve
+                    ? { opacity: 0.5, backgroundColor: colors.background.accent, borderColor: colors.border.default, borderWidth: 1 }
+                    : {}
+                ]}
                 activeOpacity={0.8}
+                disabled={report.status === 'awaiting_confirmation' && !canForceResolve}
                 onPress={() => {
                   onResolve(remarks.trim() || undefined);
                   setRemarks('');
                 }}
               >
-                <Ionicons name="checkmark-done-circle" size={18} color={colors.text.inverse} />
-                <Text style={actionButtonStyles.primaryButtonText}>Mark as Resolved</Text>
+                <Ionicons
+                  name={report.status === 'awaiting_confirmation' && !canForceResolve ? "lock-closed" : "checkmark-done-circle"}
+                  size={18}
+                  color={report.status === 'awaiting_confirmation' && !canForceResolve ? colors.text.secondary : colors.text.inverse}
+                />
+                <Text style={[
+                  actionButtonStyles.primaryButtonText,
+                  report.status === 'awaiting_confirmation' && !canForceResolve
+                    ? { color: colors.text.secondary }
+                    : {}
+                ]}>
+                  Mark as Resolved
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -556,6 +617,34 @@ export function ReportDetailsBody({
           <View style={statusBannerStyles.resolvedBanner}>
             <Ionicons name="checkmark-circle" size={24} color={colors.semantic.success} />
             <Text style={statusBannerStyles.resolvedText}>Report resolved</Text>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Awaiting Citizen Confirmation Status */}
+      {report.status === 'awaiting_confirmation' && (
+        <Animated.View
+          entering={FadeInUp.delay(580).duration(500)}
+          style={[styles.section, { marginBottom: spacing.lg }]}
+        >
+          <View style={statusBannerStyles.awaitingBanner}>
+            <Ionicons
+              name={report.resolutionConfirmedAt ? "checkmark-circle" : "hourglass-outline"}
+              size={24}
+              color={report.resolutionConfirmedAt ? "#16A34A" : "#F97316"}
+            />
+            <View style={statusBannerStyles.awaitingTextContainer}>
+              <Text style={statusBannerStyles.awaitingText}>
+                {report.resolutionConfirmedAt
+                  ? "Citizen Confirmed Resolution"
+                  : "Awaiting Citizen Confirmation"}
+              </Text>
+              <Text style={statusBannerStyles.awaitingSubtext}>
+                {report.resolutionConfirmedAt
+                  ? "The citizen has confirmed. You may now mark this concern as resolved."
+                  : "The citizen needs to confirm that this concern has been resolved."}
+              </Text>
+            </View>
           </View>
         </Animated.View>
       )}
@@ -791,6 +880,30 @@ const statusBannerStyles = StyleSheet.create({
   rejectedSubtext: {
     fontSize: typography.fontSize.sm,
     color: colors.semantic.error + 'CC',
+    marginTop: 2,
+  },
+  awaitingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF7ED',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 12,
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#F9731630',
+  },
+  awaitingTextContainer: {
+    flex: 1,
+  },
+  awaitingText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: '#F97316',
+  },
+  awaitingSubtext: {
+    fontSize: typography.fontSize.sm,
+    color: '#EA580C',
     marginTop: 2,
   },
 });

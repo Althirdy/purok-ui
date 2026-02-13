@@ -35,7 +35,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 768;
 
 // Unified feed item type - can be either a report or an anomaly
-type FeedItem = 
+type FeedItem =
   | { type: 'report'; data: EmergencyReport; timestamp: Date }
   | { type: 'anomaly'; data: AnomalyLog; timestamp: Date };
 
@@ -128,7 +128,7 @@ export default function NewsFeedScreen() {
       try {
         const { impactAsync, ImpactFeedbackStyle } = await import('expo-haptics');
         const category = report.originalCategory || 'other';
-        
+
         // Map categories to haptic feedback intensity
         let feedbackStyle = ImpactFeedbackStyle.Light; // Default
         if (category === 'safety' || category === 'security') {
@@ -139,7 +139,7 @@ export default function NewsFeedScreen() {
           // 'noise', 'other', 'voice_concern' or unknown -> Light
           feedbackStyle = ImpactFeedbackStyle.Light;
         }
-        
+
         impactAsync(feedbackStyle);
         console.log('[NewsFeed] ✅ Haptic feedback triggered for category:', category);
       } catch (error) {
@@ -149,7 +149,7 @@ export default function NewsFeedScreen() {
       // Show toast with report title/header - always show for any new report
       const toastId = `toast-${report.id}-${Date.now()}`;
       const reportId = report.id; // Capture report ID for navigation
-      
+
       setToast({
         id: toastId,
         title: '📢 New Report',
@@ -161,7 +161,7 @@ export default function NewsFeedScreen() {
           handleReportPress(reportId);
         },
       });
-      
+
       // Note: Notification is added in the useReportsFeed hook
       console.log('[NewsFeed] ✅ Toast displayed for new report');
     },
@@ -178,11 +178,11 @@ export default function NewsFeedScreen() {
       const iotBoxName = anomaly.iot_box?.device_name || anomaly.iot_box?.location_name || anomaly.iot_box?.name || `Device ${anomaly.iot_box?.id}`;
       // Handle location as object or string
       const locationObj = anomaly.location;
-      const locationName = anomaly.iot_box?.display_location || 
+      const locationName = anomaly.iot_box?.display_location ||
         (typeof locationObj === 'object' && locationObj ? `${locationObj.location_name}, ${locationObj.barangay}` : locationObj) ||
-        anomaly.iot_box?.barangay || 
+        anomaly.iot_box?.barangay ||
         'Unknown location';
-      
+
       console.log('[NewsFeed] 🚨 New anomaly received from Pusher:', {
         id: anomaly.id,
         type: anomaly.anomaly_type,
@@ -206,7 +206,7 @@ export default function NewsFeedScreen() {
         message: `Detected at ${iotBoxName} - ${locationName}`,
         severity: 'high',
       });
-      
+
       console.log('[NewsFeed] ✅ Toast displayed for new anomaly');
     },
   });
@@ -258,7 +258,7 @@ export default function NewsFeedScreen() {
     try {
       // Mark as acknowledged with optional remarks
       await updateReportStatus(reportId, 'acknowledged', remarks);
-      
+
       // Show success toast
       setToast({
         id: `toast-ack-${reportId}-${Date.now()}`,
@@ -286,7 +286,7 @@ export default function NewsFeedScreen() {
     try {
       // Mark as resolved with optional remarks
       await updateReportStatus(reportId, 'resolved', remarks);
-      
+
       // Show success toast
       setToast({
         id: `toast-resolve-${reportId}-${Date.now()}`,
@@ -316,7 +316,7 @@ export default function NewsFeedScreen() {
   // Handle resolve button - opens resolve modal (second step)
   const handleResolveAction = useCallback((reportId: string) => {
     const r = reports.find(x => x.id === reportId);
-    if (!r || r.status !== 'acknowledged') return;
+    if (!r || (r.status !== 'acknowledged' && r.status !== 'awaiting_confirmation')) return;
     setResolveTarget(r);
   }, [reports]);
 
@@ -326,8 +326,8 @@ export default function NewsFeedScreen() {
   const renderReportItem = useCallback(({ item, index }: { item: EmergencyReport; index: number }) => {
     // Create stable callback references based on item status
     const acknowledgeCallback = item.status === 'pending' ? handleAcknowledgeAction : undefined;
-    const resolveCallback = item.status === 'acknowledged' ? handleResolveAction : undefined;
-    
+    const resolveCallback = (item.status === 'acknowledged' || item.status === 'awaiting_confirmation') ? handleResolveAction : undefined;
+
     return (
       <Animated.View
         entering={FadeInDown.delay(120 + index * 40).duration(450)}
@@ -384,23 +384,23 @@ export default function NewsFeedScreen() {
   // Filter anomalies by type and search query
   const displayedAnomalies = useMemo(() => {
     let base = anomalies;
-    
+
     // Apply anomaly type filter
     if (anomalyTypeFilter !== 'all') {
       base = base.filter(a => a.anomaly_type === anomalyTypeFilter);
     }
-    
+
     // Apply search query filter for anomalies
     const q = committedQuery.trim().toLowerCase();
     if (!q) return base;
-    
+
     return base.filter(a => {
       // Search by anomaly type label (e.g., "Sound Anomaly", "Anti-Tampering")
       const typeLabel = a.anomaly_type_label?.toLowerCase() ?? '';
-      
+
       // Search by IoT box name
       const iotBoxName = (a.iot_box?.device_name || a.iot_box?.location_name || a.iot_box?.name || '').toLowerCase();
-      
+
       // Search by location (can be object or string)
       let locationStr = '';
       if (typeof a.location === 'string') {
@@ -410,33 +410,33 @@ export default function NewsFeedScreen() {
       }
       // Also check display_location from iot_box
       const displayLocation = (a.iot_box?.display_location || a.iot_box?.barangay || '').toLowerCase();
-      
+
       // Search by description
       const description = a.description?.toLowerCase() ?? '';
-      
+
       // Search by device ID
       const deviceId = a.device_id?.toLowerCase() ?? '';
-      
-      return typeLabel.includes(q) || 
-             iotBoxName.includes(q) || 
-             locationStr.includes(q) || 
-             displayLocation.includes(q) ||
-             description.includes(q) ||
-             deviceId.includes(q);
+
+      return typeLabel.includes(q) ||
+        iotBoxName.includes(q) ||
+        locationStr.includes(q) ||
+        displayLocation.includes(q) ||
+        description.includes(q) ||
+        deviceId.includes(q);
     });
   }, [anomalies, anomalyTypeFilter, committedQuery]);
-  
+
   // Derived: reports filtered by search query, status, and report type
   const displayedReports = useMemo(() => {
     const q = committedQuery.trim().toLowerCase();
     let base = reports;
-    
+
     // Apply status filter
     if (statusFilter !== 'all') {
       const targetStatus = statusFilter === 'ongoing' ? 'acknowledged' : statusFilter;
       base = base.filter(r => r.status === targetStatus);
     }
-    
+
     // Apply report type filter (manual vs voice)
     if (reportTypeFilter !== 'all') {
       if (reportTypeFilter === 'voice') {
@@ -447,52 +447,52 @@ export default function NewsFeedScreen() {
         base = base.filter(r => r.reportType === 'manual' || (!r.reportType && !r.audio));
       }
     }
-    
+
     // Apply search query filter
     if (!q) return base;
     return base.filter(r => {
       // Search by title
       const title = r.title?.toLowerCase() ?? '';
-      
+
       // Search by location
       const location = r.location?.toLowerCase() ?? '';
-      
+
       // Search by description
       const description = r.description?.toLowerCase() ?? '';
-      
+
       // Search by status (pending, ongoing/acknowledged, resolved)
       const status = r.status?.toLowerCase() ?? '';
       // Also allow "ongoing" to match "acknowledged"
       const statusMatch = status.includes(q) || (q === 'ongoing' && status === 'acknowledged');
-      
+
       // Search by severity (low, medium, high, critical)
       const severity = r.severity?.toLowerCase() ?? '';
-      
+
       // Search by category (safety, security, infrastructure, etc.)
       const category = r.originalCategory?.toLowerCase() ?? '';
-      
+
       // Search by report type (manual, voice)
       const reportType = r.reportType?.toLowerCase() ?? '';
-      
+
       // Search by reporter name
       const reportedBy = r.reportedBy?.toLowerCase() ?? '';
-      
+
       // Search by type (accident, crime, fire, medical, etc.)
       const type = r.type?.toLowerCase() ?? '';
-      
+
       // Search by transcript (for voice concerns)
       const transcript = r.transcript?.toLowerCase() ?? '';
-      
-      return title.includes(q) || 
-             location.includes(q) || 
-             description.includes(q) ||
-             statusMatch ||
-             severity.includes(q) ||
-             category.includes(q) ||
-             reportType.includes(q) ||
-             reportedBy.includes(q) ||
-             type.includes(q) ||
-             transcript.includes(q);
+
+      return title.includes(q) ||
+        location.includes(q) ||
+        description.includes(q) ||
+        statusMatch ||
+        severity.includes(q) ||
+        category.includes(q) ||
+        reportType.includes(q) ||
+        reportedBy.includes(q) ||
+        type.includes(q) ||
+        transcript.includes(q);
     });
   }, [reports, committedQuery, statusFilter, reportTypeFilter]);
 
@@ -532,10 +532,10 @@ export default function NewsFeedScreen() {
         onPress={() => setFeedType('concerns')}
         activeOpacity={0.7}
       >
-        <Ionicons 
-          name="warning-outline" 
-          size={18} 
-          color={feedType === 'concerns' ? colors.primary.blue : '#94a3b8'} 
+        <Ionicons
+          name="warning-outline"
+          size={18}
+          color={feedType === 'concerns' ? colors.primary.blue : '#94a3b8'}
         />
         <Text style={[styles.feedTabText, feedType === 'concerns' && styles.feedTabTextActive]}>
           Concerns
@@ -548,10 +548,10 @@ export default function NewsFeedScreen() {
         onPress={() => setFeedType('anomalies')}
         activeOpacity={0.7}
       >
-        <Ionicons 
-          name="radio-outline" 
-          size={18} 
-          color={feedType === 'anomalies' ? colors.primary.blue : '#94a3b8'} 
+        <Ionicons
+          name="radio-outline"
+          size={18}
+          color={feedType === 'anomalies' ? colors.primary.blue : '#94a3b8'}
         />
         <Text style={[styles.feedTabText, feedType === 'anomalies' && styles.feedTabTextActive]}>
           Anomalies
@@ -559,7 +559,7 @@ export default function NewsFeedScreen() {
       </TouchableOpacity>
     </View>
   ), [feedType]);
-  
+
   // Memoize header component - only recompute when dependencies change
   const memoizedHeader = useMemo(() => {
     return (
@@ -622,7 +622,7 @@ export default function NewsFeedScreen() {
         updateCellsBatchingPeriod={100}
         initialNumToRender={15}
         windowSize={21}
-        // Note: getItemLayout removed - items have variable heights based on content
+      // Note: getItemLayout removed - items have variable heights based on content
       />
 
       {/* Draggable Notification Bell - users can position it anywhere */}
