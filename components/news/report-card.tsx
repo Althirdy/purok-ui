@@ -259,7 +259,7 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
 // Memoize component to prevent unnecessary re-renders
 // Only re-render if report data actually changed (not function references)
 // Optimized memo comparison - only re-render if report data or callbacks change
-export const ReportCard: React.MemoExoticComponent<React.NamedExoticComponent<ReportCardProps>> = React.memo(ReportCardComponent, (prevProps, nextProps) => {
+export const ReportCard = React.memo(ReportCardComponent, (prevProps, nextProps) => {
   // Compare report by ID and key fields that affect rendering
   if (prevProps.report.id !== nextProps.report.id) return false;
   if (prevProps.report.status !== nextProps.report.status) return false;
