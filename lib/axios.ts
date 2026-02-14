@@ -35,6 +35,13 @@ export function setTokenRefreshFunction(fn: () => Promise<string | null>) {
   refreshTokenFn = fn;
 }
 
+// Forced PIN change callback (set by auth context)
+let pinChangeRequiredFn: (() => void) | null = null;
+
+export function setPinChangeRequiredCallback(fn: () => void) {
+  pinChangeRequiredFn = fn;
+}
+
 // Interceptor: Handle 401 errors and refresh token automatically
 async function handleResponseWithTokenRefresh<T>(
   response: Response,
@@ -43,6 +50,22 @@ async function handleResponseWithTokenRefresh<T>(
   // If not 401, process normally
   if (response.status !== 401) {
     return processResponse<T>(response);
+  }
+
+  // Check if this is a forced PIN change 401 (not an expired token)
+  try {
+    const clonedResponse = response.clone();
+    const body = await clonedResponse.text();
+    if (body.includes('change your default PIN') || body.includes('change your PIN')) {
+      console.log('[HTTP] 🔒 Forced PIN change required - not a token issue');
+      if (pinChangeRequiredFn) {
+        pinChangeRequiredFn();
+      }
+      throw new Error('PIN change required');
+    }
+  } catch (e: any) {
+    if (e?.message === 'PIN change required') throw e;
+    // If clone/parse fails, continue with normal token refresh
   }
 
   console.log('[HTTP] 🔄 Received 401 Unauthorized - attempting token refresh...');
@@ -73,7 +96,7 @@ async function handleResponseWithTokenRefresh<T>(
 
   try {
     const newToken = await refreshPromise;
-    
+
     if (!newToken) {
       console.error('[HTTP] ❌ Token refresh failed - forcing logout');
       // Notify subscribers that refresh failed
@@ -114,7 +137,7 @@ async function processResponse<T>(response: Response): Promise<T> {
   // Handle non-OK responses
   if (!response.ok) {
     console.error(`❌ [HTTP] Error Response: ${response.status} ${response.statusText}`);
-    
+
     // Try to get response body for debugging
     let errorBody = '';
     try {
@@ -123,7 +146,7 @@ async function processResponse<T>(response: Response): Promise<T> {
     } catch (e) {
       console.error('❌ [HTTP] Could not read error body');
     }
-    
+
     // Try to parse as JSON if possible
     if (errorBody && contentType.includes('application/json')) {
       try {
@@ -135,7 +158,7 @@ async function processResponse<T>(response: Response): Promise<T> {
         // Not valid JSON
       }
     }
-    
+
     throw new Error(`HTTP ${response.status}: ${response.statusText || errorBody.substring(0, 100)}`);
   }
 
@@ -152,20 +175,20 @@ async function processResponse<T>(response: Response): Promise<T> {
 
 export async function httpGet<T = any>(path: string, init?: RequestInit): Promise<T> {
   const fullUrl = `${API_BASE}${path}`;
-  
+
   // Merge headers properly
   const mergedHeaders = new Headers();
   mergedHeaders.set('Accept', 'application/json');
   mergedHeaders.set('X-Requested-With', 'XMLHttpRequest');
   // Required for ngrok free tier - bypasses the browser warning page
   mergedHeaders.set('ngrok-skip-browser-warning', 'true');
-  
+
   // Add authorization header if token is available
   const token = await getAccessToken();
   if (token) {
     mergedHeaders.set('Authorization', `Bearer ${token}`);
   }
-  
+
   if (init?.headers) {
     if (init.headers instanceof Headers) {
       init.headers.forEach((value, key) => {
@@ -183,12 +206,12 @@ export async function httpGet<T = any>(path: string, init?: RequestInit): Promis
       });
     }
   }
-  
+
   const fetchOptions: RequestInit = {
     method: 'GET',
     headers: mergedHeaders,
   };
-  
+
   if (init) {
     if (init.credentials) fetchOptions.credentials = init.credentials;
     if (init.mode) fetchOptions.mode = init.mode;
@@ -197,7 +220,7 @@ export async function httpGet<T = any>(path: string, init?: RequestInit): Promis
     if (init.referrer) fetchOptions.referrer = init.referrer;
     if (init.signal) fetchOptions.signal = init.signal;
   }
-  
+
   // Create a function to retry the request (for token refresh)
   const makeRequest = async (): Promise<Response> => {
     // Update token in headers if it changed
@@ -207,20 +230,20 @@ export async function httpGet<T = any>(path: string, init?: RequestInit): Promis
     }
     return fetch(fullUrl, fetchOptions);
   };
-  
+
   const response = await makeRequest();
-  
+
   // Handle 401 with automatic token refresh
   if (response.status === 401) {
     return handleResponseWithTokenRefresh<T>(response, makeRequest);
   }
-  
+
   return processResponse<T>(response);
 }
 
 export async function httpPost<T = any>(path: string, body?: any, init?: RequestInit): Promise<T> {
   const fullUrl = `${API_BASE}${path}`;
-  
+
   // Merge headers properly
   const mergedHeaders = new Headers();
   mergedHeaders.set('Content-Type', 'application/json');
@@ -228,13 +251,13 @@ export async function httpPost<T = any>(path: string, body?: any, init?: Request
   mergedHeaders.set('X-Requested-With', 'XMLHttpRequest');
   // Required for ngrok free tier - bypasses the browser warning page
   mergedHeaders.set('ngrok-skip-browser-warning', 'true');
-  
+
   // Add authorization header if token is available
   const token = await getAccessToken();
   if (token) {
     mergedHeaders.set('Authorization', `Bearer ${token}`);
   }
-  
+
   if (init?.headers) {
     if (init.headers instanceof Headers) {
       init.headers.forEach((value, key) => {
@@ -252,15 +275,15 @@ export async function httpPost<T = any>(path: string, body?: any, init?: Request
       });
     }
   }
-  
+
   const bodyStr = body !== undefined ? JSON.stringify(body) : undefined;
-  
+
   const fetchOptions: RequestInit = {
     method: 'POST',
     headers: mergedHeaders,
     body: bodyStr,
   };
-  
+
   if (init) {
     if (init.credentials) fetchOptions.credentials = init.credentials;
     if (init.mode) fetchOptions.mode = init.mode;
@@ -269,7 +292,7 @@ export async function httpPost<T = any>(path: string, body?: any, init?: Request
     if (init.referrer) fetchOptions.referrer = init.referrer;
     if (init.signal) fetchOptions.signal = init.signal;
   }
-  
+
   // Create a function to retry the request (for token refresh)
   const makeRequest = async (): Promise<Response> => {
     // Update token in headers if it changed
@@ -279,20 +302,20 @@ export async function httpPost<T = any>(path: string, body?: any, init?: Request
     }
     return fetch(fullUrl, fetchOptions);
   };
-  
+
   const response = await makeRequest();
-  
+
   // Handle 401 with automatic token refresh
   if (response.status === 401) {
     return handleResponseWithTokenRefresh<T>(response, makeRequest);
   }
-  
+
   return processResponse<T>(response);
 }
 
 export async function httpPut<T = any>(path: string, body?: any, init?: RequestInit): Promise<T> {
   const fullUrl = `${API_BASE}${path}`;
-  
+
   // Merge headers properly - ensure our headers take precedence
   const mergedHeaders = new Headers();
   mergedHeaders.set('Content-Type', 'application/json');
@@ -300,13 +323,13 @@ export async function httpPut<T = any>(path: string, body?: any, init?: RequestI
   mergedHeaders.set('X-Requested-With', 'XMLHttpRequest');
   // Required for ngrok free tier - bypasses the browser warning page
   mergedHeaders.set('ngrok-skip-browser-warning', 'true');
-  
+
   // Add authorization header if token is available
   const token = await getAccessToken();
   if (token) {
     mergedHeaders.set('Authorization', `Bearer ${token}`);
   }
-  
+
   // Add custom headers from init, but don't override our required headers
   if (init?.headers) {
     if (init.headers instanceof Headers) {
@@ -325,15 +348,15 @@ export async function httpPut<T = any>(path: string, body?: any, init?: RequestI
       });
     }
   }
-  
+
   // Log the full request details
   const logHeaders: Record<string, string> = {};
   mergedHeaders.forEach((value, key) => {
-    logHeaders[key] = key.toLowerCase() === 'authorization' 
-      ? `${value.substring(0, 20)}...` 
+    logHeaders[key] = key.toLowerCase() === 'authorization'
+      ? `${value.substring(0, 20)}...`
       : value;
   });
-  
+
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('📤 [HTTP] PUT Request');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -342,16 +365,16 @@ export async function httpPut<T = any>(path: string, body?: any, init?: RequestI
   console.log('📦 Request Body:', body ? JSON.stringify(body, null, 2) : 'No body');
   console.log('🔐 Headers:', logHeaders);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  
+
   const bodyStr = body !== undefined ? JSON.stringify(body) : undefined;
-  
+
   // Create fetch options without spreading init (to avoid overriding our settings)
   const fetchOptions: RequestInit = {
     method: 'PUT',
     headers: mergedHeaders,
     body: bodyStr,
   };
-  
+
   // Only copy non-header properties from init
   if (init) {
     if (init.credentials) fetchOptions.credentials = init.credentials;
@@ -361,7 +384,7 @@ export async function httpPut<T = any>(path: string, body?: any, init?: RequestI
     if (init.referrer) fetchOptions.referrer = init.referrer;
     if (init.signal) fetchOptions.signal = init.signal;
   }
-  
+
   // Create a function to retry the request (for token refresh)
   const makeRequest = async (): Promise<Response> => {
     // Update token in headers if it changed
@@ -371,25 +394,25 @@ export async function httpPut<T = any>(path: string, body?: any, init?: RequestI
     }
     return fetch(fullUrl, fetchOptions);
   };
-  
+
   const response = await makeRequest();
-  
+
   console.log('📥 [HTTP] Response Status:', response.status, response.statusText);
-  
+
   // Handle 401 with automatic token refresh
   if (response.status === 401) {
     return handleResponseWithTokenRefresh<T>(response, makeRequest);
   }
-  
+
   // Check content type first
   const contentType = response.headers.get('content-type') || '';
   const responseHeaders: Record<string, string> = {};
   response.headers.forEach((value, key) => {
     responseHeaders[key] = value;
   });
-  
+
   console.log('📋 [HTTP] Response Headers:', JSON.stringify(responseHeaders, null, 2));
-  
+
   // If response is HTML (likely a redirect to login page), it's an error
   if (contentType.includes('text/html')) {
     const responseText = await response.text();
@@ -398,14 +421,14 @@ export async function httpPut<T = any>(path: string, body?: any, init?: RequestI
     console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     throw new Error('Backend returned HTML page - authentication may have failed or session expired');
   }
-  
+
   if (!response.ok) {
     // Try to parse error message from response
     if (contentType.includes('application/json')) {
       try {
         const errorData = await response.json();
         console.error('❌ [HTTP] Error Response Data:', JSON.stringify(errorData, null, 2));
-        
+
         // Laravel validation errors have an 'errors' object
         if (errorData?.errors) {
           const validationErrors = Object.entries(errorData.errors)
@@ -414,7 +437,7 @@ export async function httpPut<T = any>(path: string, body?: any, init?: RequestI
           const errorMessage = errorData?.message || `Validation failed: ${validationErrors}`;
           throw new Error(errorMessage);
         }
-        
+
         const errorMessage = errorData?.message || errorData?.error || `HTTP ${response.status}`;
         throw new Error(errorMessage);
       } catch (parseError) {
@@ -438,7 +461,7 @@ export async function httpPut<T = any>(path: string, body?: any, init?: RequestI
       }
     }
   }
-  
+
   // Check if response has JSON content
   if (!contentType.includes('application/json')) {
     // Empty response or non-JSON - log the actual response
@@ -448,17 +471,17 @@ export async function httpPut<T = any>(path: string, body?: any, init?: RequestI
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return {} as T;
   }
-  
+
   try {
     const responseData = await response.json();
     console.log('📦 [HTTP] Response Body:', JSON.stringify(responseData, null, 2));
-    
+
     // Check if response indicates success
     if (responseData.success === false) {
       console.error('❌ [HTTP] Backend returned success: false');
       console.error('📦 Error Response:', JSON.stringify(responseData, null, 2));
     }
-    
+
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     return responseData as T;
   } catch (parseError) {
@@ -478,7 +501,4 @@ export async function safeGet<T = any>(url: string, fallback: () => T | Promise<
   }
 }
 
-// Export function to set up token refresh from auth context
-// This should be called during app initialization
-export { setTokenRefreshFunction };
 

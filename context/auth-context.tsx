@@ -2,7 +2,7 @@
  * Auth Context - Manages PIN login and authenticated user
  */
 
-import { setTokenRefreshFunction } from '@/lib/axios';
+import { setPinChangeRequiredCallback, setTokenRefreshFunction } from '@/lib/axios';
 import { resetPusherClient } from '@/services/realtime-service';
 import type { User } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,10 +15,13 @@ interface AuthContextType {
   isSubmitting: boolean;
   accessToken: string | null;
   refreshToken: string | null;
+  requiresPinChange: boolean;
+  setRequiresPinChange: (value: boolean) => void;
   loginWithPin: (pin: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   refreshAccessToken: () => Promise<string | null>;
+  updateTokensAfterPinChange: (newToken: string, newRefreshToken: string) => Promise<void>;
   sessionStartMs: number;
 }
 
@@ -47,15 +50,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionStartMs, setSessionStartMs] = useState<number>(Date.now());
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [requiresPinChange, setRequiresPinChange] = useState(false);
 
   useEffect(() => {
     initialize();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Register refresh function with axios interceptor when available
+  // Register refresh function and PIN change callback with axios interceptor
   useEffect(() => {
     setTokenRefreshFunction(refreshAccessToken);
+    setPinChangeRequiredCallback(() => {
+      console.log('[Auth] 🔒 PIN change required - setting flag');
+      setRequiresPinChange(true);
+    });
   }, [refreshAccessToken]);
 
   const initialize = async () => {
@@ -96,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const rawRole: string = String(raw?.role ?? '').toLowerCase();
     const role: User['role'] = rawRole === 'purok leader' || rawRole === 'purok_leader' ? 'purok_leader'
       : rawRole === 'admin' ? 'admin'
-      : 'official';
+        : 'official';
     const purokId = raw?.purokId ?? raw?.purok_id ?? raw?.purok?.id ?? '';
     const purokName = raw?.purokName ?? raw?.purok_name ?? raw?.purok?.name ?? '';
     const email = raw?.email ?? raw?.emailAddress ?? '';
@@ -133,17 +141,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const base = await getApiBase();
       const url = `${base}${LOGIN_ENDPOINT}`;
-      
+
       console.log('[Auth] Logging in to:', url);
       console.log('[Auth] PIN being sent:', pin, 'type:', typeof pin, 'length:', pin.length);
-      
+
       // Ensure pin is trimmed - backend expects pin as STRING
       const cleanPin = String(pin).trim();
-      
+
       // Send PIN as string (backend validation requires: 'pin' => 'required|string')
       const bodyStr = JSON.stringify({ pin: cleanPin });
       console.log('[Auth] Request body:', bodyStr);
-      
+
       // Try JSON format - Laravel accepts both JSON and form-data
       const resp = await fetch(url, {
         method: 'POST',
@@ -155,13 +163,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
         body: bodyStr,
       });
-      
+
       console.log('[Auth] Response status:', resp.status);
-      
+
       // Get response text first for debugging
       const responseText = await resp.text();
       console.log('[Auth] Response body:', responseText.substring(0, 500));
-      
+
       // Parse as JSON
       let responseData;
       try {
@@ -170,18 +178,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('[Auth] Failed to parse response as JSON');
         throw new Error('Invalid response from server');
       }
-      
+
       if (!resp.ok) {
         const message = responseData?.message ?? `Login failed: ${resp.status}`;
         console.error('[Auth] Login failed:', message);
         throw new Error(message);
       }
-      
+
       // Use the already-parsed response data
       const loginData = responseData?.data ?? responseData;
       const token: string | undefined = loginData?.token || loginData?.accessToken || responseData?.token;
       const refreshTokenValue: string | undefined = loginData?.refreshToken || responseData?.refreshToken;
-      
+
       if (!token) {
         console.error('[Auth] Login response missing token:', {
           hasToken: !!loginData?.token,
@@ -192,18 +200,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         throw new Error('Login response missing token');
       }
-      
+
       if (!refreshTokenValue) {
         console.warn('[Auth] ⚠️ Login response missing refreshToken - token refresh will not work');
       }
-      
+
       console.log('[Auth] ✅ Token extracted from login response:', {
         tokenLength: token.length,
         tokenPrefix: token.substring(0, 20) + '...',
         hasRefreshToken: !!refreshTokenValue,
         refreshTokenPrefix: refreshTokenValue ? refreshTokenValue.substring(0, 20) + '...' : 'none',
       });
-      
+
       // Store both tokens
       await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
       if (refreshTokenValue) {
@@ -212,7 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAccessToken(token);
       setRefreshToken(refreshTokenValue || null);
       console.log('[Auth] ✅ Tokens stored in AsyncStorage and context');
-      
+
       // Optimistically set user from login response if available
       if (loginData?.user) {
         setUser(normalizeUser(loginData.user));
@@ -229,6 +237,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setAccessToken(null);
     setRefreshToken(null);
+    setRequiresPinChange(false);
+  }, []);
+
+  const updateTokensAfterPinChange = useCallback(async (newToken: string, newRefreshToken: string) => {
+    await AsyncStorage.setItem(AUTH_TOKEN_KEY, newToken);
+    await AsyncStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
+    setAccessToken(newToken);
+    setRefreshToken(newRefreshToken);
+    setRequiresPinChange(false);
+    // Reset Pusher client to reconnect with new token
+    resetPusherClient();
+    console.log('[Auth] ✅ Tokens updated after PIN change');
   }, []);
 
   const refreshUser = useCallback(async () => {
@@ -247,9 +267,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const base = await getApiBase();
       const url = `${base}/api/v1/refresh-token`;
-      
+
       console.log('[Auth] 🔄 Refreshing access token...');
-      
+
       const resp = await fetch(url, {
         method: 'POST',
         headers: {
@@ -262,7 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!resp.ok) {
         const errorText = await resp.text();
         console.error('[Auth] ❌ Token refresh failed:', resp.status, errorText);
-        
+
         // If refresh token is expired/invalid, logout
         if (resp.status === 401 || resp.status === 403) {
           console.log('[Auth] 🔒 Refresh token expired, logging out...');
@@ -288,10 +308,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRefreshToken(newRefreshToken);
       }
       setAccessToken(newAccessToken);
-      
+
       // Reset Pusher client to reconnect with new token
       resetPusherClient();
-      
+
       console.log('[Auth] ✅ Access token refreshed successfully');
       return newAccessToken;
     } catch (error) {
@@ -307,12 +327,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isSubmitting,
     accessToken,
     refreshToken,
+    requiresPinChange,
+    setRequiresPinChange,
     loginWithPin,
     logout,
     refreshUser,
     refreshAccessToken,
+    updateTokensAfterPinChange,
     sessionStartMs,
-  }), [user, isInitializing, isSubmitting, accessToken, refreshToken, loginWithPin, logout, refreshUser, refreshAccessToken, sessionStartMs]);
+  }), [user, isInitializing, isSubmitting, accessToken, refreshToken, requiresPinChange, loginWithPin, logout, refreshUser, refreshAccessToken, updateTokensAfterPinChange, sessionStartMs]);
 
   return (
     <AuthContext.Provider value={value}>
