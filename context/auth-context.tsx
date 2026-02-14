@@ -227,6 +227,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setSessionStartMs(Date.now());
       await fetchCurrentUser(token);
+
+      // Probe a protected purok-leader endpoint to detect forced PIN change
+      // The middleware will return 401 "change your default PIN" if is_default=true
+      // The axios interceptor will automatically set requiresPinChange=true
+      try {
+        const probeUrl = `${base}/api/v1/purok-leader/assigned-concerns`;
+        await fetch(probeUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'X-Requested-With': 'XMLHttpRequest',
+            'ngrok-skip-browser-warning': 'true',
+          },
+        }).then(async (probeResp) => {
+          if (probeResp.status === 401) {
+            const probeBody = await probeResp.text();
+            if (probeBody.includes('change your default PIN') || probeBody.includes('change your PIN')) {
+              console.log('[Auth] 🔒 Default PIN detected during login - requiring PIN change');
+              setRequiresPinChange(true);
+            }
+          }
+        });
+      } catch (probeErr) {
+        // Probe failure is non-fatal — fallback to lazy detection on first API call
+        console.log('[Auth] ⚠️ PIN change probe failed (will detect lazily):', probeErr);
+      }
     } finally {
       setIsSubmitting(false);
     }
