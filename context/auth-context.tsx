@@ -57,14 +57,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Register refresh function and PIN change callback with axios interceptor
-  useEffect(() => {
-    setTokenRefreshFunction(refreshAccessToken);
-    setPinChangeRequiredCallback(() => {
-      console.log('[Auth] 🔒 PIN change required - setting flag');
-      setRequiresPinChange(true);
-    });
-  }, [refreshAccessToken]);
 
   const initialize = async () => {
     try {
@@ -346,6 +338,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return null;
     }
   }, [logout]);
+
+  // Register refresh function and PIN change callback with axios interceptor
+  useEffect(() => {
+    setTokenRefreshFunction(refreshAccessToken);
+    setPinChangeRequiredCallback(() => {
+      console.log('[Auth] 🔒 PIN change required - setting flag');
+      setRequiresPinChange(true);
+    });
+  }, [refreshAccessToken]);
 
   const value = useMemo<AuthContextType>(() => ({
     user,
