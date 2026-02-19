@@ -144,7 +144,7 @@ export function getStatusColor(status: EmergencyReport['status']): {
     return { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' };
   }
   if (status === 'acknowledged') {
-    return { backgroundColor: colors.semantic.success + '20', borderColor: colors.semantic.success };
+    return { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' }; // Blue for acknowledged (distinct from green resolved)
   }
   if (status === 'resolved') {
     return { backgroundColor: colors.semantic.success + '20', borderColor: colors.semantic.success };

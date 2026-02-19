@@ -2,6 +2,7 @@
  * Report Details Screen - Concise view matching modal UI/UX
  */
 
+import { AwaitingConfirmationModal } from '@/components/news/awaiting-confirmation-modal';
 import { ReportDetailsBody } from '@/components/report/report-details-body';
 import { DesignSystem } from '@/constants/design-system';
 import { globalStyles } from '@/constants/global-styles';
@@ -29,6 +30,7 @@ export default function ReportDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showAwaitingModal, setShowAwaitingModal] = useState(false);
 
 
   // Fetch reports on mount to ensure we have the latest data
@@ -161,6 +163,10 @@ export default function ReportDetailsScreen() {
         // optimistically show resolved. Otherwise show awaiting_confirmation.
         const nextStatus = report.status === 'awaiting_confirmation' ? 'resolved' : 'awaiting_confirmation';
         setReport(prev => (prev ? { ...prev, status: nextStatus } : prev));
+        // Show the awaiting confirmation modal when transitioning to awaiting_confirmation
+        if (nextStatus === 'awaiting_confirmation') {
+          setShowAwaitingModal(true);
+        }
       } catch (error) {
         console.error('Failed to resolve report:', error);
       }
@@ -329,6 +335,13 @@ export default function ReportDetailsScreen() {
         onMapPress={handleMapPress}
         onPlayAudio={playAudio}
         onStopAudio={stopAudio}
+      />
+
+      {/* Awaiting Citizen Confirmation Modal */}
+      <AwaitingConfirmationModal
+        visible={showAwaitingModal}
+        concernTitle={report.title}
+        onDismiss={() => setShowAwaitingModal(false)}
       />
     </SafeAreaView>
   );
