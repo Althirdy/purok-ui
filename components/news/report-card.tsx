@@ -139,10 +139,6 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
             name={getCategoryIcon(report.originalCategory, report.type)}
             size={24}
             color={getCategoryIconColor(report.originalCategory)}
-          <Ionicons
-            name={getCategoryIcon(report.originalCategory, report.type)}
-            size={24}
-            color={getCategoryIconColor(report.originalCategory)}
           />
         </View>
 
@@ -205,7 +201,6 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
         <View style={styles.actionsContainer}>
           {onPress && (
             <TouchableOpacity
-            <TouchableOpacity
               style={styles.seeMoreButton}
               onPress={(e) => {
                 e.stopPropagation();
@@ -217,8 +212,6 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
             </TouchableOpacity>
           )}
           {onAcknowledge && (
-            <TouchableOpacity
-              style={styles.acknowledgeButton}
             <TouchableOpacity
               style={styles.acknowledgeButton}
               onPress={(e) => {
@@ -268,7 +261,6 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
 // Memoize component to prevent unnecessary re-renders
 // Only re-render if report data actually changed (not function references)
 // Optimized memo comparison - only re-render if report data or callbacks change
-export const ReportCard = React.memo(ReportCardComponent, (prevProps, nextProps) => {
 export const ReportCard = React.memo(ReportCardComponent, (prevProps, nextProps) => {
   // Compare report by ID and key fields that affect rendering
   if (prevProps.report.id !== nextProps.report.id) return false;
