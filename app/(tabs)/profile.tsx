@@ -287,7 +287,20 @@ export default function ProfileScreen() {
 
         </View>
 
-
+        {/* Security */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Security</Text>
+          <TouchableOpacity
+            style={styles.settingItemNoBorder}
+            onPress={() => router.push('/(auth)/change-pin' as any)}
+          >
+            <View style={styles.settingItemLeft}>
+              <Ionicons name="lock-closed-outline" size={20} color="#1e3a8a" />
+              <Text style={styles.settingItemText}>Change PIN</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+          </TouchableOpacity>
+        </View>
 
         {/* Logout */}
         <View style={styles.logoutSection}>

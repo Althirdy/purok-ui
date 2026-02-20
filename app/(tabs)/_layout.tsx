@@ -11,7 +11,7 @@ export const unstable_settings = {
 };
 
 export default function TabLayout() {
-  const { isAuthenticated, isInitializing } = useAuth();
+  const { isAuthenticated, isInitializing, requiresPinChange } = useAuth();
 
   // Lazy-load and configure notifications (works in both Expo Go and dev builds)
   useEffect(() => {
@@ -33,6 +33,10 @@ export default function TabLayout() {
   if (isInitializing) return null;
   if (!isAuthenticated) {
     return <Redirect href="/(auth)/login" />;
+  }
+  // Redirect to change-pin if forced PIN change is required
+  if (requiresPinChange) {
+    return <Redirect href={'/(auth)/change-pin' as any} />;
   }
   return (
     <>
@@ -85,7 +89,7 @@ export default function TabLayout() {
             ),
           }}
         />
-        
+
         {/* Profile - hidden from tabs, accessible via header avatar */}
         <Tabs.Screen
           name="profile"
@@ -97,7 +101,7 @@ export default function TabLayout() {
             ),
           }}
         />
-        
+
         {/* Hide notifications from tabs */}
         <Tabs.Screen
           name="notifications"
@@ -106,7 +110,7 @@ export default function TabLayout() {
             headerShown: false,
           }}
         />
-        
+
         {/* Hide profile settings from tabs */}
         <Tabs.Screen
           name="profile-settings"

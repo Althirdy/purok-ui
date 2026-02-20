@@ -1,0 +1,63 @@
+# Resolve Confirmation — Backend Walkthrough
+
+## Summary
+
+When a Purok Leader marks a concern as "resolved", it enters `awaiting_confirmation`. The citizen can confirm or dispute. **Confirmation does NOT auto-resolve** — it only flags the concern so the uw-purok frontend can unlock the resolve button. The PurokLeader must still manually resolve.
+
+## Flow
+
+```mermaid
+sequenceDiagram
+    participant PL as Purok Leader (uw-purok)
+    participant API as Backend
+    participant C as Citizen (uw-citizen)
+
+    PL->>API: PUT /concerns/{id}/status {status: "resolved"}
+    API->>API: Set "awaiting_confirmation" + resolution_requested_at
+    API->>C: Notification + Pusher broadcast
+
+    alt Citizen confirms
+        C->>API: POST /concerns/{id}/confirm-resolution {confirmed: true}
+        API->>API: Set resolution_confirmed_at (status stays awaiting_confirmation)
+        API->>PL: Notification "Resolution Confirmed"
+        Note over PL: Frontend unlocks resolve button
+        PL->>API: PUT /concerns/{id}/status {status: "resolved"}
+        API->>API: Now sets status → "resolved"
+    else Citizen disputes
+        C->>API: POST /concerns/{id}/confirm-resolution {confirmed: false, reason: "..."}
+        API->>API: Status → "ongoing"
+        API->>PL: Notification "Resolution Disputed"
+    else No response (2hr window)
+        Note over PL: Frontend unlocks button after 2hrs
+        PL->>API: PUT /concerns/{id}/status {status: "resolved"}
+        API->>API: Sets status → "resolved"
+    end
+```
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| [Migration](file:///\\wsl.localhost\Ubuntu\home\insrno\urbanwatch\database\migrations\2026_02_13_000000_add_awaiting_confirmation_status_to_concerns_table.php) | `awaiting_confirmation` ENUM + `resolution_requested_at` + `resolution_confirmed_at` |
+| [Concern.php](file:///\\wsl.localhost\Ubuntu\home\insrno\urbanwatch\app\Models\Citizen\Concern.php) | Added both timestamps to fillable/casts |
+| [Notification.php](file:///\\wsl.localhost\Ubuntu\home\insrno\urbanwatch\app\Models\Notification.php) | 3 new type constants |
+| [PurokLeader/ConcernController](file:///\\wsl.localhost\Ubuntu\home\insrno\urbanwatch\app\Http\Controllers\Api\V1\PurokLeader\ConcernController.php) | Intercepts resolved → awaiting_confirmation, allows re-resolve |
+| [Citizen/ConcernController](file:///\\wsl.localhost\Ubuntu\home\insrno\urbanwatch\app\Http\Controllers\Api\V1\Citizen\ConcernController.php) | New [confirmResolution()](file://wsl.localhost/Ubuntu/home/insrno/urbanwatch/app/Http/Controllers/Api/V1/Citizen/ConcernController.php#125-165) endpoint |
+| [ConcernService](file:///\\wsl.localhost\Ubuntu\home\insrno\urbanwatch\app\Services\ConcernService.php) | [confirmResolution()](file://wsl.localhost/Ubuntu/home/insrno/urbanwatch/app/Http/Controllers/Api/V1/Citizen/ConcernController.php#125-165) — flags only, no auto-resolve |
+| [NotificationService](file:///\\wsl.localhost\Ubuntu\home\insrno\urbanwatch\app\Services\NotificationService.php) | [notifyResolutionConfirmationResult()](file://wsl.localhost/Ubuntu/home/insrno/urbanwatch/app/Services/NotificationService.php#192-238) + status handler |
+| [concerns.php](file:///\\wsl.localhost\Ubuntu\home\insrno\urbanwatch\routes\api\v1\concerns.php) | `POST concerns/{id}/confirm-resolution` |
+
+## Frontend Logic (for uw-purok)
+
+The resolve button should be **unlockable** when either:
+- `resolution_confirmed_at` is **not null** (citizen confirmed), OR
+- 2 hours have passed since `resolution_requested_at`
+
+## API Reference
+
+| Method | Endpoint | Body | Result |
+|--------|----------|------|--------|
+| `PUT` | `/purok-leader/concerns/{id}/status` | `{status: "resolved"}` | → `awaiting_confirmation` |
+| `POST` | `/concerns/{id}/confirm-resolution` | `{confirmed: true, reason?: "..."}` | Flags concern, notifies PL |
+| `POST` | `/concerns/{id}/confirm-resolution` | `{confirmed: false, reason: "..."}` | → `ongoing` |
+| `PUT` | `/purok-leader/concerns/{id}/status` | `{status: "resolved"}` (2nd time) | → [resolved](file://wsl.localhost/Ubuntu/home/insrno/urbanwatch/implementation_plan.md.resolved) |

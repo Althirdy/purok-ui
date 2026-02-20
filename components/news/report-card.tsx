@@ -56,6 +56,7 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
       return categoryIcons[originalCategory.toLowerCase()] || 'alert-circle-outline';
     }
 
+
     // Fallback to type-based icons
     switch (type) {
       case 'accident':
@@ -138,6 +139,10 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
             name={getCategoryIcon(report.originalCategory, report.type)}
             size={24}
             color={getCategoryIconColor(report.originalCategory)}
+          <Ionicons
+            name={getCategoryIcon(report.originalCategory, report.type)}
+            size={24}
+            color={getCategoryIconColor(report.originalCategory)}
           />
         </View>
 
@@ -173,6 +178,7 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
           <Text style={styles.timestampText}>{formatTimestamp(report.timestamp)}</Text>
         </View>
 
+
         <View style={[styles.statusBadge, { backgroundColor: statusBadgeStyle.backgroundColor }]}>
           <Text style={[styles.statusText, { color: statusBadgeStyle.borderColor }]}>
             {getStatusText(report.status)}
@@ -199,6 +205,7 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
         <View style={styles.actionsContainer}>
           {onPress && (
             <TouchableOpacity
+            <TouchableOpacity
               style={styles.seeMoreButton}
               onPress={(e) => {
                 e.stopPropagation();
@@ -210,6 +217,8 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
             </TouchableOpacity>
           )}
           {onAcknowledge && (
+            <TouchableOpacity
+              style={styles.acknowledgeButton}
             <TouchableOpacity
               style={styles.acknowledgeButton}
               onPress={(e) => {
@@ -260,6 +269,7 @@ function ReportCardComponent({ report, onPress, onAcknowledge, onResolve }: Repo
 // Only re-render if report data actually changed (not function references)
 // Optimized memo comparison - only re-render if report data or callbacks change
 export const ReportCard = React.memo(ReportCardComponent, (prevProps, nextProps) => {
+export const ReportCard = React.memo(ReportCardComponent, (prevProps, nextProps) => {
   // Compare report by ID and key fields that affect rendering
   if (prevProps.report.id !== nextProps.report.id) return false;
   if (prevProps.report.status !== nextProps.report.status) return false;
@@ -269,6 +279,7 @@ export const ReportCard = React.memo(ReportCardComponent, (prevProps, nextProps)
   // Compare related reports count (new field)
   if (prevProps.report.relatedReportsCount !== nextProps.report.relatedReportsCount) return false;
 
+
   // Compare callbacks by reference (they should be stable with useCallback)
   // Handle undefined callbacks properly
   if (!!prevProps.onPress !== !!nextProps.onPress) return false;
@@ -277,6 +288,7 @@ export const ReportCard = React.memo(ReportCardComponent, (prevProps, nextProps)
   if (prevProps.onAcknowledge && prevProps.onAcknowledge !== nextProps.onAcknowledge) return false;
   if (!!prevProps.onResolve !== !!nextProps.onResolve) return false;
   if (prevProps.onResolve && prevProps.onResolve !== nextProps.onResolve) return false;
+
 
   // Props are equal, skip re-render
   return true;
@@ -331,9 +343,11 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
 
+
   info: {
     flex: 1,
   },
+
 
   title: {
     fontSize: 18, // Same as citizen (was 16)
@@ -342,14 +356,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
+
   category: {
     fontSize: 14,
     fontWeight: '600',
   },
 
+
   meta: {
     alignItems: 'flex-end',
   },
+
 
   severityBadge: {
     paddingHorizontal: 8,
@@ -359,10 +376,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+
   severityBadgeText: {
     fontSize: 12,
     fontWeight: '600',
   },
+
 
   description: {
     fontSize: 15, // Same as citizen (was 14)
@@ -372,12 +391,14 @@ const styles = StyleSheet.create({
     marginLeft: 52, // Same as citizen (was 64) - icon 40px + margin 12px
   },
 
+
   location: {
     fontSize: 14,
     color: '#475569',
     marginBottom: 12,
     marginLeft: 52, // Same as citizen (was 64)
   },
+
 
   footer: {
     flexDirection: 'row',
@@ -386,16 +407,19 @@ const styles = StyleSheet.create({
     marginLeft: 52, // Same as citizen (was 64)
   },
 
+
   timestampRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6, // Same as citizen (was 4)
   },
 
+
   timestampText: {
     fontSize: 13, // Same as citizen (was 12)
     color: '#64748b',
   },
+
 
   // Follow-up Banner - Full width, below footer
   followUpBanner: {
@@ -413,6 +437,7 @@ const styles = StyleSheet.create({
     borderLeftColor: '#0284c7', // sky-600
   },
 
+
   followUpIconContainer: {
     width: 28,
     height: 28,
@@ -423,16 +448,19 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
 
+
   followUpBannerText: {
     flex: 1,
     fontSize: 13,
     color: '#475569', // slate-600
   },
 
+
   followUpCount: {
     fontWeight: '700',
     color: '#1e40af', // blue-800
   },
+
 
   statusBadge: {
     paddingHorizontal: 8,
@@ -440,6 +468,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
+
 
   statusText: {
     fontSize: 12,
@@ -468,6 +497,7 @@ const styles = StyleSheet.create({
     color: '#1e293b',
   },
 
+
   acknowledgeButton: {
     flex: 1,
     backgroundColor: colors.primary.blue,
@@ -475,6 +505,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
+
 
   acknowledgeText: {
     fontSize: 14,

@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { loginWithPin, isSubmitting } = useAuth();
+  const { loginWithPin, isSubmitting, requiresPinChange } = useAuth();
   const [pin, setPin] = useState<string[]>(['', '', '', '']);
   const [activeIndex, setActiveIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -137,6 +137,8 @@ export default function LoginScreen() {
     }
     try {
       await loginWithPin(pinString);
+      // Check if forced PIN change is required before navigating to tabs
+      // requiresPinChange is set by the probe in loginWithPin
       router.replace('/(tabs)/news-feed');
     } catch (err: any) {
       const message = typeof err?.message === 'string' ? err.message : 'Incorrect PIN. Please try again.';
@@ -149,62 +151,62 @@ export default function LoginScreen() {
 
   return (
     <>
-    <SafeAreaView style={globalStyles.container}>
-      <View style={styles.content}>
-        {/* Logo Section */}
-        <View style={styles.logoSection}>
-          <View style={styles.logoContainer}>
-            <View style={styles.logo}>
-              <Image
-                source={require('@/assets/images/urbanwatchicondark.png')}
-                style={{ width: 64, height: 64 }}
-                resizeMode="contain"
-              />
+      <SafeAreaView style={globalStyles.container}>
+        <View style={styles.content}>
+          {/* Logo Section */}
+          <View style={styles.logoSection}>
+            <View style={styles.logoContainer}>
+              <View style={styles.logo}>
+                <Image
+                  source={require('@/assets/images/urbanwatchicondark.png')}
+                  style={{ width: 64, height: 64 }}
+                  resizeMode="contain"
+                />
+              </View>
             </View>
-          </View>
-          <Text style={styles.appName}>UrbanWatch</Text>
-          <Text style={styles.subtitle}>Purok Officials Portal</Text>
-        </View>
-
-        {/* PIN Input Section */}
-        <View style={styles.pinSection}>
-          <Text style={styles.pinLabel}>Enter your 4 digit PIN:</Text>
-          <View style={styles.pinDots}>
-            {pin.map((digit, index) => (
-              <TextInput
-                key={index}
-                ref={inputRefs[index]}
-                style={[
-                  styles.pinBox,
-                  index === activeIndex && styles.pinBoxActive,
-                  !!errorMessage && styles.pinBoxError,
-                ]}
-                value={digit}
-                onChangeText={(text) => handleChange(text, index)}
-                onFocus={() => setActiveIndex(index)}
-                onKeyPress={(e) => handleKeyPress(e, index)}
-                keyboardType="number-pad"
-                maxLength={1}
-                secureTextEntry
-                autoCorrect={false}
-                textContentType="oneTimeCode"
-                importantForAutofill="yes"
-                editable={!isSubmitting}
-              />
-            ))}
+            <Text style={styles.appName}>UrbanWatch</Text>
+            <Text style={styles.subtitle}>Purok Officials Portal</Text>
           </View>
 
-          {!!errorMessage && (
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          )}
+          {/* PIN Input Section */}
+          <View style={styles.pinSection}>
+            <Text style={styles.pinLabel}>Enter your 4 digit PIN:</Text>
+            <View style={styles.pinDots}>
+              {pin.map((digit, index) => (
+                <TextInput
+                  key={index}
+                  ref={inputRefs[index]}
+                  style={[
+                    styles.pinBox,
+                    index === activeIndex && styles.pinBoxActive,
+                    !!errorMessage && styles.pinBoxError,
+                  ]}
+                  value={digit}
+                  onChangeText={(text) => handleChange(text, index)}
+                  onFocus={() => setActiveIndex(index)}
+                  onKeyPress={(e) => handleKeyPress(e, index)}
+                  keyboardType="number-pad"
+                  maxLength={1}
+                  secureTextEntry
+                  autoCorrect={false}
+                  textContentType="oneTimeCode"
+                  importantForAutofill="yes"
+                  editable={!isSubmitting}
+                />
+              ))}
+            </View>
+
+            {!!errorMessage && (
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            )}
+          </View>
+
+          {/* Spacer to retain original layout where numpad used to be */}
+          <View style={styles.numberPad} />
+
         </View>
-
-        {/* Spacer to retain original layout where numpad used to be */}
-        <View style={styles.numberPad} />
-
-      </View>
-    </SafeAreaView>
-    {isSubmitting && <LoadingSpinner />}
+      </SafeAreaView>
+      {isSubmitting && <LoadingSpinner />}
     </>
   );
 }
