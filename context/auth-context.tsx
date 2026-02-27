@@ -17,11 +17,15 @@ interface AuthContextType {
   refreshToken: string | null;
   requiresPinChange: boolean;
   setRequiresPinChange: (value: boolean) => void;
-  loginWithPin: (pin: string) => Promise<void>;
+  verifyId: (idNumber: string) => Promise<{ name: string; id_number: string }>;
+  loginWithCredentials: (idNumber: string, pin: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   refreshAccessToken: () => Promise<string | null>;
   updateTokensAfterPinChange: (newToken: string, newRefreshToken: string) => Promise<void>;
+  idNumber: string | null;
+  verifiedName: string | null;
+  clearVerifiedId: () => void;
   sessionStartMs: number;
 }
 
@@ -35,7 +39,10 @@ const WELCOME_DISMISSED_KEY = '@urbanwatch:welcome_dismissed';
 // For development, set EXPO_PUBLIC_API_URL to ngrok URL in .env
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me';
 const LOGIN_ENDPOINT = '/api/v1/auth/login/purok_leader';
+const VERIFY_ID_ENDPOINT = '/api/v1/auth/login/purok_leader/verify-id';
 const CURRENT_USER_ENDPOINT = '/api/v1/auth/user';
+const ID_NUMBER_KEY = '@urbanwatch:id_number';
+const VERIFIED_NAME_KEY = '@urbanwatch:verified_name';
 // Control whether session persists across app restarts
 const PERSIST_SESSION = false;
 
@@ -51,6 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [requiresPinChange, setRequiresPinChange] = useState(false);
+  const [idNumber, setIdNumber] = useState<string | null>(null);
+  const [verifiedName, setVerifiedName] = useState<string | null>(null);
 
   useEffect(() => {
     initialize();
@@ -60,6 +69,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const initialize = async () => {
     try {
+      // Always load saved ID number for returning users
+      const savedIdNumber = await AsyncStorage.getItem(ID_NUMBER_KEY);
+      const savedName = await AsyncStorage.getItem(VERIFIED_NAME_KEY);
+      if (savedIdNumber) {
+        setIdNumber(savedIdNumber);
+      }
+      if (savedName) {
+        setVerifiedName(savedName);
+      }
+
       if (!PERSIST_SESSION) {
         await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, NOTIFICATIONS_STORAGE_KEY]);
         setUser(null);
@@ -128,41 +147,86 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(normalizeUser(rawUser));
   }, []);
 
-  const loginWithPin = useCallback(async (pin: string) => {
+  const verifyId = useCallback(async (idNum: string): Promise<{ name: string; id_number: string }> => {
     setIsSubmitting(true);
     try {
       const base = await getApiBase();
-      const url = `${base}${LOGIN_ENDPOINT}`;
+      const url = `${base}${VERIFY_ID_ENDPOINT}`;
+      const cleanId = String(idNum).trim();
 
-      console.log('[Auth] Logging in to:', url);
-      console.log('[Auth] PIN being sent:', pin, 'type:', typeof pin, 'length:', pin.length);
+      console.log('[Auth] Verifying ID:', cleanId);
 
-      // Ensure pin is trimmed - backend expects pin as STRING
-      const cleanPin = String(pin).trim();
-
-      // Send PIN as string (backend validation requires: 'pin' => 'required|string')
-      const bodyStr = JSON.stringify({ pin: cleanPin });
-      console.log('[Auth] Request body:', bodyStr);
-
-      // Try JSON format - Laravel accepts both JSON and form-data
       const resp = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest', // Laravel AJAX detection
-          'ngrok-skip-browser-warning': 'true', // Required for ngrok free tier
+          'X-Requested-With': 'XMLHttpRequest',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: JSON.stringify({ id_number: cleanId }),
+      });
+
+      const responseText = await resp.text();
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (e) {
+        console.error('[Auth] Failed to parse verify-id response');
+        throw new Error('Invalid response from server');
+      }
+
+      if (!resp.ok) {
+        const message = responseData?.message ?? 'ID Number not found';
+        console.error('[Auth] Verify ID failed:', message);
+        throw new Error(message);
+      }
+
+      const data = responseData?.data ?? responseData;
+      const name = data?.name ?? 'Purok Leader';
+      const returnedId = data?.id_number ?? cleanId;
+
+      await AsyncStorage.setItem(ID_NUMBER_KEY, returnedId);
+      await AsyncStorage.setItem(VERIFIED_NAME_KEY, name);
+      setIdNumber(returnedId);
+      setVerifiedName(name);
+
+      console.log('[Auth] ✅ ID verified:', { name, id_number: returnedId });
+      return { name, id_number: returnedId };
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, []);
+
+  const loginWithCredentials = useCallback(async (idNum: string, pin: string) => {
+    setIsSubmitting(true);
+    try {
+      const base = await getApiBase();
+      const url = `${base}${LOGIN_ENDPOINT}`;
+      const cleanPin = String(pin).trim();
+      const cleanId = String(idNum).trim();
+
+      console.log('[Auth] Logging in with ID + PIN to:', url);
+
+      const bodyStr = JSON.stringify({ id_number: cleanId, pin: cleanPin });
+      console.log('[Auth] Request body:', bodyStr);
+
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'ngrok-skip-browser-warning': 'true',
         },
         body: bodyStr,
       });
 
       console.log('[Auth] Response status:', resp.status);
 
-      // Get response text first for debugging
       const responseText = await resp.text();
       console.log('[Auth] Response body:', responseText.substring(0, 500));
 
-      // Parse as JSON
       let responseData;
       try {
         responseData = JSON.parse(responseText);
@@ -177,7 +241,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(message);
       }
 
-      // Use the already-parsed response data
       const loginData = responseData?.data ?? responseData;
       const token: string | undefined = loginData?.token || loginData?.accessToken || responseData?.token;
       const refreshTokenValue: string | undefined = loginData?.refreshToken || responseData?.refreshToken;
@@ -204,13 +267,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshTokenPrefix: refreshTokenValue ? refreshTokenValue.substring(0, 20) + '...' : 'none',
       });
 
-      // Store both tokens
+      // Store tokens and ID
       await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
       if (refreshTokenValue) {
         await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshTokenValue);
       }
+      await AsyncStorage.setItem(ID_NUMBER_KEY, cleanId);
       setAccessToken(token);
       setRefreshToken(refreshTokenValue || null);
+      setIdNumber(cleanId);
       console.log('[Auth] ✅ Tokens stored in AsyncStorage and context');
 
       // Optimistically set user from login response if available
@@ -221,8 +286,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await fetchCurrentUser(token);
 
       // Probe a protected purok-leader endpoint to detect forced PIN change
-      // The middleware will return 401 "change your default PIN" if is_default=true
-      // The axios interceptor will automatically set requiresPinChange=true
       try {
         const probeUrl = `${base}/api/v1/purok-leader/assigned-concerns`;
         await fetch(probeUrl, {
@@ -243,7 +306,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         });
       } catch (probeErr) {
-        // Probe failure is non-fatal — fallback to lazy detection on first API call
         console.log('[Auth] ⚠️ PIN change probe failed (will detect lazily):', probeErr);
       }
     } finally {
@@ -251,12 +313,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchCurrentUser]);
 
+  const clearVerifiedId = useCallback(async () => {
+    setVerifiedName(null);
+    setIdNumber(null);
+    await AsyncStorage.multiRemove([ID_NUMBER_KEY, VERIFIED_NAME_KEY]);
+  }, []);
+
   const logout = useCallback(async () => {
     await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, NOTIFICATIONS_STORAGE_KEY, WELCOME_DISMISSED_KEY]);
     setUser(null);
     setAccessToken(null);
     setRefreshToken(null);
     setRequiresPinChange(false);
+    // Note: idNumber and verifiedName are NOT cleared — so returning users skip Step 1
   }, []);
 
   const updateTokensAfterPinChange = useCallback(async (newToken: string, newRefreshToken: string) => {
@@ -357,13 +426,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshToken,
     requiresPinChange,
     setRequiresPinChange,
-    loginWithPin,
+    verifyId,
+    loginWithCredentials,
     logout,
     refreshUser,
     refreshAccessToken,
     updateTokensAfterPinChange,
+    idNumber,
+    verifiedName,
+    clearVerifiedId,
     sessionStartMs,
-  }), [user, isInitializing, isSubmitting, accessToken, refreshToken, requiresPinChange, loginWithPin, logout, refreshUser, refreshAccessToken, updateTokensAfterPinChange, sessionStartMs]);
+  }), [user, isInitializing, isSubmitting, accessToken, refreshToken, requiresPinChange, verifyId, loginWithCredentials, logout, refreshUser, refreshAccessToken, updateTokensAfterPinChange, idNumber, verifiedName, clearVerifiedId, sessionStartMs]);
 
   return (
     <AuthContext.Provider value={value}>
