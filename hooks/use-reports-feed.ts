@@ -217,9 +217,10 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
             }
 
             let reportTitle = '';
+            let oldStatus = '';
             const updated = prevReports.map(report => {
               if (report.id === reportId) {
-                const oldStatus = report.status;
+                oldStatus = report.status;
                 reportTitle = report.title;
                 console.log('[ReportsFeed] ✅ Updating report status:', {
                   reportId,
@@ -227,8 +228,54 @@ export function useReportsFeed(options: UseReportsFeedOptions = {}): UseReportsF
                   newStatus,
                 });
 
-                // Note: We don't add notifications for status updates
-                // Only NEW concerns should appear in the notifications list
+                // 🔔 Notify purok leader when citizen responds to resolution confirmation
+                // Case 1: Citizen REJECTED confirmation → status goes back to ongoing/acknowledged
+                if (oldStatus === 'awaiting_confirmation' && newStatus === 'acknowledged') {
+                  console.log('[ReportsFeed] ⚠️ Citizen REJECTED confirmation for:', reportId);
+                  const notification = {
+                    id: `confirmation-rejected-${reportId}-${Date.now()}`,
+                    type: 'report_update' as const,
+                    title: '⚠️ Confirmation Declined',
+                    message: `Citizen declined the resolution for "${reportTitle || 'concern'}". Status reverted to ongoing.`,
+                    reportId: reportId,
+                    timestamp: new Date(),
+                    read: false,
+                    severity: 'high' as const,
+                  };
+                  if (addNotificationRef.current) {
+                    addNotificationRef.current(notification);
+                  }
+                  // Push notification
+                  tryScheduleNotification(
+                    '⚠️ Confirmation Declined',
+                    `Citizen declined the resolution for "${reportTitle}". Status reverted to ongoing.`,
+                    { type: 'confirmation_rejected', reportId }
+                  );
+                }
+
+                // Case 2: Citizen CONFIRMED resolution → status goes to resolved
+                if (oldStatus === 'awaiting_confirmation' && newStatus === 'resolved') {
+                  console.log('[ReportsFeed] ✅ Citizen CONFIRMED resolution for:', reportId);
+                  const notification = {
+                    id: `confirmation-accepted-${reportId}-${Date.now()}`,
+                    type: 'report_update' as const,
+                    title: '✅ Resolution Confirmed',
+                    message: `Citizen confirmed the resolution for "${reportTitle || 'concern'}". Case is now resolved.`,
+                    reportId: reportId,
+                    timestamp: new Date(),
+                    read: false,
+                    severity: 'low' as const,
+                  };
+                  if (addNotificationRef.current) {
+                    addNotificationRef.current(notification);
+                  }
+                  // Push notification
+                  tryScheduleNotification(
+                    '✅ Resolution Confirmed',
+                    `Citizen confirmed the resolution for "${reportTitle}". Case is now resolved.`,
+                    { type: 'confirmation_accepted', reportId }
+                  );
+                }
 
                 return { ...report, status: newStatus };
               }

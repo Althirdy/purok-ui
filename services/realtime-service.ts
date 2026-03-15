@@ -8,10 +8,13 @@ const AUTH_TOKEN_KEY = '@urbanwatch:auth_token';
 // Related report from Pusher payload (follow-up/duplicate)
 type PusherRelatedReport = {
   id: number;
+  title?: string;
   description: string;
   citizen_name?: string; // May be encrypted
   created_at: string;
   images?: string[];
+  audio?: string | null;
+  report_type?: 'manual' | 'voice';
 };
 
 // Payload structure from API documentation
@@ -394,10 +397,13 @@ function normalizeConcernAssigned(payload: ConcernAssignedPayload): EmergencyRep
   // Parse related reports (follow-ups/duplicates)
   const relatedReports: RelatedReport[] | undefined = concern.relatedReports?.map((r) => ({
     id: r.id,
+    title: r.title,
     description: r.description,
     citizen_name: r.citizen_name,
     created_at: r.created_at,
     images: r.images,
+    audio: r.audio,
+    report_type: r.report_type,
   }));
 
   return {
@@ -668,17 +674,33 @@ export async function subscribeToStatusUpdates(
       'awaiting_confirmation': 'awaiting_confirmation',
     };
 
+    // Deduplication for status updates - prevents same event from firing twice
+    // when backend broadcasts to multiple event name variants
+    const processedStatusUpdates = new Set<string>();
+
     // Listen for concern.status.updated event
     const statusUpdateHandler = (data: ConcernStatusUpdatedPayload) => {
       try {
-        console.log('[Pusher] 📨 Raw status update event received:', {
-          event: 'concern.status.updated or concern.updated',
-          data: JSON.stringify(data, null, 2),
-        });
-
         const concernId = data.concern.id;
         // Priority: distribution.status > concern.status (backend updates distribution_status)
         const backendStatus = data.distribution?.status || data.concern.status || 'pending';
+        
+        // Dedup key: concern ID + status (prevents same update from firing twice)
+        const dedupKey = `${concernId}-${backendStatus}`;
+        if (processedStatusUpdates.has(dedupKey)) {
+          console.log('[Pusher] ⏭️ Skipping duplicate status update:', dedupKey);
+          return;
+        }
+        processedStatusUpdates.add(dedupKey);
+        // Clean up dedup key after 5 seconds
+        setTimeout(() => processedStatusUpdates.delete(dedupKey), 5000);
+
+        console.log('[Pusher] 📨 Status update event received:', {
+          concernId,
+          backendStatus,
+          title: data.concern.title,
+        });
+
         const frontendStatus = statusMap[backendStatus.toLowerCase()] || 'pending';
 
         console.log('[Pusher] 🔄 Status Update Processed:', {

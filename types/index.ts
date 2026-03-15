@@ -19,10 +19,13 @@ export interface User {
 // Related Report (follow-up/duplicate merged into parent concern)
 export interface RelatedReport {
   id: number;
+  title?: string; // Follow-up title (e.g., "SUNOG PO")
   description: string;
   citizen_name?: string; // May be encrypted
   created_at: string;
   images?: string[];
+  audio?: string | null; // Audio URL for voice follow-ups
+  report_type?: 'manual' | 'voice'; // 'voice' if has audio
 }
 
 // Report Types

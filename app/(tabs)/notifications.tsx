@@ -102,21 +102,14 @@ export default function NotificationsScreen() {
     })));
   }, [notifications]);
 
-  // Force UI update when screen gains focus (e.g., switching tabs)
-  // This ensures new notifications added via Pusher while on other screens appear immediately
+  // Force refresh when screen gains focus (e.g., switching tabs, navigating back)
+  // This ensures new notifications appear immediately without manual refresh
   useFocusEffect(
     useCallback(() => {
-      console.log('[NotificationsScreen] 👁️ Screen focused - notifications count:', notifications.length);
-      // The notifications from context should already be up-to-date
-      // This effect just ensures the screen knows it's focused
-    }, [notifications.length])
+      console.log('[NotificationsScreen] 👁️ Screen focused - refreshing notifications from backend...');
+      fetchFromBackend();
+    }, [fetchFromBackend])
   );
-
-  // Fetch from backend when screen mounts
-  useEffect(() => {
-    console.log('[NotificationsScreen] 📱 Screen mounted, fetching notifications...');
-    fetchFromBackend();
-  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {

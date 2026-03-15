@@ -11,10 +11,13 @@ interface AssignedConcernsResponse {
 // Related report from API (follow-up/duplicate merged into parent)
 export interface ApiRelatedReport {
   id: number;
+  title?: string;
   description: string;
   citizen_name?: string; // May be encrypted
   created_at: string;
   images?: string[];
+  audio?: string | null;
+  report_type?: 'manual' | 'voice';
 }
 
 export interface AssignedConcern {
@@ -374,10 +377,13 @@ export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyRep
   // Parse related reports (follow-ups/duplicates)
   const relatedReports: RelatedReport[] | undefined = concern.relatedReports?.map((r) => ({
     id: r.id,
+    title: r.title,
     description: r.description,
     citizen_name: r.citizen_name,
     created_at: r.created_at,
     images: r.images,
+    audio: r.audio,
+    report_type: r.report_type,
   }));
 
   return {

@@ -11,8 +11,8 @@ import {
   getStatusColor,
 } from '@/utils/reportHelpers';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
@@ -47,6 +47,43 @@ interface ReportDetailsBodyProps {
 }
 
 const FOLLOW_UP_LIMIT = 3;
+
+// Helper component for follow-up images with error handling
+// Hides images that fail to load instead of showing blank grey boxes
+function FollowUpImage({ uri }: { uri: string }) {
+  const [hasError, setHasError] = useState(false);
+  if (hasError) return null;
+  return (
+    <Image
+      source={{ uri }}
+      style={{
+        width: 120,
+        height: 90,
+        borderRadius: 8,
+        marginRight: 8,
+        backgroundColor: '#e5e7eb',
+      }}
+      resizeMode="cover"
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
+function FollowUpImages({ images, isImageUrl }: { images?: string[]; isImageUrl: (url: string) => boolean }) {
+  const validImages = images?.filter(isImageUrl) || [];
+  if (validImages.length === 0) return null;
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={{ marginTop: 8 }}
+    >
+      {validImages.map((imageUrl, mediaIndex) => (
+        <FollowUpImage key={mediaIndex} uri={imageUrl} />
+      ))}
+    </ScrollView>
+  );
+}
 
 export function ReportDetailsBody({
   report,
@@ -127,11 +164,16 @@ export function ReportDetailsBody({
 
   // Filter only actual image files (exclude audio files like .m4a, .mp3, .wav)
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic', '.heif'];
-  const validImages = report.images?.filter((url) => {
+  const audioExtensions = ['.m4a', '.mp3', '.wav', '.ogg', '.aac', '.flac'];
+  const isImageUrl = (url: string) => {
     if (!url || typeof url !== 'string') return false;
     const lowerUrl = url.toLowerCase();
+    // Exclude audio files
+    if (audioExtensions.some((ext) => lowerUrl.includes(ext))) return false;
+    // Include known image extensions
     return imageExtensions.some((ext) => lowerUrl.includes(ext));
-  }) || [];
+  };
+  const validImages = report.images?.filter(isImageUrl) || [];
 
   // Check if transcript is a valid transcript (not an error message)
   const isTranscriptError = report.transcript?.toLowerCase().includes('unavailable') ||
@@ -409,24 +451,44 @@ export function ReportDetailsBody({
                     {formatRelativeTime(update.created_at)}
                   </Text>
                 </View>
-                <Text style={followUpStyles.updateDescription}>{update.description}</Text>
-                {/* Update Media (images from follow-up) */}
-                {update.images && update.images.length > 0 && (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={followUpStyles.updateMediaContainer}
-                  >
-                    {update.images.map((imageUrl, mediaIndex) => (
-                      <Image
-                        key={mediaIndex}
-                        source={{ uri: imageUrl }}
-                        style={followUpStyles.updateMediaImage}
-                        resizeMode="cover"
-                      />
-                    ))}
-                  </ScrollView>
+                {/* Voice Follow-up Badge */}
+                {(update.report_type === 'voice' || update.audio) && (
+                  <View style={followUpStyles.voiceBadge}>
+                    <Ionicons name="mic" size={14} color="#6366f1" />
+                    <Text style={followUpStyles.voiceBadgeText}>VOICE FOLLOW-UP</Text>
+                  </View>
                 )}
+                {/* Follow-up Title (if available) */}
+                {update.title && (
+                  <Text style={followUpStyles.updateTitle}>{update.title}</Text>
+                )}
+                <Text style={followUpStyles.updateDescription}>{update.description}</Text>
+                {/* Voice Recording Player (if audio available) */}
+                {update.audio && (
+                  <TouchableOpacity
+                    style={followUpStyles.audioPlayerRow}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      if (update.audio) {
+                        Linking.openURL(update.audio).catch(err => {
+                          console.error('Error opening audio URL:', err);
+                        });
+                      }
+                    }}
+                  >
+                    <View style={followUpStyles.audioPlayButton}>
+                      <Ionicons name="play" size={16} color={colors.text.inverse} />
+                    </View>
+                    <View style={followUpStyles.audioDetails}>
+                      <Text style={followUpStyles.audioFileName} numberOfLines={1}>
+                        {update.audio.split('/').pop() || 'Voice Recording'}
+                      </Text>
+                      <Text style={followUpStyles.audioTapHint}>Tap to play recording</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                {/* Update Media (images from follow-up) - filter out audio and broken images */}
+                <FollowUpImages images={update.images} isImageUrl={isImageUrl} />
               </View>
             ))}
 
@@ -552,8 +614,8 @@ export function ReportDetailsBody({
                 activeOpacity={0.8}
                 onPress={() => setRejectSheetVisible(true)}
               >
-                <Ionicons name="close-circle" size={18} color={colors.semantic.error} />
-                <Text style={actionButtonStyles.rejectButtonText}>False Alarm</Text>
+                <Ionicons name="close-circle" size={16} color={colors.semantic.error} />
+                <Text style={actionButtonStyles.rejectButtonText} numberOfLines={1} adjustsFontSizeToFit>False Alarm</Text>
               </TouchableOpacity>
             )}
 
@@ -769,6 +831,64 @@ const followUpStyles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     lineHeight: 20,
     color: colors.text.primary,
+  },
+  // Voice follow-up badge
+  voiceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eef2ff',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4,
+    alignSelf: 'flex-start',
+    marginBottom: spacing.xs,
+  },
+  voiceBadgeText: {
+    fontSize: 10,
+    fontWeight: typography.fontWeight.bold,
+    color: '#6366f1',
+    letterSpacing: 0.5,
+  },
+  // Follow-up title
+  updateTitle: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  // Audio player row for follow-up voice recordings
+  audioPlayerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background.card,
+    borderRadius: 10,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    gap: spacing.sm,
+  },
+  audioPlayButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  audioDetails: {
+    flex: 1,
+  },
+  audioFileName: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+  },
+  audioTapHint: {
+    fontSize: 10,
+    color: colors.text.tertiary,
+    marginTop: 1,
   },
   updateMediaContainer: {
     marginTop: spacing.sm,

@@ -88,6 +88,21 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }, [isAuthenticated, accessToken]);
 
+  // Periodic polling for notifications (every 30 seconds)
+  // Keeps the bell badge and notification list in sync without manual refresh
+  useEffect(() => {
+    if (!isAuthenticated || !accessToken) return;
+
+    const pollInterval = setInterval(() => {
+      console.log('[NotificationContext] ⏰ Periodic poll - refreshing notifications...');
+      fetchFromBackendInternal(true);
+    }, 30000); // 30 seconds
+
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [isAuthenticated, accessToken]);
+
   const loadNotifications = async () => {
     try {
       const stored = await AsyncStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
@@ -100,11 +115,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           timestamp: new Date(n.timestamp),
         }));
 
-        // Filter out old status update notifications (Report Resolved/Acknowledged)
-        // Only keep new_report type and backend notifications (those with backendId)
-        // This cleans up old notifications that shouldn't have been stored
+        // Filter out old status update notifications EXCEPT citizen confirmation responses
+        // Keep: new_report, report_update (confirmation declined/confirmed), backend notifications
         const filtered = withDates.filter((n: Notification) =>
-          n.backendId || n.type === 'new_report'
+          n.backendId || n.type === 'new_report' || n.type === 'report_update'
         );
 
         if (filtered.length !== withDates.length) {
@@ -204,9 +218,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           n => !existingBackendIds.has(n.backendId)
         );
 
-        // Filter local notifications: ONLY keep new_report type (not status updates like report_update)
-        // This ensures only NEW concerns show up, not "Report Resolved"/"Report Acknowledged" updates
-        const localOnly = prev.filter(n => !n.backendId && n.type === 'new_report');
+        // Filter local notifications: keep new_report AND report_update (citizen confirmation responses)
+        const localOnly = prev.filter(n => !n.backendId && (n.type === 'new_report' || n.type === 'report_update'));
 
         // Merge: backend notifications + local-only NEW REPORT notifications only
         const merged = [...normalizedBackend, ...localOnly];

@@ -16,8 +16,6 @@
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/urbanwatchicondark.png"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.urbanwatchpurok"
     },
     "web": {
@@ -29,11 +27,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/urbanwatchicondark.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
+            "image": "./assets/images/urbanwatchicondark.png",
             "backgroundColor": "#000000"
           }
         }

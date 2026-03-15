@@ -19,7 +19,7 @@ import type { EmergencyReport } from '@/types';
 import type { AnomalyLog } from '@/types/anomaly';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import React, { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dimensions, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
@@ -99,6 +99,10 @@ export default function NewsFeedScreen() {
     console.log('[NewsFeed] 🔔 Unread count updated:', unreadCount, 'Total notifications:', notifications.length);
   }, [unreadCount, notifications.length]);
 
+  // Toast deduplication - prevent same toast from showing twice in quick succession
+  const lastToastRef = useRef<{ reportId: string; timestamp: number } | null>(null);
+  const TOAST_DEDUP_WINDOW_MS = 5000; // 5 second dedup window
+
   const handleReportPress = useCallback((reportId: string) => {
     router.push({ pathname: 'report-details', params: { reportId } } as any);
   }, []);
@@ -116,6 +120,18 @@ export default function NewsFeedScreen() {
     updateReportStatus,
   } = useReportsFeed({
     onNewReport: async (report) => {
+      // 🛡️ Toast deduplication - skip if same report showed toast within dedup window
+      const now = Date.now();
+      if (
+        lastToastRef.current &&
+        lastToastRef.current.reportId === report.id &&
+        now - lastToastRef.current.timestamp < TOAST_DEDUP_WINDOW_MS
+      ) {
+        console.log('[NewsFeed] ⏭️ Skipping duplicate toast for:', report.id);
+        return;
+      }
+      lastToastRef.current = { reportId: report.id, timestamp: now };
+
       // Show toast for ANY new report from Pusher - no conditions, always show
       console.log('[NewsFeed] 🎯 New report received from Pusher - showing toast:', {
         id: report.id,
