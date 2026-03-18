@@ -58,12 +58,24 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 const NOTIFICATIONS_STORAGE_KEY = '@urbanwatch:purok:notifications';
+const CLEARED_AT_STORAGE_KEY = '@urbanwatch:purok:notifications_cleared_at';
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const clearedAtRef = useRef<string | null>(null);
   const hasFetchedFromBackend = useRef(false);
   const { isAuthenticated, accessToken, user } = useAuth();
+
+  // Load clearedAt timestamp on mount
+  useEffect(() => {
+    AsyncStorage.getItem(CLEARED_AT_STORAGE_KEY).then(val => {
+      if (val) {
+        clearedAtRef.current = val;
+        console.log('[NotificationContext] 🗑️ Loaded clearedAt from storage:', val);
+      }
+    });
+  }, []);
 
   // Load notifications from storage on mount
   useEffect(() => {
@@ -200,6 +212,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       let filteredBackendNotifications = backendNotifications.filter(
         n => relevantTypes.includes(n.type as any)
       );
+
+      // 🗑️ Filter out notifications that were created before the last "Clear All"
+      const clearedAt = clearedAtRef.current;
+      if (clearedAt) {
+        const clearedAtMs = new Date(clearedAt).getTime();
+        const beforeCount = filteredBackendNotifications.length;
+        filteredBackendNotifications = filteredBackendNotifications.filter(n => {
+          const notifTime = new Date(n.created_at).getTime();
+          return notifTime > clearedAtMs;
+        });
+        console.log('[NotificationContext] 🗑️ Clear-all filter: removed', beforeCount - filteredBackendNotifications.length, 'of', beforeCount, '(cleared at:', clearedAt, ')');
+      }
 
       // 🔒 Purok-based filtering for anomaly notifications
       // Only show anomalies from devices in the purok leader's assigned purok
@@ -390,9 +414,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const clearAll = useCallback(() => {
-    // Mark all as read on backend so they don't come back on refresh
+    // Mark all as read on backend
     apiMarkAllAsRead().catch(error => {
       console.error('[NotificationContext] ❌ Failed to mark all as read on backend:', error);
+    });
+
+    // Save the timestamp of when Clear All was pressed (use ref for immediate access)
+    const now = new Date().toISOString();
+    clearedAtRef.current = now;
+    console.log('[NotificationContext] 🗑️ Clear All pressed, setting clearedAt:', now);
+    AsyncStorage.setItem(CLEARED_AT_STORAGE_KEY, now).catch(error => {
+      console.error('[NotificationContext] ❌ Failed to save cleared timestamp:', error);
     });
 
     // Clear locally

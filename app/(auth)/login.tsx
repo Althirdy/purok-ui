@@ -287,20 +287,23 @@ export default function LoginScreen() {
               {/* Title */}
               <Text style={styles.step2Title}>Log In to UrbanWatch</Text>
 
-              {/* ID Number Pill */}
-              <View style={styles.idPill}>
-                <Text style={styles.idPillText}>{verifiedId}</Text>
+              {/* ID Card */}
+              <View style={styles.idCard}>
+                <View style={styles.idCardIcon}>
+                  <Ionicons name="person" size={18} color={colors.primary.navy} />
+                </View>
+                <View style={styles.idCardContent}>
+                  <Text style={styles.idCardName}>{verifiedName}</Text>
+                  <Text style={styles.idCardNumber}>ID: {verifiedId}</Text>
+                </View>
+                <Pressable
+                  onPress={showStep1}
+                  disabled={isSubmitting}
+                  style={styles.idCardChangeBtn}
+                >
+                  <Ionicons name="swap-horizontal" size={16} color={colors.primary.blue} />
+                </Pressable>
               </View>
-
-              {/* Change ID Number link */}
-              <Pressable
-                onPress={showStep1}
-                disabled={isSubmitting}
-                style={styles.changeIdRow}
-              >
-                <Text style={styles.changeIdText}>Change ID Number</Text>
-                <Ionicons name="swap-horizontal" size={14} color={colors.primary.blue} />
-              </Pressable>
 
               {/* PIN Section — centered vertically in remaining space */}
               <View style={styles.pinSection}>
@@ -467,32 +470,45 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     marginBottom: spacing.xl,
   },
-  idPill: {
-    borderWidth: 1.5,
-    borderColor: colors.primary.navy,
-    borderRadius: 999,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm + 2,
-    marginBottom: spacing.sm,
-    backgroundColor: '#ffffff',
-  },
-  idPillText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.primary.navy,
-    letterSpacing: 1.5,
-  },
-  changeIdRow: {
+  idCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     marginBottom: spacing.xl,
+    width: '100%',
   },
-  changeIdText: {
-    color: colors.primary.blue,
+  idCardIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: colors.primary.navy + '10',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  idCardContent: {
+    flex: 1,
+  },
+  idCardName: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: 1,
+  },
+  idCardNumber: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    textDecorationLine: 'underline',
+    color: colors.text.secondary,
+    letterSpacing: 0.5,
+  },
+  idCardChangeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: colors.primary.blue + '10',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // ── PIN ──────────────────────────────────────────

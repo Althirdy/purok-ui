@@ -16,7 +16,12 @@
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/urbanwatchicondark.png"
       },
-      "package": "com.anonymous.urbanwatchpurok"
+      "package": "com.anonymous.urbanwatchpurok",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDjj8FpQbhDhzhYSF0aUtVFKXMpGpX67aU"
+        }
+      }
     },
     "web": {
       "output": "static",

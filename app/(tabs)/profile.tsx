@@ -281,7 +281,7 @@ export default function ProfileScreen() {
               <Text style={styles.profileItemLabel}>Purok Address</Text>
             </View>
             <Text style={styles.profileItemValue}>
-              {user?.address || 'No address provided'}
+              {user?.purokName || user?.address || 'N/A'}
             </Text>
           </View>
 

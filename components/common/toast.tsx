@@ -2,12 +2,13 @@
  * System-style Toast Notification Component
  * Mimics iOS/Android system notification banner design
  * Dark translucent background with clean, modern typography
+ * Uses Modal for proper full-screen overlay positioning
  */
 
 import { DesignSystem } from '@/constants/design-system';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
-import { Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { typography, spacing } = DesignSystem;
@@ -27,13 +28,13 @@ interface ToastProps {
   duration?: number;
 }
 
-// Get a small accent color dot based on severity (subtle, not overwhelming)
+// Get a small accent color dot based on severity
 function getAccentColor(severity: string): string {
   switch (severity) {
-    case 'critical': return '#FF453A'; // System red
-    case 'high': return '#FF9F0A';     // System orange
-    case 'medium': return '#FFD60A';   // System yellow
-    default: return '#30D158';         // System green
+    case 'critical': return '#FF453A';
+    case 'high': return '#FF9F0A';
+    case 'medium': return '#FFD60A';
+    default: return '#30D158';
   }
 }
 
@@ -41,7 +42,6 @@ function getAccentColor(severity: string): string {
 function getToastIcon(toast: ToastData): { name: string; color: string } {
   const accentColor = getAccentColor(toast.severity);
 
-  // Check for success/error toasts
   if (toast.title.includes('✅') || toast.title.toLowerCase().includes('success')) {
     return { name: 'checkmark-circle-outline', color: '#30D158' };
   }
@@ -49,7 +49,6 @@ function getToastIcon(toast: ToastData): { name: string; color: string } {
     return { name: 'close-circle-outline', color: '#FF453A' };
   }
 
-  // Report type specific icons
   if (toast.reportType) {
     switch (toast.reportType) {
       case 'fire': return { name: 'flame-outline', color: accentColor };
@@ -61,7 +60,6 @@ function getToastIcon(toast: ToastData): { name: string; color: string } {
     }
   }
 
-  // Anomaly / general
   if (toast.title.includes('Anomaly') || toast.title.includes('🚨')) {
     return { name: 'alert-circle-outline', color: accentColor };
   }
@@ -74,11 +72,10 @@ export function Toast({ toast, onDismiss, duration = 5000 }: ToastProps) {
   const translateY = useRef(new Animated.Value(-100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
-  const toastTop = insets.top + 4;
+  const toastTop = insets.top + 8;
 
   useEffect(() => {
     if (!toast) {
-      // Animate out
       Animated.parallel([
         Animated.timing(translateY, {
           toValue: -100,
@@ -94,7 +91,6 @@ export function Toast({ toast, onDismiss, duration = 5000 }: ToastProps) {
       return;
     }
 
-    // Animate in
     Animated.parallel([
       Animated.spring(translateY, {
         toValue: 0,
@@ -109,7 +105,6 @@ export function Toast({ toast, onDismiss, duration = 5000 }: ToastProps) {
       }),
     ]).start();
 
-    // Auto dismiss
     const timer = setTimeout(onDismiss, duration);
     return () => clearTimeout(timer);
   }, [toast, translateY, opacity, duration, onDismiss]);
@@ -117,69 +112,77 @@ export function Toast({ toast, onDismiss, duration = 5000 }: ToastProps) {
   if (!toast) return null;
 
   const icon = getToastIcon(toast);
-  const accentColor = getAccentColor(toast.severity);
-
-  // Clean title: remove emojis
   const cleanTitle = toast.title.replace(/[✅❌📢🚨⚠️🔔]/g, '').trim();
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          top: toastTop,
-          transform: [{ translateY }],
-          opacity,
-        },
-      ]}
-      pointerEvents="box-none"
+    <Modal
+      visible={!!toast}
+      transparent
+      animationType="none"
+      statusBarTranslucent
+      onRequestClose={onDismiss}
     >
-      <TouchableOpacity
-        activeOpacity={0.92}
-        onPress={() => {
-          toast.onPress?.();
-          onDismiss();
-        }}
-        style={styles.touchable}
-      >
-        <View style={styles.toast}>
-          {/* App icon / notification icon */}
-          <View style={[styles.iconContainer, { backgroundColor: accentColor + '20' }]}>
-            <Ionicons name={icon.name as any} size={20} color={icon.color} />
-          </View>
+      <View style={styles.modalOverlay} pointerEvents="box-none">
+        <Animated.View
+          style={[
+            styles.container,
+            {
+              top: toastTop,
+              transform: [{ translateY }],
+              opacity,
+            },
+          ]}
+          pointerEvents="box-none"
+        >
+          <TouchableOpacity
+            activeOpacity={0.92}
+            onPress={() => {
+              toast.onPress?.();
+              onDismiss();
+            }}
+            style={styles.touchable}
+          >
+            <View style={styles.toast}>
+              {/* Icon */}
+              <View style={[styles.iconContainer, { backgroundColor: getAccentColor(toast.severity) + '20' }]}>
+                <Ionicons name={icon.name as any} size={20} color={icon.color} />
+              </View>
 
-          {/* Content */}
-          <View style={styles.content}>
-            <View style={styles.titleRow}>
-              <Text style={styles.appLabel}>UrbanWatch</Text>
-              <Text style={styles.timeLabel}>now</Text>
+              {/* Content */}
+              <View style={styles.content}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.appLabel}>UrbanWatch</Text>
+                  <Text style={styles.timeLabel}>now</Text>
+                </View>
+                <Text style={styles.title} numberOfLines={1}>{cleanTitle}</Text>
+                <Text style={styles.message} numberOfLines={2}>{toast.message}</Text>
+              </View>
             </View>
-            <Text style={styles.title} numberOfLines={1}>{cleanTitle}</Text>
-            <Text style={styles.message} numberOfLines={2}>{toast.message}</Text>
-          </View>
-        </View>
 
-        {/* Drag indicator (iOS-style) */}
-        <View style={styles.dragIndicator} />
-      </TouchableOpacity>
-    </Animated.View>
+            {/* Drag indicator */}
+            <View style={styles.dragIndicator} />
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   container: {
     position: 'absolute',
     left: 0,
     right: 0,
     zIndex: 9999,
     paddingHorizontal: 12,
-    // Ensure it's above everything
-    elevation: 999,
   },
   touchable: {
     borderRadius: 16,
     overflow: 'hidden',
-    // Shadow
     ...Platform.select({
       ios: {
         shadowColor: '#000',

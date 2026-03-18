@@ -117,7 +117,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       : rawRole === 'admin' ? 'admin'
         : 'official';
     const purokId = raw?.purokId ?? raw?.purok_id ?? raw?.purok?.id ?? '';
-    const purokName = raw?.purokName ?? raw?.purok_name ?? raw?.purok?.name ?? '';
+    // Try many variants for purok name - the backend may return it in various structures
+    const rawPurok = raw?.purok;
+    console.log('[Auth] Raw purok data:', JSON.stringify(rawPurok));
+    console.log('[Auth] Raw user purok fields:', { purokName: raw?.purokName, purok_name: raw?.purok_name, purok_location: raw?.purok_location });
+    let purokName = raw?.purokName
+      ?? raw?.purok_name
+      ?? raw?.purok_location
+      ?? rawPurok?.name
+      ?? rawPurok?.purok_name
+      ?? rawPurok?.display_name
+      ?? rawPurok?.location_name
+      ?? '';
+    // If purokName is still empty but we have purok sub-fields, construct it
+    if (!purokName && rawPurok) {
+      const purokNum = rawPurok?.purok_number ?? rawPurok?.number ?? '';
+      const purokLoc = rawPurok?.location ?? rawPurok?.location_name ?? rawPurok?.sitio ?? '';
+      if (purokNum || purokLoc) {
+        purokName = [purokNum, purokLoc].filter(Boolean).join(' - ');
+      }
+    }
     const email = raw?.email ?? raw?.emailAddress ?? '';
     const phoneNumber = raw?.phoneNumber ?? raw?.phone_number ?? raw?.phone ?? '';
     const address = raw?.officeAddress ?? raw?.address ?? '';
@@ -143,6 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // API returns flat user object: { id, name, email, role_id, created_at }
     // Not nested in data.user or data.data.user
     const rawUser = data?.user ?? data?.data?.user ?? data;
+    console.log('[Auth] Fetched user FULL raw data:', JSON.stringify(rawUser).substring(0, 1000));
     console.log('[Auth] Fetched user data:', { id: rawUser?.id, name: rawUser?.name, role_id: rawUser?.role_id });
     setUser(normalizeUser(rawUser));
   }, []);
