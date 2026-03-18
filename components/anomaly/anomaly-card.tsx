@@ -104,7 +104,7 @@ function AnomalyCardComponent({ anomaly, onPress }: AnomalyCardProps) {
         </View>
       </View>
 
-      {/* Header: Icon, Title */}
+      {/* Header: Icon, Title, Timestamp */}
       <View style={styles.header}>
         {/* Icon on Left */}
         <View style={[styles.iconContainer, { backgroundColor: iconColor + '15' }]}>
@@ -113,7 +113,10 @@ function AnomalyCardComponent({ anomaly, onPress }: AnomalyCardProps) {
 
         {/* Content */}
         <View style={styles.info}>
-          <Text style={styles.title} numberOfLines={2}>{anomaly.anomaly_type_label}</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title} numberOfLines={2}>{anomaly.anomaly_type_label}</Text>
+            <Text style={styles.timestampInline}>{formatTimestamp(anomaly.created_at)}</Text>
+          </View>
           <Text style={[styles.category, { color: iconColor }]}>
             {getIoTBoxDisplayName(anomaly.iot_box)}
           </Text>
@@ -128,13 +131,7 @@ function AnomalyCardComponent({ anomaly, onPress }: AnomalyCardProps) {
         </View>
       )}
 
-      {/* Footer Row: Timestamp */}
-      <View style={styles.footer}>
-        <View style={styles.timestampRow}>
-          <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
-          <Text style={styles.timestampText}>{formatTimestamp(anomaly.created_at)}</Text>
-        </View>
-      </View>
+
 
       {/* Related Anomalies Banner - shown when there are grouped anomalies */}
       {anomaly.related_anomalies_count !== undefined && anomaly.related_anomalies_count > 0 && (
@@ -208,11 +205,24 @@ const styles = StyleSheet.create({
   info: {
     flex: 1,
   },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1e293b',
     marginBottom: 4,
+    flex: 1,
+  },
+  timestampInline: {
+    fontSize: 12,
+    color: colors.text?.secondary ?? '#94a3b8',
+    fontWeight: '500',
+    marginTop: 3,
   },
   category: {
     fontSize: 14,

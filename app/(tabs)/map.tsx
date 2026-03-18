@@ -377,7 +377,7 @@ export default function MapScreen() {
           ref={mapRef}
           style={StyleSheet.absoluteFillObject}
           initialRegion={BARANGAY_176E_REGION}
-          mapType="satellite"
+          mapType="standard"
           showsCompass
           onMapReady={() => setMapReady(true)}
         >

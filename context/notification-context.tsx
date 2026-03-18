@@ -190,16 +190,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         console.log('[NotificationContext] ⚠️ No notifications found in backend');
       }
 
-      // Filter: Only show NEW concern assignments and anomaly notifications that are UNREAD
+      // Filter: Only show NEW concern assignments and anomaly notifications
       // 1. 'concern_assigned' type (new reports)
       // 2. 'anomaly_detected' type (new anomaly from IoT box)
-      // 3. Only unread (read_at is null)
       const relevantTypes = [
         NOTIFICATION_TYPES.TYPE_CONCERN_ASSIGNED,
         NOTIFICATION_TYPES.TYPE_ANOMALY_DETECTED,
       ];
       let filteredBackendNotifications = backendNotifications.filter(
-        n => relevantTypes.includes(n.type as any) && n.read_at === null
+        n => relevantTypes.includes(n.type as any)
       );
 
       // 🔒 Purok-based filtering for anomaly notifications

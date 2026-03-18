@@ -63,6 +63,7 @@ export interface RelatedAnomaly {
   anomaly_type: AnomalyType;
   anomaly_type_label: string;
   image?: string;
+  image_url?: string;    // Full URL to image (from API)
   created_at: string;
 }
 

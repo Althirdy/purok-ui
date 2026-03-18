@@ -231,11 +231,6 @@ export default function AnomalyDetailsScreen() {
                 {anomalyTypeDisplay}
               </Text>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: isPending ? '#fef3c7' : '#d1fae5' }]}>
-              <Text style={[styles.statusText, { color: isPending ? '#b45309' : '#047857' }]}>
-                {isPending ? 'Pending' : 'Confirmed'}
-              </Text>
-            </View>
           </View>
         </Animated.View>
 
@@ -348,9 +343,11 @@ export default function AnomalyDetailsScreen() {
             </View>
             <View style={styles.relatedList}>
               {anomaly.related_anomalies.map((related, index) => {
-                const relatedImageUrl = related.image
-                  ? `${process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me'}/storage/${related.image}`
-                  : null;
+                // Use image_url if available (full URL from API), otherwise construct from image path
+                const relatedImageUrl = related.image_url
+                  || (related.image
+                    ? `${process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me'}/storage/${related.image}`
+                    : null);
                 return (
                   <View
                     key={related.id}
