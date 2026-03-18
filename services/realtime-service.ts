@@ -526,9 +526,10 @@ export async function subscribeToCitizenReports(
     channel.bind(eventName, handler);
 
     return () => {
-      console.log('[Pusher] Unsubscribing from', channelName);
+      console.log('[Pusher] Unbinding concern.assigned handler from', channelName);
       channel.unbind(eventName, handler);
-      client.unsubscribe(channelName);
+      // Note: Do NOT call client.unsubscribe(channelName) here
+      // The same channel is shared by subscribeToStatusUpdates
     };
   } catch (error) {
     console.error('[Pusher] Error setting up subscription:', error);
@@ -720,24 +721,19 @@ export async function subscribeToStatusUpdates(
       }
     };
 
-    // Bind to both possible event names (with and without leading dot)
-    // Client-named events use leading dot (e.g., .concern.status.updated)
-    // Server-named events don't use leading dot (e.g., concern.status.updated)
+    // Bind to dotted event names only (Laravel broadcastAs format)
+    // Non-dotted variants removed to prevent double-firing
     channel.bind('.concern.status.updated', statusUpdateHandler);
-    channel.bind('concern.status.updated', statusUpdateHandler);
     channel.bind('.concern.updated', statusUpdateHandler);
-    channel.bind('concern.updated', statusUpdateHandler);
 
     console.log('[Pusher] ✅ Listening for status updates on', channelName);
-    console.log('[Pusher] ✅ Listening for events: .concern.status.updated, concern.status.updated, .concern.updated, concern.updated');
+    console.log('[Pusher] ✅ Listening for events: .concern.status.updated, .concern.updated');
 
     return () => {
-      console.log('[Pusher] Unsubscribing from status updates on', channelName);
+      console.log('[Pusher] Unbinding status update handlers from', channelName);
       channel.unbind('.concern.status.updated', statusUpdateHandler);
-      channel.unbind('concern.status.updated', statusUpdateHandler);
       channel.unbind('.concern.updated', statusUpdateHandler);
-      channel.unbind('concern.updated', statusUpdateHandler);
-      // Note: Don't unsubscribe from channel here - it might be used by other subscriptions
+      // Note: Don't unsubscribe from channel here - shared with subscribeToCitizenReports
     };
   } catch (error) {
     console.error('[Pusher] Error setting up status update subscription:', error);

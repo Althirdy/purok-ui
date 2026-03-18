@@ -69,13 +69,7 @@ function formatTimestamp(dateStr: string): string {
   }
 }
 
-// Format sensor value
-function formatSensorValue(value: string | undefined, unit?: string): string {
-  if (!value) return 'N/A';
-  const num = parseFloat(value);
-  if (isNaN(num)) return value;
-  return unit ? `${num.toFixed(2)} ${unit}` : num.toFixed(2);
-}
+
 
 export default function AnomalyDetailsScreen() {
   const params = useLocalSearchParams();
@@ -341,45 +335,6 @@ export default function AnomalyDetailsScreen() {
           )}
         </Animated.View>
 
-        {/* Sensor Details Section */}
-        {anomaly.details && anomaly.details.length > 0 && (
-          <Animated.View
-            entering={FadeInDown.delay(300).duration(400)}
-            style={styles.section}
-          >
-            <Text style={styles.sectionLabel}>SENSOR READINGS</Text>
-            <View style={styles.sensorGrid}>
-              {anomaly.details[0].mic_left && (
-                <View style={styles.sensorCard}>
-                  <Ionicons name="mic-outline" size={24} color="#8b5cf6" />
-                  <Text style={styles.sensorLabel}>Left Mic</Text>
-                  <Text style={styles.sensorValue}>{formatSensorValue(anomaly.details[0].mic_left)}</Text>
-                </View>
-              )}
-              {anomaly.details[0].mic_right && (
-                <View style={styles.sensorCard}>
-                  <Ionicons name="mic-outline" size={24} color="#8b5cf6" />
-                  <Text style={styles.sensorLabel}>Right Mic</Text>
-                  <Text style={styles.sensorValue}>{formatSensorValue(anomaly.details[0].mic_right)}</Text>
-                </View>
-              )}
-              {anomaly.details[0].vibration && (
-                <View style={styles.sensorCard}>
-                  <Ionicons name="pulse-outline" size={24} color="#ef4444" />
-                  <Text style={styles.sensorLabel}>Vibration</Text>
-                  <Text style={styles.sensorValue}>{formatSensorValue(anomaly.details[0].vibration)}</Text>
-                </View>
-              )}
-              {anomaly.details[0].hall_effect && (
-                <View style={styles.sensorCard}>
-                  <Ionicons name="magnet-outline" size={24} color="#10b981" />
-                  <Text style={styles.sensorLabel}>Hall Effect</Text>
-                  <Text style={styles.sensorValue}>{formatSensorValue(anomaly.details[0].hall_effect)}</Text>
-                </View>
-              )}
-            </View>
-          </Animated.View>
-        )}
 
         {/* Related Anomalies Section (grouped/merged anomalies) */}
         {anomaly.related_anomalies && anomaly.related_anomalies.length > 0 && (
@@ -392,30 +347,45 @@ export default function AnomalyDetailsScreen() {
               <Text style={styles.sectionLabel}>RELATED ANOMALIES ({anomaly.related_anomalies.length})</Text>
             </View>
             <View style={styles.relatedList}>
-              {anomaly.related_anomalies.map((related, index) => (
-                <View
-                  key={related.id}
-                  style={[
-                    styles.relatedItem,
-                    index < anomaly.related_anomalies!.length - 1 && styles.relatedItemBorder
-                  ]}
-                >
-                  <View style={[styles.relatedIconContainer, { backgroundColor: getAnomalyColor(related.anomaly_type) + '15' }]}>
-                    <Ionicons
-                      name={getAnomalyIcon(related.anomaly_type)}
-                      size={18}
-                      color={getAnomalyColor(related.anomaly_type)}
-                    />
+              {anomaly.related_anomalies.map((related, index) => {
+                const relatedImageUrl = related.image
+                  ? `${process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me'}/storage/${related.image}`
+                  : null;
+                return (
+                  <View
+                    key={related.id}
+                    style={[
+                      styles.relatedItem,
+                      index < anomaly.related_anomalies!.length - 1 && styles.relatedItemBorder
+                    ]}
+                  >
+                    <View style={[styles.relatedIconContainer, { backgroundColor: getAnomalyColor(related.anomaly_type) + '15' }]}>
+                      <Ionicons
+                        name={getAnomalyIcon(related.anomaly_type)}
+                        size={18}
+                        color={getAnomalyColor(related.anomaly_type)}
+                      />
+                    </View>
+                    <View style={styles.relatedContent}>
+                      <Text style={styles.relatedTitle}>{related.anomaly_type_label}</Text>
+                      <Text style={styles.relatedTime}>{formatTimestamp(related.created_at)}</Text>
+                      {relatedImageUrl && (
+                        <Image
+                          source={{
+                            uri: relatedImageUrl,
+                            headers: { 'ngrok-skip-browser-warning': '69420' },
+                          }}
+                          style={styles.relatedImage}
+                          contentFit="cover"
+                        />
+                      )}
+                    </View>
+                    <View style={styles.relatedIdBadge}>
+                      <Text style={styles.relatedIdText}>#{related.id}</Text>
+                    </View>
                   </View>
-                  <View style={styles.relatedContent}>
-                    <Text style={styles.relatedTitle}>{related.anomaly_type_label}</Text>
-                    <Text style={styles.relatedTime}>{formatTimestamp(related.created_at)}</Text>
-                  </View>
-                  <View style={styles.relatedIdBadge}>
-                    <Text style={styles.relatedIdText}>#{related.id}</Text>
-                  </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           </Animated.View>
         )}
@@ -735,6 +705,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text.secondary,
     fontFamily: 'monospace',
+  },
+  relatedImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    marginTop: spacing.xs,
+    backgroundColor: colors.background.secondary,
   },
   tapToViewOverlay: {
     position: 'absolute',

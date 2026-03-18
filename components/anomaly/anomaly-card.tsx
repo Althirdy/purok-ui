@@ -104,7 +104,7 @@ function AnomalyCardComponent({ anomaly, onPress }: AnomalyCardProps) {
         </View>
       </View>
 
-      {/* Header: Icon, Title, Status */}
+      {/* Header: Icon, Title */}
       <View style={styles.header}>
         {/* Icon on Left */}
         <View style={[styles.iconContainer, { backgroundColor: iconColor + '15' }]}>
@@ -116,13 +116,6 @@ function AnomalyCardComponent({ anomaly, onPress }: AnomalyCardProps) {
           <Text style={styles.title} numberOfLines={2}>{anomaly.anomaly_type_label}</Text>
           <Text style={[styles.category, { color: iconColor }]}>
             {getIoTBoxDisplayName(anomaly.iot_box)}
-          </Text>
-        </View>
-
-        {/* Status Badge on Right */}
-        <View style={[styles.statusBadge, { backgroundColor: isPending ? '#fef3c7' : '#d1fae5' }]}>
-          <Text style={[styles.statusText, { color: isPending ? '#b45309' : '#047857' }]}>
-            {isPending ? 'Pending' : 'Confirmed'}
           </Text>
         </View>
       </View>

@@ -63,7 +63,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const hasFetchedFromBackend = useRef(false);
-  const { isAuthenticated, accessToken } = useAuth();
+  const { isAuthenticated, accessToken, user } = useAuth();
 
   // Load notifications from storage on mount
   useEffect(() => {
@@ -198,9 +198,54 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         NOTIFICATION_TYPES.TYPE_CONCERN_ASSIGNED,
         NOTIFICATION_TYPES.TYPE_ANOMALY_DETECTED,
       ];
-      const filteredBackendNotifications = backendNotifications.filter(
+      let filteredBackendNotifications = backendNotifications.filter(
         n => relevantTypes.includes(n.type as any) && n.read_at === null
       );
+
+      // 🔒 Purok-based filtering for anomaly notifications
+      // Only show anomalies from devices in the purok leader's assigned purok
+      const userPurokName = user?.purokName;
+      if (userPurokName) {
+        const purokNameLower = userPurokName.toLowerCase();
+        console.log('[NotificationContext] 🏘️ Filtering anomalies for purok:', userPurokName);
+
+        filteredBackendNotifications = filteredBackendNotifications.filter(n => {
+          // Only filter anomaly notifications - let concerns through
+          if (n.type !== NOTIFICATION_TYPES.TYPE_ANOMALY_DETECTED) return true;
+
+          const anomalyData = n.data as AnomalyDetectedData | null;
+          if (!anomalyData) return true; // No data = fail-open, keep it
+
+          // Check if location contains user's purok name
+          const location = (anomalyData.location || '').toLowerCase();
+          const deviceName = (anomalyData.device_name || '').toLowerCase();
+
+          // Match by location or device name containing the purok name
+          const matchesLocation = location.includes(purokNameLower);
+          const matchesDevice = deviceName.includes(purokNameLower);
+
+          if (!matchesLocation && !matchesDevice) {
+            // If neither location nor device contains purok info, check if there's ANY purok
+            // reference. If there is, it's from another purok. If there isn't, fail-open.
+            const hasPurokReference = /purok\s*\d/i.test(location) || /purok\s*\d/i.test(deviceName);
+            if (hasPurokReference) {
+              console.log('[NotificationContext] 🚫 Filtering out anomaly from different purok:', {
+                anomalyId: anomalyData.anomaly_log_id,
+                location: anomalyData.location,
+                deviceName: anomalyData.device_name,
+                userPurok: userPurokName,
+              });
+              return false;
+            }
+            // No purok reference at all - fail-open, keep notification
+            return true;
+          }
+
+          return true;
+        });
+
+        console.log('[NotificationContext] 🏘️ After purok filtering:', filteredBackendNotifications.length, 'notifications');
+      }
 
       console.log('[NotificationContext] 🔍 Filtered to', filteredBackendNotifications.length, 'unread notifications (concerns + anomalies)');
 
