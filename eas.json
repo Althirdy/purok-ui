@@ -6,10 +6,24 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://uat.urbanwatch.me",
+        "EXPO_PUBLIC_PUSHER_KEY": "8abc068a07e65df34203",
+        "EXPO_PUBLIC_PUSHER_CLUSTER": "ap1",
+        "EXPO_PUBLIC_PUSHER_AUTH_ENDPOINT": "https://uat.urbanwatch.me/api/v1/broadcasting/auth",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDjj8FpQbhDhzhYSF0aUtVFKXMpGpX67aU"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://uat.urbanwatch.me",
+        "EXPO_PUBLIC_PUSHER_KEY": "8abc068a07e65df34203",
+        "EXPO_PUBLIC_PUSHER_CLUSTER": "ap1",
+        "EXPO_PUBLIC_PUSHER_AUTH_ENDPOINT": "https://uat.urbanwatch.me/api/v1/broadcasting/auth",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDjj8FpQbhDhzhYSF0aUtVFKXMpGpX67aU"
+      }
     },
     "production": {
       "autoIncrement": true,
@@ -20,10 +34,11 @@
         "EXPO_PUBLIC_API_URL": "https://uat.urbanwatch.me",
         "EXPO_PUBLIC_PUSHER_KEY": "8abc068a07e65df34203",
         "EXPO_PUBLIC_PUSHER_CLUSTER": "ap1",
-        "EXPO_PUBLIC_PUSHER_AUTH_ENDPOINT": "https://uat.urbanwatch.me/api/v1/broadcasting/auth"
+        "EXPO_PUBLIC_PUSHER_AUTH_ENDPOINT": "https://uat.urbanwatch.me/api/v1/broadcasting/auth",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY":"AIzaSyDjj8FpQbhDhzhYSF0aUtVFKXMpGpX67aU"
       }
     }
-  },
+  }, 
   "submit": {
     "production": {}
   }

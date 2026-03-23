@@ -1,0 +1,113 @@
+---
+description: Reference for fixing Google Maps blank/broken tiles in EAS production APK builds
+globs: app.config.js, eas.json, app/(tabs)/map.tsx
+alwaysApply: false
+---
+
+# Fix Google Maps in EAS / APK Builds
+
+## The Problem
+
+Google Maps works in `npx expo start` (Expo Go) but shows blank tiles or fails in EAS production builds.
+
+## Why It Happens
+
+| Environment | API Key Used | Result |
+|---|---|---|
+| `npx expo start` (Expo Go) | **Expo's built-in key** (all permissions) | Works |
+| EAS Build / APK | **Your key** from `app.config.js` | Breaks if misconfigured |
+
+Expo Go ships with Expo's own Google Maps API key that has all services enabled. Your `.env` key is **not used** during development — only in production builds.
+
+## Checklist
+
+### 1. Environment Variable Pipeline
+
+`.env` is gitignored. EAS servers don't have it. The key must flow through:
+
+```
+.env (local dev) ──► app.config.js (reads process.env) ──► Android manifest
+eas.json env block (EAS builds) ──► app.config.js ──► Android manifest
+```
+
+**app.config.js** — must reference the env var, never hardcode the key:
+```js
+android: {
+  config: {
+    googleMaps: {
+      apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+    },
+  },
+},
+```
+
+**eas.json** — must define the key in the production env block:
+```json
+"production": {
+  "env": {
+    "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIza..."
+  }
+}
+```
+
+### 2. Google Cloud Console — Required APIs
+
+Go to [Google Cloud Console → APIs & Services → Enabled APIs](https://console.cloud.google.com/apis/dashboard) and enable:
+
+- **Maps SDK for Android** — required for basic map rendering
+- **Maps Static API** — sometimes needed for hybrid/satellite tiles
+- **Maps JavaScript API** — only if using web builds
+
+If only "Maps SDK for Android" is enabled, `mapType="standard"` works but `"hybrid"` / `"satellite"` may show blank tiles.
+
+### 3. API Key Restrictions
+
+At [API Credentials](https://console.cloud.google.com/apis/credentials), check the key:
+
+- **Application restrictions**: If set to "Android apps", you must add:
+  - Package name: `com.anonymous.urbanwatchpurok`
+  - SHA-1 fingerprint: get it from EAS with `eas credentials`
+- **API restrictions**: Must include "Maps SDK for Android" (and Maps Static API if using hybrid)
+- **Easiest for dev**: Set "None" for both restrictions, then tighten later
+
+### 4. Map Type Fallback
+
+If satellite/hybrid tiles are blank but the Google watermark shows, the key works but lacks satellite permissions. Use `mapType="standard"` as a safe default:
+
+```tsx
+<MapView mapType="standard" ... />
+```
+
+### 5. Billing Must Be Active
+
+Google Maps Platform requires an active billing account linked to the Cloud project — even for the free $200/month tier. Without billing, the SDK loads (watermark visible) but tiles won't render.
+
+Check: [Google Cloud Console → Billing](https://console.cloud.google.com/billing)
+
+### 6. SHA-1 Fingerprint Must Match EAS Keystore
+
+Run `eas credentials` → compare the SHA-1 fingerprint with what's registered in Cloud Console under your API key's Android app restrictions. They must match exactly.
+
+### 7. Nuclear Option — Temporarily Remove ALL Restrictions
+
+If tiles are still blank after confirming billing, APIs, and SHA-1:
+1. Go to API Credentials → click the key
+2. Set **Application restrictions** → None
+3. Set **API restrictions** → Don't restrict key
+4. Save → wait 5 min → test APK (no rebuild needed, restrictions are server-side)
+5. If map works → a restriction was wrong. Re-add them one by one.
+
+## Debugging in Production
+
+A visible banner in `map.tsx` shows `API Key: NOT SET` if the env var is missing. Remove the `debugStyles` block and the banner JSX once the map is confirmed working.
+
+## Quick Fixes Summary
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Completely blank map, no watermark | Key is `undefined` | Add key to `eas.json` env block (ALL profiles) |
+| Watermark visible, tiles blank (standard) | API restrictions blocking requests | Remove all key restrictions temporarily to test |
+| Watermark visible, tiles blank (standard) | Billing not active | Link billing account to Cloud project |
+| Watermark visible, tiles blank (hybrid only) | Missing satellite API | Enable Maps Static API or use `mapType="standard"` |
+| Map works locally, blank in APK | Expo Go uses Expo's key, not yours | Ensure your key + Cloud Console are correctly set up |
+| "This API key is not authorized" | SHA-1 or package mismatch | Run `eas credentials`, match SHA-1 in Cloud Console |

@@ -50,6 +50,20 @@ export const getMarkerColor = (
 };
 
 /**
+ * Get marker color for IoT anomalies
+ */
+export const getAnomalyMarkerColor = (anomalyType: string): string => {
+  switch (anomalyType) {
+    case 'sound_anomaly':
+      return '#7C3AED';
+    case 'anti_tampering':
+      return '#EA580C';
+    default:
+      return '#7C3AED';
+  }
+};
+
+/**
  * Process markers to jitter overlapping coordinates
  * Works with both citizen concerns and CCTV accidents
  */

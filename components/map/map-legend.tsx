@@ -1,7 +1,7 @@
 /**
  * Map Legend Component
  * 
- * Shows legend for purok territories at the bottom of the map.
+ * Shows legend for purok territories and marker types at the bottom of the map.
  */
 
 import { DesignSystem } from '@/constants/design-system';
@@ -20,6 +20,10 @@ export function MapLegend() {
             <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: '#22c55e' }]} />
                 <Text style={styles.legendText}>Selected</Text>
+            </View>
+            <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#7C3AED' }]} />
+                <Text style={styles.legendText}>Anomaly</Text>
             </View>
         </View>
     );

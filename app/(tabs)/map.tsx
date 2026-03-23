@@ -1,22 +1,15 @@
 /**
- * Map Screen - View of Verified/Ongoing Incidents
+ * Map Screen - View of Incidents & Anomalies
  * 
- * Shows TWO types of data on the map:
- * 1. Citizen Concerns (acknowledged/resolved by Purok) - Markers
- * 2. CCTV Accidents (In Progress - acknowledged by Operator) - Markers
+ * Shows THREE types of data on the map with multi-select filter toggles:
+ * 1. Citizen Concerns - Markers (blue)
+ * 2. CCTV Accidents (In Progress) - Markers (amber)
+ * 3. IoT Anomalies - Markers (purple/orange) — ALL anomalies within Brgy 176-E
  * 
- * Data Sources:
- * - Citizen Concerns: GET /api/v1/purok-leader/concerns
- * - CCTV Accidents: GET /api/v1/active-accidents (markers) + GET /api/v1/active-accidents/{id} (details)
- * 
- * PRIVACY LOGIC (unified for both citizen concerns and CCTV accidents):
- * - Photos/images shown ONLY if incident is verified (acknowledged/resolved)
- * - Only verified/acknowledged incidents appear as markers
- * - InfoCard handles the privacy display logic for images
+ * Filter: All 3 categories start active. Tap to toggle each on/off.
  */
 
 import { InfoCard } from '@/components/map/info-card';
-import { MapLegend } from '@/components/map/map-legend';
 import { PurokInfoCard } from '@/components/map/purok-info-card';
 import { BARANGAY_176E_REGION } from '@/constants/barangay-boundary';
 import { DesignSystem } from '@/constants/design-system';
@@ -25,10 +18,12 @@ import { globalStyles } from '@/constants/global-styles';
 import { mapStyles as styles } from '@/constants/map-screen.styles';
 import { PUROK_COLORS } from '@/constants/purok-colors';
 import { useAuth } from '@/context/auth-context';
+import { useAnomalyFeed } from '@/hooks/use-anomaly-feed';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
 import { fetchActiveAccidentDetail, fetchActiveAccidentMarkers, markerToEmergencyReport } from '@/services/active-accidents-service';
 import { subscribeToAccidentStatusUpdates } from '@/services/realtime-service';
 import type { EmergencyReport } from '@/types';
+import type { AnomalyLog } from '@/types/anomaly';
 import { getMarkerColor, processMarkersWithJitter, type SelectedMarker } from '@/utils/mapHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -38,9 +33,33 @@ import MapView, { Marker, Polygon } from 'react-native-maps';
 
 const { colors } = DesignSystem;
 
+type MapFilterCategory = 'citizen' | 'cctv' | 'anomaly';
+
+const ANOMALY_COLORS = {
+  sound_anomaly: '#7C3AED',
+  anti_tampering: '#EA580C',
+  default: '#7C3AED',
+} as const;
+
 export default function MapScreen() {
-  // Get auth token for authenticated requests
   const { accessToken } = useAuth();
+
+  // Filter state — all active by default
+  const [activeFilters, setActiveFilters] = useState<Set<MapFilterCategory>>(
+    () => new Set(['citizen', 'cctv', 'anomaly'])
+  );
+
+  const toggleFilter = useCallback((category: MapFilterCategory) => {
+    setActiveFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  }, []);
 
   // Citizen concerns from Pusher/API
   const { reports, loading: loadingConcerns, fetchReports } = useReportsFeed();
@@ -48,6 +67,14 @@ export default function MapScreen() {
   // CCTV accidents (ongoing)
   const [cctvAccidents, setCctvAccidents] = useState<EmergencyReport[]>([]);
   const [loadingAccidents, setLoadingAccidents] = useState(false);
+
+  // IoT Anomalies — all anomalies within Brgy 176-E regardless of purok
+  const {
+    anomalies,
+    loading: loadingAnomalies,
+    refreshAnomalies,
+    fetchAnomalies,
+  } = useAnomalyFeed({ perPage: 100 });
 
   const mapRef = useRef<MapView | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -57,7 +84,6 @@ export default function MapScreen() {
 
   // Fetch citizen concerns on mount
   useEffect(() => {
-    console.log('[MapScreen] Fetching reports...');
     fetchReports('all');
   }, [fetchReports]);
 
@@ -85,13 +111,13 @@ export default function MapScreen() {
     fetchAccidents();
   }, [fetchAccidents]);
 
-  // Refresh data when screen gains focus (e.g., coming back from other screens)
+  // Refresh data when screen gains focus
   useFocusEffect(
     useCallback(() => {
-      console.log('[MapScreen] 👁️ Screen focused - refreshing data...');
       fetchReports('all');
       fetchAccidents();
-    }, [fetchReports, fetchAccidents])
+      fetchAnomalies();
+    }, [fetchReports, fetchAccidents, fetchAnomalies])
   );
 
   // Subscribe to real-time accident status updates
@@ -175,66 +201,143 @@ export default function MapScreen() {
     await Promise.all([
       fetchReports('all'),
       fetchAccidents(),
+      refreshAnomalies(),
     ]);
     setRefreshing(false);
-  }, [fetchReports, fetchAccidents]);
+  }, [fetchReports, fetchAccidents, refreshAnomalies]);
 
-  // Show ALL citizen concerns (pending, acknowledged, resolved) on the map
-  // Previously filtered only verified - now showing all for visibility
-  const allConcerns = useMemo(() => {
-    console.log('[MapScreen] Total reports from feed:', reports.length);
-    return reports;
-  }, [reports]);
+  const allConcerns = useMemo(() => reports, [reports]);
 
-  // Combine both sources: all citizen concerns + CCTV accidents
-  const allIncidents = useMemo(() => {
-    return [...allConcerns, ...cctvAccidents];
-  }, [allConcerns, cctvAccidents]);
+  // Build separate marker arrays for each category
+  const citizenMarkers = useMemo(() => {
+    if (!activeFilters.has('citizen')) return [];
+    return processMarkersWithJitter(
+      allConcerns
+        .filter((r) => {
+          const { latitude: lat, longitude: lng } = r.coordinates ?? {};
+          return lat != null && lng != null && !isNaN(lat) && !isNaN(lng) &&
+            lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+        })
+        .map((r) => ({
+          id: r.id,
+          latitude: r.coordinates!.latitude,
+          longitude: r.coordinates!.longitude,
+          title: r.title,
+          description: r.description,
+          type: r.type,
+          severity: r.severity,
+          location: r.location,
+          timestamp: r.timestamp,
+          status: r.status,
+          source: 'citizen' as const,
+          images: r.images,
+        }))
+    );
+  }, [allConcerns, activeFilters]);
 
-  // Convert to markers (only valid coordinates)
-  const incidentMarkers = useMemo(() => {
-    return allIncidents
-      .filter((r: EmergencyReport) => {
-        const { latitude: lat, longitude: lng } = r.coordinates ?? {};
-        return lat != null && lng != null && !isNaN(lat) && !isNaN(lng) &&
-          lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+  const cctvMarkers = useMemo(() => {
+    if (!activeFilters.has('cctv')) return [];
+    return processMarkersWithJitter(
+      cctvAccidents
+        .filter((r) => {
+          const { latitude: lat, longitude: lng } = r.coordinates ?? {};
+          return lat != null && lng != null && !isNaN(lat) && !isNaN(lng) &&
+            lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+        })
+        .map((r) => ({
+          id: r.id,
+          latitude: r.coordinates!.latitude,
+          longitude: r.coordinates!.longitude,
+          title: r.title,
+          description: r.description,
+          type: r.type,
+          severity: r.severity,
+          location: r.location,
+          timestamp: r.timestamp,
+          status: r.status,
+          source: 'cctv' as const,
+          images: r.images,
+        }))
+    );
+  }, [cctvAccidents, activeFilters]);
+
+  // Convert IoT anomalies to map markers
+  const anomalyMarkers = useMemo(() => {
+    if (!activeFilters.has('anomaly')) return [];
+
+    const validAnomalies = anomalies
+      .map((a: AnomalyLog) => {
+        const rawLat = a.latitude ?? a.iot_box?.latitude;
+        const rawLng = a.longitude ?? a.iot_box?.longitude;
+        const lat = typeof rawLat === 'string' ? parseFloat(rawLat) : rawLat;
+        const lng = typeof rawLng === 'string' ? parseFloat(rawLng) : rawLng;
+
+        if (lat == null || lng == null || isNaN(lat) || isNaN(lng) ||
+            lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+          return null;
+        }
+
+        const locationParts = [
+          typeof a.location === 'object' ? a.location?.location_name : a.location,
+          typeof a.location === 'object' ? a.location?.barangay : undefined,
+          a.iot_box?.display_location || a.iot_box?.barangay,
+        ].filter(Boolean);
+
+        return {
+          id: `anomaly-${a.id}`,
+          latitude: lat,
+          longitude: lng,
+          title: a.anomaly_type_label || 'IoT Anomaly',
+          description: a.description || `Detected by ${a.iot_box?.device_name || a.iot_box?.name || 'IoT Box'}`,
+          type: a.anomaly_type,
+          severity: 'medium' as const,
+          location: locationParts.join(', ') || 'Unknown location',
+          timestamp: new Date(a.created_at),
+          status: a.is_confirmed ? 'confirmed' : 'pending',
+          source: 'anomaly' as const,
+          images: a.image_url ? [a.image_url] : a.image ? [a.image] : undefined,
+          anomalyType: a.anomaly_type,
+          isConfirmed: a.is_confirmed,
+          iotBoxName: a.iot_box?.device_name || a.iot_box?.name || a.iot_box?.location_name,
+        };
       })
-      .map((r: EmergencyReport) => ({
-        id: r.id,
-        latitude: r.coordinates!.latitude,
-        longitude: r.coordinates!.longitude,
-        title: r.title,
-        description: r.description,
-        type: r.type,
-        severity: r.severity,
-        location: r.location,
-        timestamp: r.timestamp,
-        status: r.status,
-        source: r.source,
-        images: r.images, // Include images for verified incidents
-      }));
-  }, [allIncidents]);
+      .filter(Boolean) as Array<{
+        id: string; latitude: number; longitude: number; title: string;
+        description: string; type: string; severity: string; location: string;
+        timestamp: Date; status: string; source: 'anomaly'; images?: string[];
+        anomalyType: string; isConfirmed: boolean; iotBoxName?: string;
+      }>;
 
-  // Process markers with jitter for overlapping coordinates
-  const displayedMarkers = useMemo(
-    () => processMarkersWithJitter(incidentMarkers),
-    [incidentMarkers]
-  );
+    return processMarkersWithJitter(validAnomalies);
+  }, [anomalies, activeFilters]);
 
-  // Loading state for fetching accident details
   const [loadingDetails, setLoadingDetails] = useState(false);
 
-  const handleMarkerPress = async (marker: typeof displayedMarkers[0]) => {
+  const handleMarkerPress = async (marker: { id: string; title?: string; description?: string; type?: string; severity?: string; location?: string; timestamp?: Date; status?: string; source?: string; images?: string[]; anomalyType?: string; isConfirmed?: boolean; iotBoxName?: string }) => {
+    // Anomaly marker
+    if (marker.id.startsWith('anomaly-')) {
+      const color = ANOMALY_COLORS[marker.anomalyType as keyof typeof ANOMALY_COLORS] || ANOMALY_COLORS.default;
+      setSelectedMarker({
+        id: marker.id,
+        title: marker.title || 'IoT Anomaly',
+        description: marker.description || 'IoT detected anomaly',
+        type: marker.anomalyType || 'anomaly',
+        severity: marker.isConfirmed ? 'confirmed' : 'pending',
+        location: marker.location || 'Unknown location',
+        timestamp: marker.timestamp,
+        color,
+        status: marker.isConfirmed ? 'acknowledged' : 'pending',
+        images: marker.images,
+      });
+      return;
+    }
+
     const color = getMarkerColor(marker.type as EmergencyReport['type'], marker.severity as EmergencyReport['severity']);
 
-    // Check if this is a CCTV accident (id starts with 'accident-')
-    const isCctvAccident = marker.id.startsWith('accident-');
-
-    if (isCctvAccident && accessToken) {
-      // Fetch full details from backend for CCTV accidents
+    // CCTV accident
+    if (marker.id.startsWith('accident-') && accessToken) {
       const accidentId = parseInt(marker.id.replace('accident-', ''), 10);
 
-      // Show loading state with basic info first
       setSelectedMarker({
         id: marker.id,
         title: marker.title || 'Loading...',
@@ -250,7 +353,6 @@ export default function MapScreen() {
       try {
         const details = await fetchActiveAccidentDetail(accidentId, accessToken);
         if (details) {
-          // Build location string from details
           let locationStr = marker.location || 'Unknown location';
           if (details.location) {
             const parts = [
@@ -258,16 +360,12 @@ export default function MapScreen() {
               details.location.barangay,
               details.location.landmark,
             ].filter(Boolean);
-            if (parts.length > 0) {
-              locationStr = parts.join(', ');
-            }
+            if (parts.length > 0) locationStr = parts.join(', ');
           }
 
-          // Extract images from details (same logic as citizen concerns)
-          // Images shown only if verified (handled by InfoCard privacy logic)
           let images: string[] | undefined;
           if (details.media && Array.isArray(details.media)) {
-            images = details.media.map(m => m.url).filter(Boolean);
+            images = details.media.map((m: any) => m.url).filter(Boolean);
           } else if (details.images && Array.isArray(details.images)) {
             images = details.images.filter(Boolean);
           }
@@ -281,8 +379,8 @@ export default function MapScreen() {
             location: locationStr,
             timestamp: marker.timestamp,
             color,
-            status: 'acknowledged', // CCTV accidents are acknowledged by default
-            images: images && images.length > 0 ? images : undefined, // Same privacy logic as citizen concerns
+            status: 'acknowledged',
+            images: images && images.length > 0 ? images : undefined,
           });
         }
       } catch (error) {
@@ -290,26 +388,28 @@ export default function MapScreen() {
       } finally {
         setLoadingDetails(false);
       }
-    } else {
-      // For citizen concerns, use the existing data (includes images if verified)
-      setSelectedMarker({
-        id: marker.id,
-        title: marker.title || 'Incident Report',
-        description: marker.description || 'No description available',
-        type: marker.type || 'unknown',
-        severity: marker.severity || 'low',
-        location: marker.location || 'Unknown location',
-        timestamp: marker.timestamp,
-        color,
-        status: marker.status, // Include status for privacy logic
-        images: marker.images, // Include images for verified incidents
-      });
+      return;
     }
+
+    // Citizen concern
+    setSelectedMarker({
+      id: marker.id,
+      title: marker.title || 'Incident Report',
+      description: marker.description || 'No description available',
+      type: marker.type || 'unknown',
+      severity: marker.severity || 'low',
+      location: marker.location || 'Unknown location',
+      timestamp: marker.timestamp,
+      color,
+      status: marker.status,
+      images: marker.images,
+    });
   };
 
-  const loading = loadingConcerns || loadingAccidents;
+  const loading = loadingConcerns || loadingAccidents || loadingAnomalies;
   const citizenCount = allConcerns.length;
   const cctvCount = cctvAccidents.length;
+  const anomalyCount = anomalies.length;
 
   // Helper function to zoom to coordinates
   const zoomToCoordinates = useCallback((coordinates: { latitude: number; longitude: number }[]) => {
@@ -339,35 +439,17 @@ export default function MapScreen() {
     }
   }, []);
 
-  // Zoom to citizen concerns when badge is clicked
   const handleCitizenBadgePress = useCallback(() => {
-    const coordinates = allConcerns
-      .filter((r) => {
-        const { latitude: lat, longitude: lng } = r.coordinates ?? {};
-        return lat != null && lng != null && !isNaN(lat) && !isNaN(lng);
-      })
-      .map((r) => ({
-        latitude: r.coordinates!.latitude,
-        longitude: r.coordinates!.longitude,
-      }));
+    toggleFilter('citizen');
+  }, [toggleFilter]);
 
-    zoomToCoordinates(coordinates);
-  }, [allConcerns, zoomToCoordinates]);
-
-  // Zoom to CCTV accidents when badge is clicked
   const handleCctvBadgePress = useCallback(() => {
-    const coordinates = cctvAccidents
-      .filter((r) => {
-        const { latitude: lat, longitude: lng } = r.coordinates ?? {};
-        return lat != null && lng != null && !isNaN(lat) && !isNaN(lng);
-      })
-      .map((r) => ({
-        latitude: r.coordinates!.latitude,
-        longitude: r.coordinates!.longitude,
-      }));
+    toggleFilter('cctv');
+  }, [toggleFilter]);
 
-    zoomToCoordinates(coordinates);
-  }, [cctvAccidents, zoomToCoordinates]);
+  const handleAnomalyBadgePress = useCallback(() => {
+    toggleFilter('anomaly');
+  }, [toggleFilter]);
 
   return (
     <View style={globalStyles.container}>
@@ -377,9 +459,14 @@ export default function MapScreen() {
           ref={mapRef}
           style={StyleSheet.absoluteFillObject}
           initialRegion={BARANGAY_176E_REGION}
-          mapType="hybrid"
+          mapType="satellite"
           showsCompass
+          showsBuildings
+          showsTraffic={false}
+          loadingEnabled
+          loadingIndicatorColor={colors.primary.blue}
           onMapReady={() => setMapReady(true)}
+          onMapLoaded={() => console.log('[MapScreen] Map tiles loaded successfully')}
         >
           {/* Purok Territories (Interactive Polygons) */}
           {purokBoundaries.features
@@ -422,12 +509,34 @@ export default function MapScreen() {
                 />
               );
             })}
-          {/* Incident Markers (Citizen Concerns + CCTV Accidents) */}
-          {mapReady && displayedMarkers.map((m) => (
+          {/* Citizen Markers */}
+          {mapReady && citizenMarkers.map((m) => (
             <Marker
               key={m.id}
               coordinate={{ latitude: m._lat, longitude: m._lng }}
               pinColor={getMarkerColor(m.type as EmergencyReport['type'], m.severity as EmergencyReport['severity'])}
+              title={m.title}
+              description={m.location}
+              onPress={() => handleMarkerPress(m)}
+            />
+          ))}
+          {/* CCTV Markers */}
+          {mapReady && cctvMarkers.map((m) => (
+            <Marker
+              key={m.id}
+              coordinate={{ latitude: m._lat, longitude: m._lng }}
+              pinColor={getMarkerColor(m.type as EmergencyReport['type'], m.severity as EmergencyReport['severity'])}
+              title={m.title}
+              description={m.location}
+              onPress={() => handleMarkerPress(m)}
+            />
+          ))}
+          {/* Anomaly Markers */}
+          {mapReady && anomalyMarkers.map((m) => (
+            <Marker
+              key={m.id}
+              coordinate={{ latitude: m._lat, longitude: m._lng }}
+              pinColor={ANOMALY_COLORS[m.anomalyType as keyof typeof ANOMALY_COLORS] || ANOMALY_COLORS.default}
               title={m.title}
               description={m.location}
               onPress={() => handleMarkerPress(m)}
@@ -448,19 +557,18 @@ export default function MapScreen() {
           </View>
         )}
 
-        {/* Floating Stats Card */}
+        {/* Floating Filter Bar */}
         <View style={styles.floatingStatsCard}>
           <TouchableOpacity
-            style={styles.floatingStatItem}
+            style={[styles.floatingStatItem, !activeFilters.has('citizen') && { opacity: 0.4 }]}
             onPress={handleCitizenBadgePress}
             activeOpacity={0.7}
-            disabled={citizenCount === 0}
           >
-            <View style={[styles.floatingStatIcon, { backgroundColor: '#DBEAFE' }]}>
-              <Ionicons name="people" size={14} color="#2563EB" />
+            <View style={[styles.floatingStatIcon, { backgroundColor: activeFilters.has('citizen') ? '#DBEAFE' : '#F1F5F9' }]}>
+              <Ionicons name="people" size={14} color={activeFilters.has('citizen') ? '#2563EB' : '#94A3B8'} />
             </View>
             <View style={styles.floatingStatContent}>
-              <Text style={[styles.floatingStatNumber, { color: '#2563EB' }]}>{citizenCount}</Text>
+              <Text style={[styles.floatingStatNumber, { color: activeFilters.has('citizen') ? '#2563EB' : '#94A3B8' }]}>{citizenCount}</Text>
               <Text style={styles.floatingStatLabel}>Citizen</Text>
             </View>
           </TouchableOpacity>
@@ -468,28 +576,34 @@ export default function MapScreen() {
           <View style={styles.floatingStatDivider} />
 
           <TouchableOpacity
-            style={styles.floatingStatItem}
+            style={[styles.floatingStatItem, !activeFilters.has('cctv') && { opacity: 0.4 }]}
             onPress={handleCctvBadgePress}
             activeOpacity={0.7}
-            disabled={cctvCount === 0}
           >
-            <View style={[styles.floatingStatIcon, { backgroundColor: '#FEF3C7' }]}>
-              <Ionicons name="videocam" size={14} color="#D97706" />
+            <View style={[styles.floatingStatIcon, { backgroundColor: activeFilters.has('cctv') ? '#FEF3C7' : '#F1F5F9' }]}>
+              <Ionicons name="videocam" size={14} color={activeFilters.has('cctv') ? '#D97706' : '#94A3B8'} />
             </View>
             <View style={styles.floatingStatContent}>
-              <Text style={[styles.floatingStatNumber, { color: '#D97706' }]}>{cctvCount}</Text>
+              <Text style={[styles.floatingStatNumber, { color: activeFilters.has('cctv') ? '#D97706' : '#94A3B8' }]}>{cctvCount}</Text>
               <Text style={styles.floatingStatLabel}>CCTV</Text>
             </View>
           </TouchableOpacity>
 
           <View style={styles.floatingStatDivider} />
 
-          <View style={styles.floatingStatItem}>
-            <View style={[styles.floatingStatIcon, { backgroundColor: '#D1FAE5' }]}>
-              <Ionicons name="shield-checkmark" size={12} color="#059669" />
+          <TouchableOpacity
+            style={[styles.floatingStatItem, !activeFilters.has('anomaly') && { opacity: 0.4 }]}
+            onPress={handleAnomalyBadgePress}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.floatingStatIcon, { backgroundColor: activeFilters.has('anomaly') ? '#EDE9FE' : '#F1F5F9' }]}>
+              <Ionicons name="hardware-chip" size={14} color={activeFilters.has('anomaly') ? '#7C3AED' : '#94A3B8'} />
             </View>
-            <Text style={styles.floatingVerifiedText}>Verified</Text>
-          </View>
+            <View style={styles.floatingStatContent}>
+              <Text style={[styles.floatingStatNumber, { color: activeFilters.has('anomaly') ? '#7C3AED' : '#94A3B8' }]}>{anomalyCount}</Text>
+              <Text style={styles.floatingStatLabel}>Anomaly</Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Floating Refresh Button */}
@@ -515,8 +629,6 @@ export default function MapScreen() {
           />
         )}
 
-        {/* Map Legend */}
-        <MapLegend />
 
       </View>
     </View>
