@@ -18,10 +18,10 @@ import { globalStyles } from '@/constants/global-styles';
 import { mapStyles as styles } from '@/constants/map-screen.styles';
 import { PUROK_COLORS } from '@/constants/purok-colors';
 import { useAuth } from '@/context/auth-context';
-import { useAnomalyFeed } from '@/hooks/use-anomaly-feed';
 import { useReportsFeed } from '@/hooks/use-reports-feed';
 import { fetchActiveAccidentDetail, fetchActiveAccidentMarkers, markerToEmergencyReport } from '@/services/active-accidents-service';
-import { subscribeToAccidentStatusUpdates } from '@/services/realtime-service';
+import { fetchMapAnomalies } from '@/services/anomaly-service';
+import { subscribeToAccidentStatusUpdates, subscribeToAnomalyLogs } from '@/services/realtime-service';
 import type { EmergencyReport } from '@/types';
 import type { AnomalyLog } from '@/types/anomaly';
 import { getMarkerColor, processMarkersWithJitter, type SelectedMarker } from '@/utils/mapHelpers';
@@ -68,13 +68,57 @@ export default function MapScreen() {
   const [cctvAccidents, setCctvAccidents] = useState<EmergencyReport[]>([]);
   const [loadingAccidents, setLoadingAccidents] = useState(false);
 
-  // IoT Anomalies — all anomalies within Brgy 176-E regardless of purok
-  const {
-    anomalies,
-    loading: loadingAnomalies,
-    refreshAnomalies,
-    fetchAnomalies,
-  } = useAnomalyFeed({ perPage: 100 });
+  // IoT Anomalies — all anomalies within barangay from /api/v1/map/anomalies
+  const [anomalies, setAnomalies] = useState<AnomalyLog[]>([]);
+  const [loadingAnomalies, setLoadingAnomalies] = useState(false);
+  const processedAnomalyIds = useRef<Set<number>>(new Set());
+
+  // Fetch map anomalies from the new endpoint
+  const fetchMapAnomaliesData = useCallback(async () => {
+    if (!accessToken) return;
+    setLoadingAnomalies(true);
+    try {
+      console.log('[MapScreen] Fetching map anomalies...');
+      const response = await fetchMapAnomalies(accessToken, { per_page: 100 });
+      setAnomalies(response.data);
+      processedAnomalyIds.current = new Set(response.data.map(a => a.id));
+      console.log('[MapScreen] ✅ Loaded', response.data.length, 'map anomalies');
+    } catch (error) {
+      console.error('[MapScreen] Error fetching map anomalies:', error);
+    } finally {
+      setLoadingAnomalies(false);
+    }
+  }, [accessToken]);
+
+  // Subscribe to real-time Pusher anomalies for the map
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+    const setup = async () => {
+      unsubscribe = await subscribeToAnomalyLogs((anomaly) => {
+        if (processedAnomalyIds.current.has(anomaly.id)) return;
+        processedAnomalyIds.current.add(anomaly.id);
+        console.log('[MapScreen] 🚨 Real-time anomaly for map:', anomaly.id);
+        const rawData = anomaly as any;
+        const newLog: AnomalyLog = {
+          id: anomaly.id,
+          anomaly_type: anomaly.anomaly_type,
+          anomaly_type_label: anomaly.anomaly_type_label,
+          iot_box_id: anomaly.iot_box?.id,
+          iot_box: anomaly.iot_box,
+          is_confirmed: anomaly.is_confirmed ?? false,
+          location: anomaly.location,
+          image: anomaly.image,
+          details: anomaly.details,
+          created_at: anomaly.created_at,
+          latitude: rawData.latitude ?? anomaly.iot_box?.latitude,
+          longitude: rawData.longitude ?? anomaly.iot_box?.longitude,
+        };
+        setAnomalies(prev => [newLog, ...prev]);
+      });
+    };
+    setup();
+    return () => { if (unsubscribe) unsubscribe(); };
+  }, []);
 
   const mapRef = useRef<MapView | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -82,10 +126,11 @@ export default function MapScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPurok, setSelectedPurok] = useState<{ name: string; description?: string } | null>(null);
 
-  // Fetch citizen concerns on mount
+  // Fetch citizen concerns & map anomalies on mount
   useEffect(() => {
     fetchReports('all');
-  }, [fetchReports]);
+    fetchMapAnomaliesData();
+  }, [fetchReports, fetchMapAnomaliesData]);
 
   // Fetch CCTV accidents on mount
   const fetchAccidents = useCallback(async () => {
@@ -116,8 +161,8 @@ export default function MapScreen() {
     useCallback(() => {
       fetchReports('all');
       fetchAccidents();
-      fetchAnomalies();
-    }, [fetchReports, fetchAccidents, fetchAnomalies])
+      fetchMapAnomaliesData();
+    }, [fetchReports, fetchAccidents, fetchMapAnomaliesData])
   );
 
   // Subscribe to real-time accident status updates
@@ -201,10 +246,10 @@ export default function MapScreen() {
     await Promise.all([
       fetchReports('all'),
       fetchAccidents(),
-      refreshAnomalies(),
+      fetchMapAnomaliesData(),
     ]);
     setRefreshing(false);
-  }, [fetchReports, fetchAccidents, refreshAnomalies]);
+  }, [fetchReports, fetchAccidents, fetchMapAnomaliesData]);
 
   const allConcerns = useMemo(() => reports, [reports]);
 

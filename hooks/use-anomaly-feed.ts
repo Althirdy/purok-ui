@@ -85,6 +85,8 @@ export function useAnomalyFeed(options: UseAnomalyFeedOptions = {}): UseAnomalyF
   // Refs
   const onNewAnomalyRef = useRef(onNewAnomaly);
   const processedAnomalyIds = useRef<Set<number>>(new Set());
+  // Track anomalies received via Pusher so they aren't wiped by API refresh
+  const pusherAnomalyIds = useRef<Set<number>>(new Set());
   
   // Update ref when callback changes
   useEffect(() => {
@@ -131,8 +133,19 @@ export function useAnomalyFeed(options: UseAnomalyFeedOptions = {}): UseAnomalyF
       const response = await fetchAnomalyLogs(accessToken, params);
       
       if (page === 1) {
-        setAnomalies(response.data);
-        processedAnomalyIds.current = new Set(response.data.map(a => a.id));
+        // Merge: keep Pusher-received anomalies that API didn't return
+        setAnomalies(prev => {
+          const apiIds = new Set(response.data.map(a => a.id));
+          // Keep anomalies that came from Pusher and aren't in the API response
+          const pusherOnly = prev.filter(
+            a => pusherAnomalyIds.current.has(a.id) && !apiIds.has(a.id)
+          );
+          // Update processedIds with both API and preserved Pusher anomalies
+          const merged = [...pusherOnly, ...response.data];
+          processedAnomalyIds.current = new Set(merged.map(a => a.id));
+          console.log('[AnomalyFeed] Merged:', response.data.length, 'from API +', pusherOnly.length, 'from Pusher');
+          return merged;
+        });
       } else {
         setAnomalies(prev => {
           const newAnomalies = response.data.filter(a => !processedAnomalyIds.current.has(a.id));
@@ -273,6 +286,7 @@ export function useAnomalyFeed(options: UseAnomalyFeedOptions = {}): UseAnomalyF
         }
         
         processedAnomalyIds.current.add(anomaly.id);
+        pusherAnomalyIds.current.add(anomaly.id); // Track as Pusher-sourced
         console.log('[AnomalyFeed] 🚨 New anomaly received:', anomaly.id);
         
         // Handle location - can be object or string
@@ -282,6 +296,8 @@ export function useAnomalyFeed(options: UseAnomalyFeedOptions = {}): UseAnomalyF
           anomaly.iot_box?.barangay;
         
         // Add to list (prepend for newest first)
+        // Include latitude/longitude from Pusher event so map markers work
+        const rawData = anomaly as any; // Pusher event may have extra fields
         const newAnomalyLog: AnomalyLog = {
           id: anomaly.id,
           anomaly_type: anomaly.anomaly_type,
@@ -293,7 +309,17 @@ export function useAnomalyFeed(options: UseAnomalyFeedOptions = {}): UseAnomalyF
           image: anomaly.image,
           details: anomaly.details,
           created_at: anomaly.created_at,
+          // Copy coordinates from event data for map markers
+          latitude: rawData.latitude ?? anomaly.iot_box?.latitude,
+          longitude: rawData.longitude ?? anomaly.iot_box?.longitude,
         };
+        console.log('[AnomalyFeed] Pusher anomaly coords:', {
+          id: anomaly.id,
+          lat: newAnomalyLog.latitude,
+          lng: newAnomalyLog.longitude,
+          iotBoxLat: anomaly.iot_box?.latitude,
+          iotBoxLng: anomaly.iot_box?.longitude,
+        });
         
         setAnomalies(prev => [newAnomalyLog, ...prev]);
         

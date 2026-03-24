@@ -2,10 +2,11 @@
  * Anomaly Service - API service for IoT Box / Anomaly Logs
  * 
  * Endpoints:
- * - GET /api/v1/anomaly-logs - List all anomaly logs (paginated)
+ * - GET /api/v1/anomaly-logs - List anomaly logs for purok (paginated)
  * - GET /api/v1/anomaly-logs/statistics - Dashboard statistics
  * - GET /api/v1/anomaly-logs/{id} - Get single anomaly detail
  * - PUT /api/v1/anomaly-logs/{id} - Confirm/dismiss anomaly
+ * - GET /api/v1/map/anomalies - All barangay anomalies for map (no purok filter)
  */
 
 import { httpGet, httpPut } from '@/lib/axios';
@@ -20,6 +21,7 @@ import type {
 } from '@/types/anomaly';
 
 const BASE_PATH = '/api/v1/anomaly-logs';
+const MAP_BASE_PATH = '/api/v1/map/anomalies';
 
 /**
  * Helper to ensure the details field is parsed as an array
@@ -142,6 +144,78 @@ export async function fetchAnomalyLogs(
       from: 1,
       last_page: 1,
       per_page: 15,
+      to: anomalies.length,
+      total: anomalies.length,
+    },
+  };
+}
+
+/**
+ * Fetch ALL anomalies for the barangay map (no purok filtering)
+ * Uses the new /api/v1/map/anomalies endpoint
+ * @param token - Auth token
+ * @param params - Query parameters (anomaly_type, is_confirmed, hours, per_page, page)
+ */
+export async function fetchMapAnomalies(
+  token: string,
+  params: AnomalyLogsQueryParams & { hours?: number } = {}
+): Promise<AnomalyLogsListResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.anomaly_type) searchParams.append('anomaly_type', params.anomaly_type);
+  if (params.is_confirmed !== undefined) searchParams.append('is_confirmed', String(params.is_confirmed));
+  if (params.hours) searchParams.append('hours', String(params.hours));
+  if (params.per_page) searchParams.append('per_page', String(params.per_page));
+  if (params.page) searchParams.append('page', String(params.page));
+
+  const queryString = searchParams.toString();
+  const url = `${MAP_BASE_PATH}${queryString ? `?${queryString}` : ''}`;
+
+  console.log('[AnomalyService] Fetching MAP anomalies:', url);
+
+  const response = await httpGet<any>(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  // Same parsing logic as fetchAnomalyLogs
+  let anomalies: AnomalyLog[] = [];
+  let meta: any = null;
+
+  if (Array.isArray(response.data)) {
+    anomalies = response.data;
+    meta = response.meta;
+  } else if (response.data?.anomaly_logs?.data && Array.isArray(response.data.anomaly_logs.data)) {
+    const pagination = response.data.anomaly_logs;
+    anomalies = pagination.data;
+    meta = {
+      current_page: pagination.current_page,
+      last_page: pagination.last_page,
+      per_page: pagination.per_page,
+      total: pagination.total,
+      from: pagination.from,
+      to: pagination.to,
+    };
+  } else if (response.data?.data && Array.isArray(response.data.data)) {
+    anomalies = response.data.data;
+    meta = response.data.meta || response.meta || {
+      current_page: response.data.current_page,
+      last_page: response.data.last_page,
+      per_page: response.data.per_page,
+      total: response.data.total,
+    };
+  } else if (Array.isArray(response)) {
+    anomalies = response;
+  }
+
+  console.log('[AnomalyService] Map anomalies count:', anomalies.length);
+
+  return {
+    success: response.success ?? true,
+    data: anomalies,
+    meta: meta || {
+      current_page: 1,
+      from: 1,
+      last_page: 1,
+      per_page: 100,
       to: anomalies.length,
       total: anomalies.length,
     },

@@ -139,7 +139,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const email = raw?.email ?? raw?.emailAddress ?? '';
     const phoneNumber = raw?.phoneNumber ?? raw?.phone_number ?? raw?.phone ?? '';
-    const address = raw?.officeAddress ?? raw?.address ?? '';
+    const address = raw?.assigned_brgy ?? raw?.assignedBrgy ?? raw?.assigned_barangay ?? raw?.officeAddress ?? raw?.office_address ?? raw?.address ?? '';
+    console.log('[Auth] Purok/Address fields:', { purokName, address });
     // Prefer the full URL if available, otherwise use the path
     const profilePicture = raw?.profilePhotoUrl ?? raw?.profile_photo_url ?? raw?.profile_photo_path ?? raw?.profilePicture ?? raw?.profile_picture ?? raw?.avatar ?? raw?.avatarUrl ?? raw?.avatar_url ?? '';
     return { id, name, role, purokId, purokName, email, phoneNumber, address, profilePicture } as User;
