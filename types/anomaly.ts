@@ -64,6 +64,10 @@ export interface RelatedAnomaly {
   anomaly_type_label: string;
   image?: string;
   image_url?: string;    // Full URL to image (from API)
+  audio?: string;        // Audio recording path
+  audio_url?: string;    // Full URL to audio (from API)
+  video?: string;        // Video recording path
+  video_url?: string;    // Full URL to video (from API)
   created_at: string;
 }
 
@@ -79,6 +83,10 @@ export interface AnomalyLog {
   location?: AnomalyLocation | string;  // Can be object or string
   image?: string;               // Anomaly image path
   image_url?: string;           // Full URL to image (from API)
+  audio?: string;               // Audio recording path
+  audio_url?: string;           // Full URL to audio (from API)
+  video?: string;               // Video recording path
+  video_url?: string;           // Full URL to video (from API)
   details?: Array<{             // Sensor details
     vibration?: string;
     mic_left?: string;

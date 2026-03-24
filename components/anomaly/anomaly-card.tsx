@@ -131,9 +131,31 @@ function AnomalyCardComponent({ anomaly, onPress }: AnomalyCardProps) {
         </View>
       )}
 
+      {/* Media Indicators */}
+      {(anomaly.image || anomaly.image_url || anomaly.audio || anomaly.audio_url || anomaly.video || anomaly.video_url) && (
+        <View style={styles.mediaBadges}>
+          {(anomaly.image || anomaly.image_url) && (
+            <View style={styles.mediaBadge}>
+              <Ionicons name="image-outline" size={12} color="#3b82f6" />
+              <Text style={styles.mediaBadgeText}>Image</Text>
+            </View>
+          )}
+          {(anomaly.audio || anomaly.audio_url) && (
+            <View style={[styles.mediaBadge, { backgroundColor: '#f3e8ff', borderColor: '#e9d5ff' }]}>
+              <Ionicons name="mic-outline" size={12} color="#8b5cf6" />
+              <Text style={[styles.mediaBadgeText, { color: '#7c3aed' }]}>Audio</Text>
+            </View>
+          )}
+          {(anomaly.video || anomaly.video_url) && (
+            <View style={[styles.mediaBadge, { backgroundColor: '#fef3c7', borderColor: '#fde68a' }]}>
+              <Ionicons name="videocam-outline" size={12} color="#d97706" />
+              <Text style={[styles.mediaBadgeText, { color: '#b45309' }]}>Video</Text>
+            </View>
+          )}
+        </View>
+      )}
 
-
-      {/* Related Anomalies Banner - shown when there are grouped anomalies */}
+      {/* Related Anomalies Banner */}
       {anomaly.related_anomalies_count !== undefined && anomaly.related_anomalies_count > 0 && (
         <View style={styles.relatedBanner}>
           <View style={styles.relatedIconContainer}>
@@ -265,6 +287,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.text?.secondary ?? '#94a3b8',
     fontWeight: '500',
+  },
+  // Media indicator badges
+  mediaBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 52,
+    marginBottom: 8,
+    gap: 6,
+  },
+  mediaBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    gap: 3,
+  },
+  mediaBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#2563eb',
   },
   // Related anomalies banner styles (matches report-card followUpBanner)
   relatedBanner: {

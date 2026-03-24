@@ -633,18 +633,6 @@ export function ReportDetailsBody({
 
           {/* Action Buttons */}
           <View style={actionButtonStyles.buttonRow}>
-            {/* Reject Button - only show on pending status */}
-            {report.status === 'pending' && (
-              <TouchableOpacity
-                style={actionButtonStyles.rejectButton}
-                activeOpacity={0.8}
-                onPress={() => setRejectSheetVisible(true)}
-              >
-                <Ionicons name="close-circle" size={16} color={colors.semantic.error} />
-                <Text style={actionButtonStyles.rejectButtonText} numberOfLines={1} adjustsFontSizeToFit>False Alarm</Text>
-              </TouchableOpacity>
-            )}
-
             {/* Primary Action Button */}
             {report.status === 'pending' && (
               <TouchableOpacity
@@ -657,6 +645,18 @@ export function ReportDetailsBody({
               >
                 <Ionicons name="checkmark-circle" size={18} color={colors.text.inverse} />
                 <Text style={actionButtonStyles.primaryButtonText}>Acknowledge</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Reject Button - subtle text link below */}
+            {report.status === 'pending' && (
+              <TouchableOpacity
+                style={actionButtonStyles.rejectButton}
+                activeOpacity={0.8}
+                onPress={() => setRejectSheetVisible(true)}
+              >
+                <Ionicons name="close-circle" size={16} color={colors.semantic.error} />
+                <Text style={actionButtonStyles.rejectButtonText}>Mark as False Alarm</Text>
               </TouchableOpacity>
             )}
             {/* Resolve Button - Show if Acknowledged or Awaiting Confirmation */}
@@ -945,31 +945,27 @@ const followUpStyles = StyleSheet.create({
   },
 });
 
-// Styles for Action Buttons (new layout with reject)
+// Styles for Action Buttons (stacked layout for breathing room)
 const actionButtonStyles = StyleSheet.create({
   buttonRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
+    flexDirection: 'column',
+    gap: spacing.sm,
   },
   rejectButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
-    borderRadius: 16,
-    backgroundColor: colors.semantic.error + '10',
-    borderWidth: 1,
-    borderColor: colors.semantic.error + '30',
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'transparent',
     gap: spacing.xs,
   },
   rejectButtonText: {
-    fontSize: typography.fontSize.base,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.semantic.error,
   },
   primaryButton: {
-    flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

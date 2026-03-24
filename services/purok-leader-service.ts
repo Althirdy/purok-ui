@@ -259,6 +259,15 @@ export async function updateAssignedConcernStatus(
 }
 
 export function normalizeAssignedConcern(concern: AssignedConcern): EmergencyReport {
+  // Debug: Log raw media fields to see what backend sends
+  console.log(`[PurokLeaderService] Concern #${concern.id} raw media:`, {
+    images: concern.images,
+    audio: concern.audio,
+    video: (concern as any).video,
+    video_url: (concern as any).video_url,
+    attachments: (concern as any).attachments,
+    media: (concern as any).media,
+  });
   // Parse coordinates - support both formats:
   // 1. Nested: concern.location.lat / concern.location.lng
   // 2. Flat: concern.latitude / concern.longitude

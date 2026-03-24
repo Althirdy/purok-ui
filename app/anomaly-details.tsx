@@ -7,6 +7,8 @@ import { useAuth } from '@/context/auth-context';
 import { fetchAnomalyById } from '@/services/anomaly-service';
 import type { AnomalyLog, AnomalyType } from '@/types/anomaly';
 import { getIoTBoxDisplayName, getIoTBoxLocation, getLocationDisplay } from '@/types/anomaly';
+import { AudioPlayer } from '@/components/ui/audio-player';
+import { VideoPlayerModal, VideoThumbnail } from '@/components/ui/video-player';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -82,6 +84,7 @@ export default function AnomalyDetailsScreen() {
 
   const [imageError, setImageError] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
 
   // Fetch anomaly details
   const fetchDetails = useCallback(async () => {
@@ -180,9 +183,16 @@ export default function AnomalyDetailsScreen() {
   const anomalyTypeDisplay = anomaly.anomaly_type ?
     anomaly.anomaly_type.replace(/_/g, ' ').toUpperCase() : 'IOT ANOMALY';
 
-  // Use image_url from API if available, otherwise construct from image path
   const imageUrl = anomaly.image_url ||
     (anomaly.image ? `${process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me'}/storage/${anomaly.image}` : null);
+
+  // Audio URL
+  const audioUrl = anomaly.audio_url ||
+    (anomaly.audio ? `${process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me'}/storage/${anomaly.audio}` : null);
+
+  // Video URL
+  const videoUrl = anomaly.video_url ||
+    (anomaly.video ? `${process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me'}/storage/${anomaly.video}` : null);
 
   // Format timestamp safely
   const formattedTimestamp = anomaly.created_at ? formatTimestamp(anomaly.created_at) : 'Unknown time';
@@ -278,6 +288,32 @@ export default function AnomalyDetailsScreen() {
           </Animated.View>
         )}
 
+        {/* Audio Section */}
+        {audioUrl && (
+          <Animated.View
+            entering={FadeInDown.delay(220).duration(400)}
+            style={styles.section}
+          >
+            <Text style={styles.sectionLabel}>CAPTURED AUDIO</Text>
+            <AudioPlayer uri={audioUrl} label="Sound Recording" />
+          </Animated.View>
+        )}
+
+        {/* Video Section */}
+        {videoUrl && (
+          <Animated.View
+            entering={FadeInDown.delay(230).duration(400)}
+            style={styles.section}
+          >
+            <Text style={styles.sectionLabel}>CAPTURED VIDEO</Text>
+            <VideoThumbnail
+              uri={videoUrl}
+              style={styles.videoThumbnail}
+              onPress={() => setVideoPlayerUri(videoUrl)}
+            />
+          </Animated.View>
+        )}
+
         {/* Device Info Section */}
         <Animated.View
           entering={FadeInDown.delay(250).duration(400)}
@@ -343,10 +379,17 @@ export default function AnomalyDetailsScreen() {
             </View>
             <View style={styles.relatedList}>
               {anomaly.related_anomalies.map((related, index) => {
-                // Use image_url if available (full URL from API), otherwise construct from image path
                 const relatedImageUrl = related.image_url
                   || (related.image
                     ? `${process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me'}/storage/${related.image}`
+                    : null);
+                const relatedAudioUrl = related.audio_url
+                  || (related.audio
+                    ? `${process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me'}/storage/${related.audio}`
+                    : null);
+                const relatedVideoUrl = related.video_url
+                  || (related.video
+                    ? `${process.env.EXPO_PUBLIC_API_URL ?? 'https://www.urbanwatch.me'}/storage/${related.video}`
                     : null);
                 return (
                   <View
@@ -364,21 +407,45 @@ export default function AnomalyDetailsScreen() {
                       />
                     </View>
                     <View style={styles.relatedContent}>
-                      <Text style={styles.relatedTitle}>{related.anomaly_type_label}</Text>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={styles.relatedTitle}>{related.anomaly_type_label}</Text>
+                        <View style={styles.relatedIdBadge}>
+                          <Text style={styles.relatedIdText}>#{related.id}</Text>
+                        </View>
+                      </View>
                       <Text style={styles.relatedTime}>{formatTimestamp(related.created_at)}</Text>
+                      {/* Related anomaly image */}
                       {relatedImageUrl && (
-                        <Image
-                          source={{
-                            uri: relatedImageUrl,
-                            headers: { 'ngrok-skip-browser-warning': '69420' },
-                          }}
-                          style={styles.relatedImage}
-                          contentFit="cover"
-                        />
+                        <TouchableOpacity
+                          onPress={() => setImageModalVisible(true)}
+                          activeOpacity={0.8}
+                        >
+                          <Image
+                            source={{
+                              uri: relatedImageUrl,
+                              headers: { 'ngrok-skip-browser-warning': '69420' },
+                            }}
+                            style={styles.relatedImage}
+                            contentFit="cover"
+                          />
+                        </TouchableOpacity>
                       )}
-                    </View>
-                    <View style={styles.relatedIdBadge}>
-                      <Text style={styles.relatedIdText}>#{related.id}</Text>
+                      {/* Related anomaly audio */}
+                      {relatedAudioUrl && (
+                        <View style={{ marginTop: 8 }}>
+                          <AudioPlayer uri={relatedAudioUrl} label="Recording" compact />
+                        </View>
+                      )}
+                      {/* Related anomaly video */}
+                      {relatedVideoUrl && (
+                        <View style={{ marginTop: 8 }}>
+                          <VideoThumbnail
+                            uri={relatedVideoUrl}
+                            style={styles.relatedVideo}
+                            onPress={() => setVideoPlayerUri(relatedVideoUrl)}
+                          />
+                        </View>
+                      )}
                     </View>
                   </View>
                 );
@@ -411,9 +478,7 @@ export default function AnomalyDetailsScreen() {
             <Image
               source={{
                 uri: imageUrl,
-                headers: {
-                  'ngrok-skip-browser-warning': '69420',
-                }
+                headers: { 'ngrok-skip-browser-warning': '69420' }
               }}
               style={styles.fullScreenImage}
               contentFit="contain"
@@ -421,6 +486,13 @@ export default function AnomalyDetailsScreen() {
           )}
         </View>
       </Modal>
+
+      {/* Video Player Modal */}
+      <VideoPlayerModal
+        uri={videoPlayerUri}
+        visible={!!videoPlayerUri}
+        onClose={() => setVideoPlayerUri(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -709,6 +781,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: spacing.xs,
     backgroundColor: colors.background.secondary,
+  },
+  relatedVideo: {
+    width: '100%',
+    height: 100,
+    borderRadius: 8,
+  },
+  videoThumbnail: {
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+    marginTop: spacing.xs,
   },
   tapToViewOverlay: {
     position: 'absolute',

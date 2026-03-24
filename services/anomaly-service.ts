@@ -24,8 +24,10 @@ const BASE_PATH = '/api/v1/anomaly-logs';
 const MAP_BASE_PATH = '/api/v1/map/anomalies';
 
 /**
- * Helper to ensure the details field is parsed as an array
- * Database stores it as JSON text, API might return string or parsed
+ * Helper to parse anomaly details and extract embedded media (video/audio)
+ * The backend may nest video/audio data inside the details object:
+ *   details: { "0": {sensor data}, "video": {public_url, storage_path, ...}, "audio": {...} }
+ * We extract these to top-level fields and ensure details is a clean sensor data array.
  */
 function parseAnomalyDetails(anomaly: any): AnomalyLog {
   if (!anomaly) return anomaly;
@@ -40,9 +42,82 @@ function parseAnomalyDetails(anomaly: any): AnomalyLog {
     }
   }
   
+  // Extract video/audio from details before converting to array
+  // Backend may put them as: details.video = { public_url, storage_path, mime_type, ... }
+  if (anomaly.details && !Array.isArray(anomaly.details) && typeof anomaly.details === 'object') {
+    const rawDetails = anomaly.details;
+    
+    // Extract video if nested in details
+    if (rawDetails.video && typeof rawDetails.video === 'object') {
+      const vid = rawDetails.video;
+      if (!anomaly.video_url) {
+        anomaly.video_url = vid.public_url || vid.url || null;
+      }
+      if (!anomaly.video) {
+        anomaly.video = vid.storage_path || vid.path || null;
+      }
+      console.log('[AnomalyService] Extracted video from details:', anomaly.video_url);
+    }
+    
+    // Extract audio if nested in details
+    if (rawDetails.audio && typeof rawDetails.audio === 'object') {
+      const aud = rawDetails.audio;
+      if (!anomaly.audio_url) {
+        anomaly.audio_url = aud.public_url || aud.url || null;
+      }
+      if (!anomaly.audio) {
+        anomaly.audio = aud.storage_path || aud.path || null;
+      }
+      console.log('[AnomalyService] Extracted audio from details:', anomaly.audio_url);
+    }
+    
+    // Now build sensor data array from numeric keys only
+    const sensorEntries = Object.entries(rawDetails)
+      .filter(([key]) => !isNaN(Number(key)) || (key !== 'video' && key !== 'audio'))
+      .filter(([key]) => key !== 'video' && key !== 'audio')
+      .map(([, value]) => value);
+    
+    anomaly.details = sensorEntries.length > 0 ? sensorEntries : [];
+  }
+  
   // Ensure details is an array
   if (!Array.isArray(anomaly.details)) {
     anomaly.details = anomaly.details ? [anomaly.details] : [];
+  }
+  
+  // Also parse related anomalies (branching) — they may also have video/audio nested in details
+  if (anomaly.related_anomalies && Array.isArray(anomaly.related_anomalies)) {
+    anomaly.related_anomalies = anomaly.related_anomalies.map((related: any) => {
+      if (!related) return related;
+      
+      // Parse details string if needed
+      if (typeof related.details === 'string') {
+        try { related.details = JSON.parse(related.details); } catch { related.details = []; }
+      }
+      
+      // Extract video/audio from related anomaly's details
+      if (related.details && !Array.isArray(related.details) && typeof related.details === 'object') {
+        const rd = related.details;
+        if (rd.video && typeof rd.video === 'object') {
+          if (!related.video_url) related.video_url = rd.video.public_url || rd.video.url || null;
+          if (!related.video) related.video = rd.video.storage_path || rd.video.path || null;
+          console.log('[AnomalyService] Extracted video from related anomaly #' + related.id);
+        }
+        if (rd.audio && typeof rd.audio === 'object') {
+          if (!related.audio_url) related.audio_url = rd.audio.public_url || rd.audio.url || null;
+          if (!related.audio) related.audio = rd.audio.storage_path || rd.audio.path || null;
+        }
+        // Clean sensor data
+        const entries = Object.entries(rd)
+          .filter(([key]) => key !== 'video' && key !== 'audio')
+          .map(([, value]) => value);
+        related.details = entries.length > 0 ? entries : [];
+      }
+      if (!Array.isArray(related.details)) {
+        related.details = related.details ? [related.details] : [];
+      }
+      return related;
+    });
   }
   
   return anomaly;
@@ -136,9 +211,12 @@ export async function fetchAnomalyLogs(
   
   console.log('[AnomalyService] Parsed anomalies count:', anomalies.length);
   
+  // Parse each anomaly to extract embedded video/audio from details
+  const parsed = anomalies.map(parseAnomalyDetails);
+
   return {
     success: response.success ?? true,
-    data: anomalies,
+    data: parsed,
     meta: meta || {
       current_page: 1,
       from: 1,
@@ -208,9 +286,12 @@ export async function fetchMapAnomalies(
 
   console.log('[AnomalyService] Map anomalies count:', anomalies.length);
 
+  // Parse each anomaly to extract embedded video/audio from details
+  const parsed = anomalies.map(parseAnomalyDetails);
+
   return {
     success: response.success ?? true,
-    data: anomalies,
+    data: parsed,
     meta: meta || {
       current_page: 1,
       from: 1,
