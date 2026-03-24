@@ -1,8 +1,10 @@
 import { reportDetailsStyles as styles } from '@/app/report-details.styles';
 import { RejectSheet } from '@/components/news/reject-sheet';
 import { ImageViewer } from '@/components/ui/image-viewer';
+import { VideoPlayerModal, VideoThumbnail } from '@/components/ui/video-player';
 import { DesignSystem } from '@/constants/design-system';
 import type { EmergencyReport } from '@/types';
+import { isImageUrl, isVideoUrl, getVisualMedia } from '@/utils/mediaUtils';
 import {
   cleanTitle,
   formatDateReadable,
@@ -69,18 +71,27 @@ function FollowUpImage({ uri }: { uri: string }) {
   );
 }
 
-function FollowUpImages({ images, isImageUrl }: { images?: string[]; isImageUrl: (url: string) => boolean }) {
-  const validImages = images?.filter(isImageUrl) || [];
-  if (validImages.length === 0) return null;
+function FollowUpMedia({ images, onPlayVideo }: { images?: string[]; onPlayVideo: (uri: string) => void }) {
+  const visualMedia = getVisualMedia(images);
+  if (visualMedia.length === 0) return null;
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       style={{ marginTop: 8 }}
     >
-      {validImages.map((imageUrl, mediaIndex) => (
-        <FollowUpImage key={mediaIndex} uri={imageUrl} />
-      ))}
+      {visualMedia.map((url, mediaIndex) =>
+        isVideoUrl(url) ? (
+          <VideoThumbnail
+            key={mediaIndex}
+            uri={url}
+            style={{ width: 120, height: 90, borderRadius: 8, marginRight: 8 }}
+            onPress={() => onPlayVideo(url)}
+          />
+        ) : (
+          <FollowUpImage key={mediaIndex} uri={url} />
+        )
+      )}
     </ScrollView>
   );
 }
@@ -101,6 +112,7 @@ export function ReportDetailsBody({
 }: ReportDetailsBodyProps) {
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
   const [showAllUpdates, setShowAllUpdates] = useState(false);
   const [remarks, setRemarks] = useState('');
   const [rejectSheetVisible, setRejectSheetVisible] = useState(false);
@@ -162,18 +174,10 @@ export function ReportDetailsBody({
     return date.toLocaleDateString();
   };
 
-  // Filter only actual image files (exclude audio files like .m4a, .mp3, .wav)
-  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic', '.heif'];
-  const audioExtensions = ['.m4a', '.mp3', '.wav', '.ogg', '.aac', '.flac'];
-  const isImageUrl = (url: string) => {
-    if (!url || typeof url !== 'string') return false;
-    const lowerUrl = url.toLowerCase();
-    // Exclude audio files
-    if (audioExtensions.some((ext) => lowerUrl.includes(ext))) return false;
-    // Include known image extensions
-    return imageExtensions.some((ext) => lowerUrl.includes(ext));
-  };
+  // Separate visual media into images and videos
   const validImages = report.images?.filter(isImageUrl) || [];
+  const validVideos = report.images?.filter(isVideoUrl) || [];
+  const allVisualMedia = getVisualMedia(report.images);
 
   // Check if transcript is a valid transcript (not an error message)
   const isTranscriptError = report.transcript?.toLowerCase().includes('unavailable') ||
@@ -300,34 +304,49 @@ export function ReportDetailsBody({
           </>
         )}
 
-      {/* Images Gallery */}
+      {/* Media Gallery (Images + Videos) */}
       <Animated.View entering={FadeInDown.delay(350).duration(500)} style={styles.section}>
-        <Text style={styles.sectionLabel}>Photos from citizen</Text>
-        {validImages.length > 0 ? (
+        <Text style={styles.sectionLabel}>
+          {validVideos.length > 0 ? 'Photos & Videos from citizen' : 'Photos from citizen'}
+        </Text>
+        {allVisualMedia.length > 0 ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.imageGallery}
             contentContainerStyle={styles.imageGalleryContent}
           >
-            {validImages.map((imageUrl, index) => (
-              <Pressable
-                key={index}
-                style={styles.imageContainer}
-                onPress={() => handleImagePress(index)}
-              >
-                <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
-                <View style={styles.imageTapHint}>
-                  <Ionicons name="expand-outline" size={16} color={colors.text.inverse} />
-                </View>
-              </Pressable>
-            ))}
+            {allVisualMedia.map((url, index) =>
+              isVideoUrl(url) ? (
+                <VideoThumbnail
+                  key={`video-${index}`}
+                  uri={url}
+                  style={styles.imageContainer}
+                  onPress={() => setVideoPlayerUri(url)}
+                />
+              ) : (
+                <Pressable
+                  key={`img-${index}`}
+                  style={styles.imageContainer}
+                  onPress={() => {
+                    // Find index within images-only array for the image viewer
+                    const imgIndex = validImages.indexOf(url);
+                    handleImagePress(imgIndex >= 0 ? imgIndex : 0);
+                  }}
+                >
+                  <Image source={{ uri: url }} style={styles.image} resizeMode="cover" />
+                  <View style={styles.imageTapHint}>
+                    <Ionicons name="expand-outline" size={16} color={colors.text.inverse} />
+                  </View>
+                </Pressable>
+              )
+            )}
           </ScrollView>
         ) : (
           <View style={styles.noImageContainer}>
             <Ionicons name="image-outline" size={40} color={colors.neutral.gray400} />
-            <Text style={styles.noImageText}>No photos attached</Text>
-            <Text style={styles.noImageSubtext}>The citizen did not include any photos</Text>
+            <Text style={styles.noImageText}>No media attached</Text>
+            <Text style={styles.noImageSubtext}>The citizen did not include any photos or videos</Text>
           </View>
         )}
       </Animated.View>
@@ -341,6 +360,13 @@ export function ReportDetailsBody({
           onClose={() => setImageViewerVisible(false)}
         />
       )}
+
+      {/* Video Player Modal */}
+      <VideoPlayerModal
+        uri={videoPlayerUri}
+        visible={!!videoPlayerUri}
+        onClose={() => setVideoPlayerUri(null)}
+      />
 
       {/* Status Timeline - only shows phases that have been reached */}
       <Animated.View entering={FadeInDown.delay(420).duration(500)} style={styles.timelineSection}>
@@ -487,8 +513,8 @@ export function ReportDetailsBody({
                     </View>
                   </TouchableOpacity>
                 )}
-                {/* Update Media (images from follow-up) - filter out audio and broken images */}
-                <FollowUpImages images={update.images} isImageUrl={isImageUrl} />
+                {/* Update Media (images + videos from follow-up) */}
+                <FollowUpMedia images={update.images} onPlayVideo={(uri) => setVideoPlayerUri(uri)} />
               </View>
             ))}
 
