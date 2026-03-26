@@ -328,13 +328,18 @@ export default function MapScreen() {
           a.iot_box?.display_location || a.iot_box?.barangay,
         ].filter(Boolean);
 
+        // Use anomaly_type_label for display, fallback to formatted anomaly_type
+        const typeLabel = a.anomaly_type_label ||
+          (a.anomaly_type === 'sound_anomaly' ? 'Sound Anomaly' :
+           a.anomaly_type === 'anti_tampering' ? 'Anti-Tampering Alert' : 'IoT Anomaly');
+
         return {
           id: `anomaly-${a.id}`,
           latitude: lat,
           longitude: lng,
-          title: a.anomaly_type_label || 'IoT Anomaly',
-          description: a.description || `Detected by ${a.iot_box?.device_name || a.iot_box?.name || 'IoT Box'}`,
-          type: a.anomaly_type,
+          title: typeLabel,
+          description: `Detected by ${a.iot_box?.device_name || a.iot_box?.name || 'IoT Box'}`,
+          type: typeLabel,
           severity: 'medium' as const,
           location: locationParts.join(', ') || 'Unknown location',
           timestamp: new Date(a.created_at),
